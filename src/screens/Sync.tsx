@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { syncLink } from '../lib/sync';
+import { normalizeCode, syncLink } from '../lib/sync';
 import { haptic } from '../lib/format';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
@@ -114,7 +114,7 @@ export function JoinWithCode({ initial = '', onDone }: { initial?: string; onDon
           {err}
         </p>
       )}
-      <button type="submit" disabled={busy || code.replace(/[\s-]/g, '').length < 16} className="btn-accent w-full disabled:opacity-40">
+      <button type="submit" disabled={busy || !normalizeCode(code)} className="btn-accent w-full disabled:opacity-40">
         {busy ? 'Linking…' : 'Link this device'}
       </button>
     </form>
@@ -222,7 +222,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
                 ui.openSheet({
                   type: 'confirm',
                   title: 'Delete the online copy?',
-                  body: 'This turns sync off and deletes the encrypted copy from the server. Data on each device stays, but they stop syncing and the code stops working.',
+                  body: 'This turns sync off here and deletes the encrypted copy from the server. Data on each device stays. Stop sync on your other devices too, or the next one you open will upload its copy again.',
                   confirm: 'Delete online copy',
                   run: () => void store.disableSync(true).then((e) => store.toast({ text: e ?? 'Online copy deleted. Sync is off.' })),
                 })

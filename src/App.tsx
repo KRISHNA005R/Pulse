@@ -160,12 +160,15 @@ function Shell() {
   // A sync link (#sync=PULSE-…) from a QR scan: open the link screen with the code filled in.
   useEffect(() => {
     if (!state.onboarding.done) return;
-    const pending = sessionStorage.getItem('pulse-sync-pending');
-    const code = takeSyncLink() ?? pending;
-    sessionStorage.removeItem('pulse-sync-pending');
-    if (code && !store.sync.enabled) ui.resetTo('you', { name: 'sync', code });
+    const check = () => {
+      const code = takeSyncLink();
+      if (code && !store.sync.enabled) ui.resetTo('you', { name: 'sync', code });
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.onboarding.done]);
+  }, [state.onboarding.done, store.sync.enabled]);
 
   // Home-screen shortcuts and deep links: /?action=add | afford | ai, /?tab=plans|activity|you
   useEffect(() => {
