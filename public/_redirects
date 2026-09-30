@@ -1,0 +1,22 @@
+# ---- Domain: pulsemoney.in is the one true address -------------------------------------------
+# Old Netlify address. The app page and the offline worker go through a one-time data transfer
+# (browsers keep saved data per address), everything else moves permanently with a 301.
+https://pulsemoney.netlify.app/sw.js          /sw-migrate.js   200!
+http://pulsemoney.netlify.app/sw.js           /sw-migrate.js   200!
+https://pulsemoney.netlify.app/migrate.html   /migrate.html    200!
+http://pulsemoney.netlify.app/migrate.html    /migrate.html    200!
+https://pulsemoney.netlify.app/               /migrate.html    200!
+http://pulsemoney.netlify.app/                /migrate.html    200!
+https://pulsemoney.netlify.app/*              https://pulsemoney.in/:splat   301!
+http://pulsemoney.netlify.app/*               https://pulsemoney.in/:splat   301!
+
+# www and plain http go to https://pulsemoney.in
+https://www.pulsemoney.in/*                   https://pulsemoney.in/:splat   301!
+http://www.pulsemoney.in/*                    https://pulsemoney.in/:splat   301!
+http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301!
+
+# ---- Paths ----------------------------------------------------------------------------------
+# Old share links or typos land on the app instead of an error
+/app        /           301
+/home       /           301
+/about.html /about/     301

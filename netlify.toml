@@ -1,0 +1,11 @@
+# Netlify builds the app from this repository on every push to the main branch.
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

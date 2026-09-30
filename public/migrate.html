@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://pulsemoney.in/" />
+  <title>PULSE</title>
+  <meta name="theme-color" content="#17140F" />
+  <style>
+    /* Nothing to see: the same dark ground the PULSE logo animation starts on, so the hop to
+       pulsemoney.in feels like the splash beginning. */
+    html, body { margin: 0; height: 100%; background: #17140F; }
+    noscript a { position: fixed; inset: 0; display: grid; place-items: center; color: #F18460; font: 600 16px system-ui, sans-serif; }
+  </style>
+</head>
+<body>
+  <noscript><a href="https://pulsemoney.in/">Open PULSE at pulsemoney.in</a></noscript>
+  <script>
+    // Runs only on the old address (pulsemoney.netlify.app). Browsers keep saved data per address,
+    // so this hands the person's PULSE data to pulsemoney.in inside the link's #fragment,
+    // which never reaches any server. pulsemoney.in reads it once and removes it from the address bar.
+    (async function () {
+      var TARGET = 'https://pulsemoney.in';
+      // Keep where the person was going (for example /?action=add from a home-screen shortcut).
+      var next = TARGET + (location.pathname === '/migrate.html' ? '/' : location.pathname) + location.search;
+      try {
+        var params = new URLSearchParams(location.search);
+        var back = params.get('to');
+        if (location.pathname === '/migrate.html') next = TARGET + '/';
+        if (back && back.charAt(0) === '/' && back.charAt(1) !== '/') next = TARGET + back;
+      } catch (e) {}
+
+      function toB64Url(bytes) {
+        var s = '';
+        for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+
+      var hash = '';
+      try {
+        var state = localStorage.getItem('pulse-state-v1');
+        var stash = localStorage.getItem('pulse-personal-stash-v1');
+        var mode = null;
+        try { mode = state ? JSON.parse(state).mode : null; } catch (e) {}
+        // Only people with their own data need moving; the demo rebuilds itself.
+        if (state && (mode === 'personal' || stash)) {
+          var raw = new TextEncoder().encode(JSON.stringify({ v: 1, state: state, stash: stash }));
+          var zipped = null;
+          if (window.CompressionStream) {
+            zipped = await Promise.race([
+              new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer().then(function (b) { return new Uint8Array(b); }),
+              new Promise(function (r) { setTimeout(function () { r(null); }, 1500); })
+            ]);
+          }
+          if (zipped) {
+            hash = '#migrate=z.' + toB64Url(zipped);
+          } else {
+            hash = '#migrate=j.' + toB64Url(raw);
+          }
+        }
+      } catch (e) {}
+
+      // Remove the old offline copy, but never let that hold up the move.
+      var cleanup = (async function () {
+        try {
+          if (navigator.serviceWorker) {
+            var regs = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(regs.map(function (r) { return r.unregister(); }));
+          }
+          if (window.caches) {
+            var keys = await caches.keys();
+            await Promise.all(keys.map(function (k) { return caches.delete(k); }));
+          }
+        } catch (e) {}
+      })();
+      await Promise.race([cleanup, new Promise(function (r) { setTimeout(r, 300); })]);
+
+      location.replace(next + hash);
+    })();
+  </script>
+</body>
+</html>

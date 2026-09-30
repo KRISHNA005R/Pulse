@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  PULSE tokens. Colours are stored as RGB channels so Tailwind can apply alpha.
+  Light is the base palette; dark is applied for the OS preference (unless the
+  page is forced light) and for an explicit data-theme="dark".
+*/
+/*
+  PULSE tokens. Colours are RGB channels so Tailwind can apply alpha.
+  Accent is Persimmon (#EC5B2B). --accent fills buttons and bars;
+  --accent-ink is the darker shade used for orange text so it stays readable.
+*/
+:root {
+  --bg: 246 245 242;
+  --surface: 255 255 255;
+  --sunk: 237 235 230;
+  --line: 228 225 218;
+  --ink: 23 20 15;
+  --ink2: 87 82 74;
+  --ink3: 116 111 103;
+  --accent: 236 91 43;
+  --accent-ink: 173 67 31;
+  --accent-soft: 245 225 216;
+  --on-accent: 23 20 15;
+  --pill: 23 20 15;
+  --pill-fg: 236 91 43;
+  --pos: 26 122 76;
+  --warn: 150 92 6;
+  --neg: 184 52 36;
+  --font-display: 'Unbounded Variable', 'Unbounded', 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Onest Variable', 'Onest', ui-sans-serif, system-ui, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: 18 17 15;
+    --surface: 28 26 23;
+    --sunk: 38 35 31;
+    --line: 47 44 39;
+    --ink: 243 241 236;
+    --ink2: 189 184 174;
+    --ink3: 148 143 134;
+    --accent: 236 91 43;
+    --accent-ink: 241 132 96;
+    --accent-soft: 62 32 21;
+    --on-accent: 23 20 15;
+    --pill: 54 49 43;
+    --pill-fg: 241 132 96;
+    --pos: 86 200 142;
+    --warn: 232 170 70;
+    --neg: 242 128 108;
+  }
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 18 17 15;
+  --surface: 28 26 23;
+  --sunk: 38 35 31;
+  --line: 47 44 39;
+  --ink: 243 241 236;
+  --ink2: 189 184 174;
+  --ink3: 148 143 134;
+  --accent: 236 91 43;
+  --accent-ink: 241 132 96;
+  --accent-soft: 62 32 21;
+  --on-accent: 23 20 15;
+  --pill: 54 49 43;
+  --pill-fg: 241 132 96;
+  --pos: 86 200 142;
+  --warn: 232 170 70;
+  --neg: 242 128 108;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  /* Amounts in lists: Onest with tabular figures so columns line up. */
+  .num {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+  /* Hero numbers: Unbounded, wide and chunky. */
+  .num-hero {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+  }
+  .display {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  /* Section labels: small caps in Onest. */
+  .eyebrow {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgb(var(--ink3));
+  }
+  /* Press in fast, spring back out: every tappable thing feels squishy. */
+  .tap {
+    transition: transform 0.45s cubic-bezier(0.34, 1.9, 0.5, 1), background-color 0.15s ease, opacity 0.15s ease;
+  }
+  .tap:active {
+    transform: scale(0.95);
+    transition-duration: 0.08s;
+  }
+  /* A light sweep across text or a surface. */
+  .shine {
+    background-image: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.45) 50%, transparent 70%);
+    background-size: 60% 100%;
+    background-repeat: no-repeat;
+  }
+  .focus-ring:focus-visible,
+  button:focus-visible,
+  a:focus-visible,
+  [role='button']:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2.5px solid rgb(var(--accent));
+    outline-offset: 2px;
+  }
+  .field {
+    @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[15px] text-ink placeholder:text-ink3;
+  }
+  .btn {
+    @apply tap inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-bg;
+  }
+  .btn-accent {
+    @apply btn bg-accent text-on-accent;
+  }
+  .btn-quiet {
+    @apply btn bg-sunk text-ink;
+  }
+  .btn-ghost {
+    @apply btn text-ink2 hover:bg-sunk;
+  }
+  .chip {
+    @apply tap inline-flex min-h-[36px] items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface px-3 text-[13.5px] font-medium text-ink2;
+  }
+  .chip[aria-pressed='true'],
+  .chip[aria-checked='true'],
+  .chip[aria-selected='true'] {
+    @apply border-ink bg-ink text-bg;
+  }
+  .row-btn {
+    @apply tap flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-sunk/70;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Home hero: the amount scales with the card so even ₹1,23,45,678 stays on one line. */
+.hero-card { container-type: inline-size; }
+.hero-amt { font-size: clamp(34px, 11.5vw, 52px); line-height: 1; white-space: nowrap; }
+/* The small per-day / payday figures shrink the same way inside their half of the card. */
+.stat-amt { font-size: 20px; line-height: 1.2; }
+@supports (width: 1cqi) {
+  .hero-amt { font-size: clamp(28px, calc(100cqi / (var(--len, 6) * 0.74)), 56px); }
+  .stat-amt { font-size: clamp(14px, calc(40cqi / (var(--len, 7) * 0.62)), 21px); }
+}
+/* On the narrowest phones the two buttons stack instead of cutting their labels. */
+@container (max-width: 262px) {
+  .hero-actions { grid-template-columns: 1fr; }
+}
+
+/* Sections of a screen arrive one after another. */
+@keyframes stagger-rise { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
+.stagger > * { animation: stagger-rise .55s cubic-bezier(.2,.9,.3,1.08) both; }
+.stagger > *:nth-child(2) { animation-delay: 60ms; }
+.stagger > *:nth-child(3) { animation-delay: 120ms; }
+.stagger > *:nth-child(4) { animation-delay: 170ms; }
+.stagger > *:nth-child(5) { animation-delay: 210ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 240ms; }
+
+/* Brand sign-off at the end of Home, the You tab and the About page. */
+.brand-sig { text-align: center; }
+.brand-sig-mark { display: block; width: 100%; height: auto; margin-top: 28px; fill: rgb(var(--ink) / .085); user-select: none; }

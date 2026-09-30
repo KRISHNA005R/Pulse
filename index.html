@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en-IN" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- Primary -->
+    <title>PULSE: Safe-to-spend money app for Gen Z Bharat</title>
+    <meta name="description" content="PULSE shows what you can safely spend until payday after bills, SIPs and savings. Plan trips, split with friends and track spending. Free, no bank login." />
+    <link rel="canonical" href="__SITE_URL__/" />
+    <link rel="alternate" hreflang="en-IN" href="__SITE_URL__/" />
+    <link rel="alternate" hreflang="x-default" href="__SITE_URL__/" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="PULSE" />
+    <meta name="application-name" content="PULSE" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="theme-color" content="#F6F5F2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12110F" media="(prefers-color-scheme: dark)" />
+
+    <!-- Icons (the P. submark) -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96" />
+    <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!-- manifest is injected by vite-plugin-pwa -->
+
+    <!-- Installed app on iPhone -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="PULSE" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Open Graph (WhatsApp, Instagram, LinkedIn, Facebook) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="PULSE" />
+    <meta property="og:locale" content="en_IN" />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:title" content="PULSE: Know what you can spend, without doing the math" />
+    <meta property="og:description" content="Safe-to-spend until payday, life plans, splits with friends and SIPs in one free money app. No bank login." />
+    <meta property="og:image" content="__SITE_URL__/og-image.jpg" />
+    <meta property="og:image:secure_url" content="__SITE_URL__/og-image.jpg" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="PULSE app showing ₹2,840 safe to spend, with the line: Know what you can spend, without doing the math." />
+
+    <!-- X / Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PULSE: Know what you can spend, without doing the math" />
+    <meta name="twitter:description" content="Safe-to-spend until payday, life plans, splits and SIPs. Free, no bank login." />
+    <meta name="twitter:image" content="__SITE_URL__/og-image.jpg" />
+    <meta name="twitter:image:alt" content="PULSE app showing ₹2,840 safe to spend." />
+
+    <!-- font-preload -->
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "__SITE_URL__/#website",
+            "url": "__SITE_URL__/",
+            "name": "PULSE",
+            "alternateName": "PULSE Money",
+            "description": "Safe-to-spend money app for Gen Z Bharat.",
+            "inLanguage": "en-IN",
+            "publisher": { "@id": "__SITE_URL__/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "__SITE_URL__/#org",
+            "name": "PULSE",
+            "url": "__SITE_URL__/",
+            "logo": { "@type": "ImageObject", "url": "__SITE_URL__/icon-512.png", "width": 512, "height": 512 },
+            "slogan": "Know what you can spend, without doing the math."
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "__SITE_URL__/#app",
+            "name": "PULSE",
+            "url": "__SITE_URL__/",
+            "applicationCategory": "FinanceApplication",
+            "applicationSubCategory": "Budgeting and expense tracking",
+            "keywords": "budget app Bharat, budget app India, expense tracker, safe to spend, salary budget, split bills with friends, SIP tracker, money app for Gen Z",
+            "operatingSystem": "Any (web browser, installable as an app)",
+            "browserRequirements": "Requires JavaScript",
+            "inLanguage": "en-IN",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" },
+            "image": "__SITE_URL__/og-image.jpg",
+            "screenshot": "__SITE_URL__/screenshots/home-light.jpg",
+            "description": "PULSE shows what you can safely spend until payday after bills, SIPs and savings, with life plans, bill splitting with friends and a money assistant.",
+            "featureList": [
+              "Safe-to-spend until payday",
+              "Life plans with ahead or behind tracking",
+              "Split bills with friends and groups",
+              "Automatic monthly SIP tracking",
+              "Can I afford this? checks",
+              "Subscriptions and bill reminders",
+              "Shareable budget cards",
+              "Works offline, no bank login"
+            ],
+            "publisher": { "@id": "__SITE_URL__/#org" },
+            "creator": { "@type": "Organization", "name": "Krsna Studios" }
+          }
+        ]
+      }
+    </script>
+
+    <style>
+      /* First paint before the app loads: a real, readable screen (also what search engines read). */
+      #splash { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; gap: 18px; padding: 24px; max-width: 560px; margin: 0 auto; font-family: 'Onest Variable', 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif; color: #17140f; }
+      html { background: #f6f5f2; }
+      #splash .wm { font-family: 'Unbounded Variable', 'Unbounded', system-ui, sans-serif; font-weight: 800; font-size: 44px; letter-spacing: -0.03em; margin: 0; }
+      #splash .wm span { color: #ec5b2b; }
+      #splash h1 { font-family: 'Unbounded Variable', 'Unbounded', system-ui, sans-serif; font-weight: 600; font-size: 30px; line-height: 1.1; letter-spacing: -0.03em; margin: 0; }
+      #splash p { font-size: 16px; line-height: 1.55; color: #57524a; margin: 0; }
+      #splash ul { margin: 0; padding-left: 20px; color: #57524a; line-height: 1.7; }
+      #splash a { color: #ad431f; font-weight: 600; }
+      @media (prefers-color-scheme: dark) {
+        html { background: #12110f; }
+        #splash { color: #f3f1ec; }
+        #splash p, #splash ul { color: #bdb8ae; }
+        #splash a { color: #f18460; }
+      }
+/* splash-css:start */
+#sp { --W: min(76vw, 380px); --D: calc(var(--W) * 0.25786); --ink: #17140F; --or: #EC5B2B; position: fixed; top: 0; left: 0; right: 0; bottom: 0; height: 100vh; height: 100dvh; z-index: 2147483000; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; box-sizing: border-box; padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px); background: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; animation: spBg 3.4s linear both; }
+#sp::before { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(90% 60% at 50% 50%, rgba(236,91,43,.11) 0%, rgba(23,20,15,0) 50%), radial-gradient(130% 100% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+  animation: spHide 3.4s step-end both; }
+#sp::after { content: ''; position: absolute; inset: -60px; pointer-events: none; opacity: .09; mix-blend-mode: screen;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: spGrain .5s steps(4) infinite, spHide 3.4s step-end both; }
+#sp .spStage { position: relative; width: var(--W); aspect-ratio: 4300 / 840; animation: spCam 2.8s cubic-bezier(.2,.7,.2,1) both; }
+#sp .spWordWrap { position: absolute; inset: 0; animation: spHide 3.4s step-end both; }
+#sp svg.spWord { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; animation: spReelsIn .12s linear 0.92s both; }
+#sp .spLetter { fill: #F6F5F2; }
+#sp .spDig { fill: rgba(246,245,242,.42); }
+#sp .spRup { fill: var(--or); }
+#sp .spReel { animation: spReel var(--len) cubic-bezier(.25,.1,.3,1.12) 0.92s both;
+  --len: calc(0.42s + var(--i) * 0.1s); }
+#sp .spSheen { transform: translateX(-1200px) skewX(-18deg); animation: spSheen .75s cubic-bezier(.45,0,.3,1) 1.84s both; }
+/* Logo and tagline are one centred column, so the pair sits in the exact middle of the visible screen. */
+#sp .spGroup { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+#sp .spTag { position: relative; white-space: nowrap; margin: 0; text-align: center;
+  font: 500 clamp(12.5px, 3.6vw, 15px)/1 'Onest Variable', 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: .01em; color: rgba(246,245,242,.62);
+  animation: spTag 3.4s linear both; }
+#sp .spTag b { color: var(--or); font-weight: 600; }
+
+#sp .spCoin, #sp .spFlood, #sp .spIris, #sp .spFloor, #sp .spSpark { position: absolute; }
+#sp .spCoin { width: var(--D); height: var(--D); left: calc(var(--W) * 0.96465 - var(--D) / 2); top: calc(var(--W) * 0.15935 - var(--D) / 2);
+  transform: translate(0px, 0px) scale(0.2273); animation: spCoin 3.4s linear both, spHide 3.4s step-end both; will-change: transform; }
+#sp .spFall { position: absolute; inset: 0; perspective: 700px; animation: spFall 3.4s linear both; }
+#sp .spSpin { position: absolute; inset: 0; transform-style: preserve-3d; animation: spSpin 3.4s linear both; }
+#sp .spSpin i, #sp .spFace { position: absolute; inset: 0; border-radius: 50%; }
+#sp .spSpin i { background: #B9441B; transform: translateZ(var(--z)); }
+#sp .spFace { background: var(--or); transform: translateZ(4px); overflow: hidden; backface-visibility: hidden; box-shadow: 0 0 22px rgba(236,91,43,.45); outline: 1px solid transparent; }
+#sp .spFace.spBack { transform: rotateY(180deg) translateZ(4px); }
+#sp .spMint { position: absolute; inset: 0; border-radius: 50%; opacity: 0; animation: spMint 3.4s linear both;
+  background: radial-gradient(circle at 30% 26%, rgba(255,214,190,.55), rgba(255,214,190,0) 46%), radial-gradient(circle at 70% 80%, rgba(120,32,6,.35), rgba(120,32,6,0) 55%); }
+#sp .spMint::before { content: ''; position: absolute; inset: 9%; border-radius: 50%; border: calc(var(--D) * .025) solid rgba(23,20,15,.2); box-shadow: inset 0 0 0 calc(var(--D) * .02) rgba(255,220,200,.18); }
+#sp .spMint::after { content: ''; position: absolute; inset: -10%; background: linear-gradient(115deg, transparent 38%, rgba(255,251,244,.85) 50%, transparent 62%);
+  transform: translateX(-120%); animation: spGlint .5s cubic-bezier(.4,0,.2,1) 0.68s both; }
+#sp .spRupee { position: absolute; left: 27%; top: 25%; width: 46%; height: 50%; fill: #17140F; opacity: .88; }
+#sp .spFloor { width: calc(var(--D) * 1.6); height: calc(var(--D) * .34); left: calc(50% - var(--D) * .8); top: calc(50% + var(--D) * .52);
+  border-radius: 50%; background: radial-gradient(closest-side, rgba(236,91,43,.55), rgba(236,91,43,0)); opacity: 0; animation: spFloor 3.4s linear both; }
+#sp .spSpark { left: 50%; top: 50%; width: calc(var(--D) * .16); height: calc(var(--D) * .16); margin: calc(var(--D) * -.08); opacity: 0;
+  background: #FFD9C4; clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+  animation: spSpark .6s cubic-bezier(.1,.7,.3,1) 0.58s both; }
+#sp .spSpark:nth-child(odd) { background: var(--or); }
+#sp .spFlood { width: calc(var(--W) * 0.05860); aspect-ratio: 1; left: calc(var(--W) * 0.96465); top: calc(var(--W) * 0.15935); transform: translate(-50%, -50%);
+  border-radius: 50%; background: var(--or); opacity: 0;
+  animation: spFlood 0.32s cubic-bezier(.7,0,.85,.25) 2.52s forwards, spHide 3.4s step-end both; }
+#sp .spIris { width: 0; height: 0; left: calc(var(--W) * 0.96465); top: calc(var(--W) * 0.15935); transform: translate(-50%, -50%); border-radius: 50%;
+  box-shadow: 0 0 0 300vmax var(--or); opacity: 0; animation: spIris 0.51s cubic-bezier(.55,.05,.25,1) 2.81s forwards; }
+#sp.spOut { opacity: 0; transition: opacity .28s ease; pointer-events: none; }
+
+@keyframes spCoin {
+  0.00% { transform: translate(calc(var(--W) * -0.46465), calc(var(--W) * -0.06167)) scale(1.0000); animation-timing-function: linear; }
+  28.82% { transform: translate(calc(var(--W) * -0.46465), calc(var(--W) * -0.06167)) scale(1.0000); animation-timing-function: cubic-bezier(.65,0,.25,1); }
+  41.76% { transform: translate(0px, 0px) scale(0.2273); animation-timing-function: linear; }
+  51.18% { transform: translate(0px, 0px) scale(0.2273); animation-timing-function: cubic-bezier(.3,0,.3,1); }
+  52.94% { transform: translate(0px, 0px) scale(0.3295); animation-timing-function: cubic-bezier(.3,0,.3,1); }
+  56.47% { transform: translate(0px, 0px) scale(0.2273); animation-timing-function: linear; }
+  100.00% { transform: translate(0px, 0px) scale(0.2273); animation-timing-function: linear; }
+}
+@keyframes spSpin {
+  0.00% { transform: rotateY(0deg); animation-timing-function: linear; }
+  3.53% { transform: rotateY(0deg); animation-timing-function: cubic-bezier(.15,.55,.3,1); }
+  19.41% { transform: rotateY(1080deg); animation-timing-function: linear; }
+  28.82% { transform: rotateY(1080deg); animation-timing-function: cubic-bezier(.55,0,.35,1); }
+  41.76% { transform: rotateY(1440deg); animation-timing-function: linear; }
+  67.06% { transform: rotateY(1440deg); animation-timing-function: cubic-bezier(.5,0,.3,1); }
+  74.71% { transform: rotateY(1800deg); animation-timing-function: linear; }
+  100.00% { transform: rotateY(1800deg); animation-timing-function: linear; }
+}
+@keyframes spFall {
+  0.00% { transform: translateY(-78vh); animation-timing-function: linear; }
+  3.53% { transform: translateY(-78vh); animation-timing-function: cubic-bezier(.55,0,.9,.45); }
+  17.06% { transform: translateY(0px); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  20.00% { transform: translateY(calc(var(--W) * -0.07)); animation-timing-function: cubic-bezier(.6,0,.8,.4); }
+  22.94% { transform: translateY(0px); animation-timing-function: cubic-bezier(.2,.7,.4,1); }
+  24.41% { transform: translateY(calc(var(--W) * -0.018)); animation-timing-function: cubic-bezier(.6,0,.8,.4); }
+  25.88% { transform: translateY(0px); animation-timing-function: linear; }
+  100.00% { transform: translateY(0px); animation-timing-function: linear; }
+}
+@keyframes spMint { 0% { opacity: 1; } 31.18% { opacity: 1; } 40.00%, 100% { opacity: 0; } }
+@keyframes spFloor { 0%, 7.94% { opacity: 0; transform: scale(.4); } 17.06% { opacity: 1; transform: scale(1); }
+  20.00% { opacity: .7; transform: scale(.85); } 22.94% { opacity: 1; transform: scale(1); }
+  28.82% { opacity: .8; transform: scale(1); } 34.12%, 100% { opacity: 0; transform: scale(.5); } }
+@keyframes spSpark { 0% { opacity: 0; transform: rotate(var(--a)) translateX(calc(var(--D) * .5)) scale(.4); }
+  12% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(calc(var(--D) * (1.05 + var(--d) * .5))) scale(1.1) rotate(90deg); } }
+@keyframes spGlint { to { transform: translateX(120%); } }
+@keyframes spReel { from { transform: translateY(calc(var(--n) * -1100px)); } to { transform: translateY(0); } }
+@keyframes spReelsIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes spBg { 0%, 83.82% { background-color: #17140F; } 84.12%, 100% { background-color: transparent; } }
+@keyframes spHide { 0%, 83.82% { visibility: visible; } 84.12%, 100% { visibility: hidden; } }
+@keyframes spGrain { 0% { transform: translate(0, 0); } 25% { transform: translate(-22px, 14px); } 50% { transform: translate(16px, -26px); } 75% { transform: translate(-10px, -8px); } 100% { transform: translate(0, 0); } }
+@keyframes spCam { from { transform: scale(1.07); } to { transform: scale(1); } }
+@keyframes spSheen { to { transform: translateX(5200px) skewX(-18deg); } }
+@keyframes spTag { 0%, 54.71% { opacity: 0; transform: translateY(8px); letter-spacing: .12em; }
+  66.47%, 83.82% { opacity: 1; transform: translateY(0); letter-spacing: .01em; }
+  84.12%, 100% { opacity: 0; } }
+@keyframes spFlood { 0% { opacity: 1; } 100% { opacity: 1; width: 240vmax; } }
+@keyframes spIris { 0% { opacity: 1; width: 0; height: 0; } 100% { opacity: 1; width: 170vmax; height: 170vmax; } }
+@media (prefers-reduced-motion: reduce) {
+  #sp, #sp *, #sp::before, #sp::after { animation: none !important; }
+  #sp { animation: spQuiet 1.2s ease both !important; }
+  #sp .spFloor, #sp .spSpark, #sp .spIris, #sp .spFlood, #sp .spSheen { display: none; }
+  #sp .spTag { opacity: 1; }
+  @keyframes spQuiet { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+}
+/* splash-css:end */
+    </style>
+  </head>
+  <body>
+<!-- splash:start -->
+<div id="sp" aria-hidden="true">
+  <div class="spGroup">
+  <div class="spStage">
+    <span class="spFloor"></span>
+    <div class="spWordWrap">
+      <svg class="spWord" viewBox="0 -800 4300 840" focusable="false">
+        <defs><path id="spG0" transform="scale(1 -1)" d="M467.8 -17.2Q338.4 -17.2 241.8 31.7Q145.2 80.6 92 168.8Q38.8 257 38.8 374.9Q38.8 492.8 92 581.1Q145.2 669.4 241.8 718.3Q338.4 767.2 467.8 767.2Q597.2 767.2 693.7 718.3Q790.2 669.4 843.4 581.2Q896.6 493 896.6 375.1Q896.6 257.2 843.4 168.9Q790.2 80.6 693.7 31.7Q597.2 -17.2 467.8 -17.2ZM468.2 171Q561.6 171 613.4 224.5Q665.2 278.1 665.2 375Q665.2 472.8 613.4 525.9Q561.6 579 467.8 579Q374.8 579 322.5 525.9Q270.2 472.8 270.2 375.4Q270.2 278 322.5 224.5Q374.8 171 468.2 171Z"/><path id="spG1" transform="scale(1 -1)" d="M467 750V0H237.4V666.8L342.2 570L15.4 512.6V691.2L296.8 750Z"/><path id="spG2" transform="scale(1 -1)" d="M30.8 476Q37.6 566.2 91.1 631.6Q144.6 697 233.6 732.1Q322.6 767.2 434 767.2Q540.4 767.2 619.7 735.2Q699 703.2 743.1 646.4Q787.2 589.6 787.2 514.6Q787.2 456.4 754.7 406.2Q722.2 356 654.1 308.7Q586 261.4 477.4 212.4L286 123.8L281 182H807V0H49.8V160L372.8 337.2Q445.6 377 484.9 403.7Q524.2 430.4 540 452.6Q555.8 474.8 555.8 500.6Q555.8 528.4 540.8 548.2Q525.8 568 496.5 579.2Q467.2 590.4 425.2 590.4Q370.2 590.4 335.4 574.8Q300.6 559.2 283.1 533.3Q265.6 507.4 262.2 476Z"/><path id="spG3" transform="scale(1 -1)" d="M44.2 503.8Q48.8 576 94.7 635.5Q140.6 695 227.9 731.1Q315.2 767.2 441 767.2Q547.6 767.2 626.7 740.5Q705.8 713.8 749.6 666.3Q793.4 618.8 793.4 555.2Q793.4 504.8 762.9 462.9Q732.4 421 665.6 396.6Q598.8 372.2 490.6 373V394.4Q590.6 399.2 661.8 381.5Q733 363.8 771.3 323.5Q809.6 283.2 809.6 219.2Q809.6 150.6 764.6 97.4Q719.6 44.2 633.7 13.5Q547.8 -17.2 424.6 -17.2Q305.2 -17.2 216.2 15.5Q127.2 48.2 77.7 108.4Q28.2 168.6 24.8 250.2H256.2Q262.8 206.6 303 183.1Q343.2 159.6 424.6 159.6Q495.6 159.6 534.4 179.8Q573.2 200 573.2 237Q573.2 258.6 561.1 273.1Q549 287.6 517.7 294.6Q486.4 301.6 429.6 301.6H303.2V454.8H429.6Q504.2 454.8 532.2 472.9Q560.2 491 560.2 521.4Q560.2 555.2 526.5 572.8Q492.8 590.4 428.4 590.4Q357.2 590.4 319.9 567.7Q282.6 545 275.6 503.8Z"/><path id="spG4" transform="scale(1 -1)" d="M731.6 750V0H502V647H568L191.6 232.2L191 303.2H845.4V134H24.6V297L438 750Z"/><path id="spG5" transform="scale(1 -1)" d="M122.8 750H723.6V580.6H190.6L282.4 617.2L241.2 362.8L186.2 362.6Q207.6 400.8 245.1 431.8Q282.6 462.8 338.3 481.5Q394 500.2 469 500.2Q564.6 500.2 634.6 469.1Q704.6 438 743.3 383Q782 328 782 255.2Q782 175.4 738 114.2Q694 53 610.7 17.9Q527.4 -17.2 409.6 -17.2Q296.6 -17.2 212.4 15.8Q128.2 48.8 80.5 105.5Q32.8 162.2 27.6 231.4H258.2Q265.8 199.6 305.4 179.6Q345 159.6 409.6 159.6Q454.4 159.6 485.7 171.3Q517 183 533.8 204.5Q550.6 226 550.6 256Q550.6 284.2 534.7 306.1Q518.8 328 488.1 340.1Q457.4 352.2 412.8 352.2Q376.2 352.2 346.3 344.4Q316.4 336.6 294.5 324.2Q272.6 311.8 257.2 297.8H55.2Z"/><path id="spG6" transform="scale(1 -1)" d="M454 767.2Q554.2 767.2 631.6 736.6Q709 706 756.6 654.3Q804.2 602.6 813.6 537.8H601.2Q587.6 565.2 554 583.3Q520.4 601.4 460.2 601.4Q391.8 601.4 346.4 576.3Q301 551.2 278.5 503.3Q256 455.4 256 384.6Q256 306 280.4 254Q304.8 202 351 176.1Q397.2 150.2 462.6 150.2Q506.2 150.2 535.9 161.9Q565.6 173.6 580.9 193.8Q596.2 214 596.2 238.2Q596.2 265.2 581.4 284.5Q566.6 303.8 537.9 313.8Q509.2 323.8 466.6 323.8Q410 323.8 357.2 300.6Q304.4 277.4 257 227.2L181.8 277Q212.4 339.6 260.1 387.5Q307.8 435.4 374.3 462.9Q440.8 490.4 526.2 490.4Q620.8 490.4 688.5 459.3Q756.2 428.2 792.7 373Q829.2 317.8 829.2 246.2Q829.2 170.2 786.2 110.6Q743.2 51 661.1 16.9Q579 -17.2 458.6 -17.2Q317.6 -17.2 224.8 33.1Q132 83.4 86.3 171.8Q40.6 260.2 40.6 374.2Q40.6 488.2 86.6 577Q132.6 665.8 224.9 716.5Q317.2 767.2 454 767.2Z"/><path id="spG7" transform="scale(1 -1)" d="M117.2 0 528 631.8 527.8 568H14.6V750H741.6V565.4L386.2 0Z"/><path id="spG8" transform="scale(1 -1)" d="M452.6 767.2Q643.6 767.2 743.8 709.6Q844 652 844 549.4Q844 458.8 758.2 414Q672.4 369.2 519.4 375.4V394.8Q682.6 408.6 773.8 361Q865 313.4 865 209.2Q865 98.6 759.8 40.7Q654.6 -17.2 452.6 -17.2Q250.8 -17.2 145.5 40.7Q40.2 98.6 40.2 209.2Q40.2 313.4 131.5 361.1Q222.8 408.8 385.8 394.8V375.4Q233 369.2 147.1 414Q61.2 458.8 61.2 549.4Q61.2 652 161.4 709.6Q261.6 767.2 452.6 767.2ZM452.6 158.4Q539.6 158.4 584.6 176.9Q629.6 195.4 629.6 230.6Q629.6 266.2 584.6 284Q539.6 301.8 452.6 301.8Q365.6 301.8 320.6 284Q275.6 266.2 275.6 230.6Q275.6 195.4 320.6 176.9Q365.6 158.4 452.6 158.4ZM452.6 457.8Q504.8 457.8 540.5 465.4Q576.2 473 594.5 488Q612.8 503 612.8 524.8Q612.8 557 571.9 574.3Q531 591.6 452.6 591.6Q374.4 591.6 333.4 574.3Q292.4 557 292.4 524.8Q292.4 503 310.7 488Q329 473 364.7 465.4Q400.4 457.8 452.6 457.8Z"/><path id="spG9" transform="scale(1 -1)" d="M413.4 -17.2Q313.4 -17.2 235.9 13.4Q158.4 44 111.3 96.2Q64.2 148.4 53.8 212.2H266.2Q279.8 184.8 313.8 166.7Q347.8 148.6 407.2 148.6Q476.6 148.6 521.5 173.7Q566.4 198.8 588.9 247.2Q611.4 295.6 611.4 365.4Q611.4 444.2 587 496.1Q562.6 548 516.4 573.9Q470.2 599.8 404.8 599.8Q361.2 599.8 331.5 588.1Q301.8 576.4 286.5 556.7Q271.2 537 271.2 511.8Q271.2 485 286 466Q300.8 447 330 436.6Q359.2 426.2 400.8 426.2Q458.2 426.2 511 449.4Q563.8 472.6 610.4 522.8L685.6 473Q656 411.2 607.8 362.9Q559.6 314.6 493.5 287.1Q427.4 259.6 341.2 259.6Q246.6 259.6 178.9 290.7Q111.2 321.8 75.1 377.1Q39 432.4 38.2 503.8Q39 579.8 81.6 639.4Q124.2 699 206.8 733.1Q289.4 767.2 408.8 767.2Q549.8 767.2 642.6 716.9Q735.4 666.6 781.6 578.3Q827.8 490 826.8 375.8Q827.8 261.8 781.3 173.1Q734.8 84.4 642.9 33.6Q551 -17.2 413.4 -17.2Z"/><path id="spGR" transform="scale(1 -1)" d="M50.4 184.6V358.2H303.8Q356.4 358.2 385.4 386.8Q414.4 415.4 414.4 467.2Q414.4 519.2 385.4 547.8Q356.4 576.4 303.8 576.4H51.4V750H336Q434.4 750 504.7 715.1Q575 680.2 612.1 616.6Q649.2 553 649.2 467.2Q649.2 381.6 612.1 318Q575 254.4 504.7 219.5Q434.4 184.6 336 184.6ZM461.8 0 148.6 351H429.4L738.2 0ZM51.4 413.4V521.2H758.6V413.4ZM187 643V750.8H758.6V643Z"/>
+          <linearGradient id="spFade" gradientUnits="userSpaceOnUse" x1="0" y1="-930" x2="0" y2="170"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".12" stop-color="#fff"/><stop offset=".85" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+          <mask id="spWin" maskUnits="userSpaceOnUse" x="-300" y="-930" width="4900" height="1100"><rect x="-300" y="-930" width="4900" height="1100" fill="url(#spFade)"/></mask>
+          <clipPath id="spShape"><use href="#spP0"/><use href="#spP1"/><use href="#spP2"/><use href="#spP3"/><use href="#spP4"/></clipPath>
+          <linearGradient id="spShine" x1="0" x2="1"><stop offset="0" stop-color="#EC5B2B" stop-opacity="0"/><stop offset=".5" stop-color="#EC5B2B" stop-opacity=".95"/><stop offset="1" stop-color="#EC5B2B" stop-opacity="0"/></linearGradient></defs>
+        <g mask="url(#spWin)"><g class="spReel" style="--i:0;--n:6"><path id="spP0" class="spLetter" transform="translate(0 0) scale(1 -1)" d="M493.8 750Q592.2 750 662.5 717.2Q732.8 684.4 769.9 624.5Q807 564.6 807 484.2Q807 403.8 769.9 343.9Q732.8 284 662.5 251.2Q592.2 218.4 493.8 218.4H172.8V402H479.2Q523.2 402 547.7 423.8Q572.2 445.6 572.2 484.2Q572.2 523.6 547.7 545Q523.2 566.4 479.2 566.4H193L297.6 672.4V0H64.8V750Z"/><use href="#spG5" class="spDig" transform="translate(31 1100)"/><use href="#spGR" class="spRup" transform="translate(31 2200)"/><use href="#spG2" class="spDig" transform="translate(17 3300)"/><use href="#spG6" class="spDig" transform="translate(1 4400)"/><use href="#spG0" class="spDig" transform="translate(-32 5500)"/><use href="#spGR" class="spRup" transform="translate(31 6600)"/></g><g class="spReel" style="--i:1;--n:8"><path id="spP1" class="spLetter" transform="translate(795 0) scale(1 -1)" d="M287.6 339.6Q287.6 293.4 304.6 260Q321.6 226.6 355.7 208.5Q389.8 190.4 441.4 190.4Q494 190.4 528 208.1Q562 225.8 578.6 259.6Q595.2 293.4 595.2 339.6V750H828V327.4Q828 223.6 779.8 146.3Q731.6 69 644.8 25.9Q558 -17.2 441.4 -17.2Q325.8 -17.2 238.9 25.9Q152 69 103.4 146.3Q54.8 223.6 54.8 327.4V750H287.6Z"/><use href="#spG1" class="spDig" transform="translate(995 1100)"/><use href="#spGR" class="spRup" transform="translate(832 2200)"/><use href="#spG8" class="spDig" transform="translate(784 3300)"/><use href="#spG1" class="spDig" transform="translate(995 4400)"/><use href="#spG5" class="spDig" transform="translate(832 5500)"/><use href="#spGR" class="spRup" transform="translate(832 6600)"/><use href="#spG9" class="spDig" transform="translate(804 7700)"/><use href="#spG0" class="spDig" transform="translate(769 8800)"/></g><g class="spReel" style="--i:2;--n:10"><path id="spP2" class="spLetter" transform="translate(1649 0) scale(1 -1)" d="M297.6 750V103L193 207.2H752.4V0H64.8V750Z"/><use href="#spG8" class="spDig" transform="translate(1605 1100)"/><use href="#spGR" class="spRup" transform="translate(1653 2200)"/><use href="#spG3" class="spDig" transform="translate(1640 3300)"/><use href="#spG0" class="spDig" transform="translate(1590 4400)"/><use href="#spG1" class="spDig" transform="translate(1816 5500)"/><use href="#spGR" class="spRup" transform="translate(1653 6600)"/><use href="#spG6" class="spDig" transform="translate(1623 7700)"/><use href="#spG6" class="spDig" transform="translate(1623 8800)"/><use href="#spG1" class="spDig" transform="translate(1816 9900)"/><use href="#spGR" class="spRup" transform="translate(1653 11000)"/></g><g class="spReel" style="--i:3;--n:12"><path id="spP3" class="spLetter" transform="translate(2391 0) scale(1 -1)" d="M35.6 246.4H272Q276.4 219.8 297.9 200.6Q319.4 181.4 356.2 170.9Q393 160.4 443.4 160.4Q511.6 160.4 550.2 176.3Q588.8 192.2 588.8 224.6Q588.8 247.8 566.8 262.2Q544.8 276.6 479.8 282L348.2 292.6Q185.8 305 113.5 363.7Q41.2 422.4 41.2 520.6Q41.2 601.6 87.9 656.5Q134.6 711.4 219 739.3Q303.4 767.2 416.6 767.2Q527.2 767.2 612.8 736Q698.4 704.8 748.9 648.5Q799.4 592.2 804.2 517H567.8Q564.4 539.4 545.5 555.6Q526.6 571.8 493 580.7Q459.4 589.6 412 589.6Q349.6 589.6 313.4 574.8Q277.2 560 277.2 529.6Q277.2 508 298.5 494.1Q319.8 480.2 378.4 474.8L523.2 463Q631.4 454.6 697.5 429.5Q763.6 404.4 793.8 360.5Q824 316.6 824 251.4Q824 170.6 776 110.2Q728 49.8 641.3 16.3Q554.6 -17.2 439 -17.2Q319.8 -17.2 229.7 15.7Q139.6 48.6 88.8 108.2Q38 167.8 35.6 246.4Z"/><use href="#spG3" class="spDig" transform="translate(2404 1100)"/><use href="#spGR" class="spRup" transform="translate(2416 2200)"/><use href="#spG1" class="spDig" transform="translate(2580 3300)"/><use href="#spG8" class="spDig" transform="translate(2368 4400)"/><use href="#spG6" class="spDig" transform="translate(2386 5500)"/><use href="#spGR" class="spRup" transform="translate(2416 6600)"/><use href="#spG0" class="spDig" transform="translate(2353 7700)"/><use href="#spG9" class="spDig" transform="translate(2388 8800)"/><use href="#spG1" class="spDig" transform="translate(2580 9900)"/><use href="#spGR" class="spRup" transform="translate(2416 11000)"/><use href="#spG3" class="spDig" transform="translate(2404 12100)"/><use href="#spG9" class="spDig" transform="translate(2388 13200)"/></g><g class="spReel" style="--i:4;--n:14"><path id="spP4" class="spLetter" transform="translate(3218 0) scale(1 -1)" d="M719.8 457.2V292.8H163V457.2ZM322 375 274.6 84.8 183.6 186H755.2V0H43.6L99.6 375L43.6 750H750.2V564H183.6L274.6 665.2Z"/><use href="#spG0" class="spDig" transform="translate(3150 1100)"/><use href="#spGR" class="spRup" transform="translate(3213 2200)"/><use href="#spG9" class="spDig" transform="translate(3185 3300)"/><use href="#spG9" class="spDig" transform="translate(3185 4400)"/><use href="#spG6" class="spDig" transform="translate(3183 5500)"/><use href="#spGR" class="spRup" transform="translate(3213 6600)"/><use href="#spG0" class="spDig" transform="translate(3150 7700)"/><use href="#spG3" class="spDig" transform="translate(3200 8800)"/><use href="#spG0" class="spDig" transform="translate(3150 9900)"/><use href="#spGR" class="spRup" transform="translate(3213 11000)"/><use href="#spG8" class="spDig" transform="translate(3165 12100)"/><use href="#spG2" class="spDig" transform="translate(3199 13200)"/><use href="#spG4" class="spDig" transform="translate(3182 14300)"/><use href="#spGR" class="spRup" transform="translate(3213 15400)"/></g></g>
+        <g clip-path="url(#spShape)"><rect class="spSheen" x="0" y="-900" width="620" height="1000" fill="url(#spShine)"/></g>
+      </svg>
+    </div>
+    <span class="spSparks"><span class="spSpark" style="--a:-8deg;--d:1"></span><span class="spSpark" style="--a:28deg;--d:0.8"></span><span class="spSpark" style="--a:62deg;--d:1.1"></span><span class="spSpark" style="--a:118deg;--d:0.9"></span><span class="spSpark" style="--a:152deg;--d:1.05"></span><span class="spSpark" style="--a:188deg;--d:0.85"></span><span class="spSpark" style="--a:222deg;--d:1"></span><span class="spSpark" style="--a:258deg;--d:0.75"></span><span class="spSpark" style="--a:298deg;--d:1.1"></span><span class="spSpark" style="--a:332deg;--d:0.9"></span></span>
+    <span class="spCoin"><span class="spFall"><span class="spSpin"><i style="--z:-3.5px"></i><i style="--z:-2.5px"></i><i style="--z:-1.5px"></i><i style="--z:-0.5px"></i><i style="--z:0.5px"></i><i style="--z:1.5px"></i><i style="--z:2.5px"></i><b class="spFace"><span class="spMint"><svg class="spRupee" viewBox="10 -791 788 831"><path transform="scale(1 -1)" d="M50.4 184.6V358.2H303.8Q356.4 358.2 385.4 386.8Q414.4 415.4 414.4 467.2Q414.4 519.2 385.4 547.8Q356.4 576.4 303.8 576.4H51.4V750H336Q434.4 750 504.7 715.1Q575 680.2 612.1 616.6Q649.2 553 649.2 467.2Q649.2 381.6 612.1 318Q575 254.4 504.7 219.5Q434.4 184.6 336 184.6ZM461.8 0 148.6 351H429.4L738.2 0ZM51.4 413.4V521.2H758.6V413.4ZM187 643V750.8H758.6V643Z"/></svg></span></b><b class="spFace spBack"><span class="spMint"><svg class="spRupee" viewBox="10 -791 788 831"><path transform="scale(1 -1)" d="M50.4 184.6V358.2H303.8Q356.4 358.2 385.4 386.8Q414.4 415.4 414.4 467.2Q414.4 519.2 385.4 547.8Q356.4 576.4 303.8 576.4H51.4V750H336Q434.4 750 504.7 715.1Q575 680.2 612.1 616.6Q649.2 553 649.2 467.2Q649.2 381.6 612.1 318Q575 254.4 504.7 219.5Q434.4 184.6 336 184.6ZM461.8 0 148.6 351H429.4L738.2 0ZM51.4 413.4V521.2H758.6V413.4ZM187 643V750.8H758.6V643Z"/></svg></span></b></span></span></span>
+    <span class="spFlood"></span>
+    <span class="spIris"></span>
+  </div>
+  <p class="spTag">Know what you can <b>spend.</b></p>
+  </div>
+</div>
+<script>
+(function () {
+  var sp = document.getElementById('sp');
+  if (!sp) return;
+  var seen = false;
+  try { seen = sessionStorage.getItem('pulse-splash') === '1'; sessionStorage.setItem('pulse-splash', '1'); } catch (e) {}
+  // Once per session, and never in the way of a home-screen shortcut.
+  if (seen || /[?&]action=/.test(location.search)) { sp.remove(); return; }
+  var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var tc = document.createElement('meta');
+  tc.name = 'theme-color'; tc.id = 'sp-tc'; tc.content = '#17140F';
+  document.head.insertBefore(tc, document.head.firstChild);
+  var done = false, timers = [];
+  function end() {
+    if (done) return; done = true;
+    timers.forEach(clearTimeout);
+    tc.remove(); sp.remove();
+    removeEventListener('keydown', skip, true);
+  }
+  function skip() {
+    if (done) return;
+    tc.remove(); sp.classList.add('spOut');
+    timers.push(setTimeout(end, 300));
+  }
+  sp.addEventListener('pointerdown', skip);
+  addEventListener('keydown', skip, true);
+  timers.push(setTimeout(function () { tc.remove(); }, calm ? 800 : 2840));
+  timers.push(setTimeout(end, calm ? 1250 : 3420));
+})();
+</script>
+<!-- splash:end -->
+    <div id="root">
+      <main id="splash">
+        <p class="wm">PULSE<span>.</span></p>
+        <h1>Know what you can spend, without doing the math.</h1>
+        <p>PULSE is a free money app for Gen Z Bharat. It works out what you can safely spend until payday after bills, SIPs and the money you're saving, so you never have to do the maths yourself.</p>
+        <ul>
+          <li>Safe-to-spend until payday, updated every time money moves</li>
+          <li>Life plans like a Goa trip or a new laptop, with ahead or behind tracking</li>
+          <li>Split bills with friends and settle up in the same app</li>
+          <li>SIPs deducted automatically each month</li>
+        </ul>
+        <p><a href="/about/">What is PULSE and how does it work?</a></p>
+        <noscript><p>PULSE needs JavaScript to run. Please turn it on, or read <a href="/about/">about PULSE</a>.</p></noscript>
+      </main>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

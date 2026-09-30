@@ -1,0 +1,7 @@
+# PULSE · https://pulsemoney.in
+User-agent: *
+Allow: /
+Disallow: /migrate.html
+Disallow: /sw-migrate.js
+
+Sitemap: https://pulsemoney.in/sitemap.xml
