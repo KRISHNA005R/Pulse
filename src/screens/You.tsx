@@ -5,7 +5,7 @@ import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { detections, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { detections, incomeThisMonth, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, fmtMonthYear, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -400,20 +400,36 @@ export function IncomeScreen() {
   const ui = useUI();
   const ms = startOfMonth(state.today);
   const received = state.transactions.filter((t) => t.type === 'income' && t.date >= ms);
-  const recTotal = received.reduce((a, t) => a + t.amount, 0);
-  const expected = state.incomes.reduce((a, i) => a + i.expected, 0);
+  const m = incomeThisMonth(state);
+  const byId = new Map(m.sources.map((x) => [x.income.id, x]));
   const sts = safeToSpend(state);
+  const waiting = m.sources.filter((x) => x.pending > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const extraNote = m.extra > 0 ? ` Plus ${rupees(m.extra)} extra.` : '';
+  const summary =
+    m.expected === 0
+      ? `${rupees(m.total)} received this month.`
+      : waiting.length === 0
+        ? `All your expected income is in.${extraNote}`
+        : `${rupees(m.pending)} still to come: ${waiting.length === 1 ? `${waiting[0].income.name} ${waiting[0].date < state.today ? `(was due ${fmtDate(waiting[0].date)})` : `on ${fmtDate(waiting[0].date)}`}` : `${waiting.length} sources`}.${extraNote}`;
+  const sourceSub = (i: (typeof state.incomes)[number]) => {
+    if (i.cycle !== 'monthly') return `${incomeLabel(i.kind)} · irregular, counted when it lands`;
+    const x = byId.get(i.id);
+    if (!x) return `${incomeLabel(i.kind)} · monthly, next ${relDay(i.nextDate!, state.today).toLowerCase()}`;
+    if (x.received > 0) return `Received ✓ · next ${fmtDate(x.next)}`;
+    if (x.date < state.today) return `Due ${fmtDate(x.date)} · not logged yet`;
+    return x.date === state.today ? 'Due today' : `Next ${fmtDate(x.date)}${daysBetween(state.today, x.date) <= 6 ? ` · ${relDay(x.date, state.today).toLowerCase()}` : ''}`;
+  };
   return (
     <div>
       <TopNavigation title="Income" onBack={ui.pop} right={<button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => ui.openSheet({ type: 'income-form' })}><Icon name="plus" size={16} /> Source</button>} />
       <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-surface p-4">
         <div>
           <p className="text-[12.5px] text-ink3">Expected</p>
-          <p className="num text-[20px] font-semibold">{rupeesShort(expected)}</p>
+          <p className="num text-[20px] font-semibold">{rupeesShort(m.expected)}</p>
         </div>
         <div>
           <p className="text-[12.5px] text-ink3">Received</p>
-          <p className="num text-[20px] font-semibold text-pos">{rupeesShort(recTotal)}</p>
+          <p className="num text-[20px] font-semibold text-pos">{rupeesShort(m.total)}</p>
         </div>
         <div>
           <p className="text-[12.5px] text-ink3">Next payday</p>
@@ -421,14 +437,14 @@ export function IncomeScreen() {
         </div>
       </div>
       <div className="mt-3 px-1">
-        <ProgressBar value={recTotal / Math.max(1, expected)} label={`${Math.round((recTotal / Math.max(1, expected)) * 100)}% of expected income received`} tone="pos" height={6} />
-        <p className="mt-1.5 text-[13px] text-ink3">{recTotal >= expected ? `You've received ${rupees(recTotal - expected)} more than expected this month.` : `${rupees(expected - recTotal)} still expected this month.`}</p>
+        {m.expected > 0 && <ProgressBar value={m.fixedReceived / m.expected} label={`${Math.round((m.fixedReceived / m.expected) * 100)}% of expected income received`} tone="pos" height={6} />}
+        <p className="mt-1.5 text-[13px] text-ink3">{summary}</p>
       </div>
       <section className="mt-8" aria-labelledby="inc-src">
         <SectionHeader id="inc-src" title="Sources" />
         {state.incomes.length === 0 && <p className="px-1 py-3 text-[14px] text-ink3">No income sources. Add one so PULSE knows when your next payday is.</p>}
         {state.incomes.map((i) => (
-          <NavRow key={i.id} icon={i.kind === 'salary' ? 'briefcase' : 'spark'} label={i.name} sub={`${incomeLabel(i.kind)} · ${i.cycle === 'monthly' ? `monthly, next ${relDay(i.nextDate!, state.today).toLowerCase()}` : 'irregular, counted when it lands'}`} value={rupees(i.expected)} onClick={() => ui.openSheet({ type: 'income-form', incomeId: i.id })} />
+          <NavRow key={i.id} icon={i.kind === 'salary' ? 'briefcase' : 'spark'} label={i.name} sub={sourceSub(i)} value={rupees(i.expected)} onClick={() => ui.openSheet({ type: 'income-form', incomeId: i.id })} />
         ))}
         {state.incomes.length > 0 && <p className="mt-1 px-1 text-[12.5px] text-ink3">Tap a source to change it or remove it.</p>}
       </section>

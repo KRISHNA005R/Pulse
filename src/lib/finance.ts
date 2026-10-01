@@ -587,3 +587,56 @@ export function pendingPaydays(s: State): { income: IncomeSource; date: ISODate 
   }
   return out;
 }
+
+export interface SourceMonth {
+  income: IncomeSource;
+  /** This calendar month's payday for the source. */
+  date: ISODate;
+  received: number;
+  /** Still to come this month: the full amount until anything from this source lands. */
+  pending: number;
+  /** The payday to show next: next month's once this month's has landed. */
+  next: ISODate;
+}
+
+/**
+ * Income for the current calendar month, source by source. Money that lands from a fixed source
+ * settles that source only; anything else (freelance, a gift, a refund) is "extra" and never
+ * eats into what's still expected from a salary.
+ */
+export function incomeThisMonth(s: State): { sources: SourceMonth[]; expected: number; fixedReceived: number; pending: number; extra: number; total: number } {
+  const ms = startOfMonth(s.today);
+  const me = endOfMonth(s.today);
+  const txs = s.transactions.filter((t) => t.type === 'income' && t.date >= ms && t.date <= me);
+  const used = new Set<string>();
+  const fixed = s.incomes.filter((i) => i.cycle === 'monthly' && i.nextDate && i.expected > 0);
+  // Tagged payments first, so a guess never steals another source's money.
+  const tagged = new Map(fixed.map((i) => [i.id, txs.filter((t) => t.incomeId === i.id)]));
+  tagged.forEach((list) => list.forEach((t) => used.add(t.id)));
+  const sources = fixed.map((i): SourceMonth => {
+    const cat = incomeCategory(i.kind);
+    const mine = [...tagged.get(i.id)!];
+    if (!mine.length) {
+      const guess = txs.find((t) => !used.has(t.id) && !t.incomeId && t.category === cat && Math.abs(t.amount - i.expected) <= i.expected * 0.35);
+      if (guess) {
+        used.add(guess.id);
+        mine.push(guess);
+      }
+    }
+    let date = i.nextDate!;
+    for (let g = 0; date > me && g < 24; g++) date = addMonths(date, -1);
+    for (let g = 0; date < ms && g < 24; g++) date = addMonths(date, 1);
+    const received = mine.reduce((a, t) => a + t.amount, 0);
+    return { income: i, date, received, pending: received > 0 ? 0 : i.expected, next: received > 0 ? addMonths(date, 1) : date };
+  });
+  const total = txs.reduce((a, t) => a + t.amount, 0);
+  const fixedReceived = sources.reduce((a, x) => a + x.received, 0);
+  return {
+    sources,
+    expected: sources.reduce((a, x) => a + x.income.expected, 0),
+    fixedReceived,
+    pending: sources.reduce((a, x) => a + x.pending, 0),
+    extra: Math.max(0, total - fixedReceived),
+    total,
+  };
+}
