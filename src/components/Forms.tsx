@@ -511,6 +511,15 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
       >
         Save income source
       </button>
+      {ex && (
+        <DeleteRow
+          label="Remove this income source"
+          onDelete={() => {
+            store.deleteIncome(ex.id);
+            onDone();
+          }}
+        />
+      )}
     </div>
   );
 }

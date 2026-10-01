@@ -398,9 +398,11 @@ export function IncomeScreen() {
       </div>
       <section className="mt-8" aria-labelledby="inc-src">
         <SectionHeader id="inc-src" title="Sources" />
+        {state.incomes.length === 0 && <p className="px-1 py-3 text-[14px] text-ink3">No income sources. Add one so PULSE knows when your next payday is.</p>}
         {state.incomes.map((i) => (
           <NavRow key={i.id} icon={i.kind === 'salary' ? 'briefcase' : 'spark'} label={i.name} sub={`${incomeLabel(i.kind)} · ${i.cycle === 'monthly' ? `monthly, next ${relDay(i.nextDate!, state.today).toLowerCase()}` : 'irregular, counted when it lands'}`} value={rupees(i.expected)} onClick={() => ui.openSheet({ type: 'income-form', incomeId: i.id })} />
         ))}
+        {state.incomes.length > 0 && <p className="mt-1 px-1 text-[12.5px] text-ink3">Tap a source to change it or remove it.</p>}
       </section>
       <section className="mt-8" aria-labelledby="inc-rec">
         <SectionHeader id="inc-rec" title="Received this month" action={{ label: 'Log income', onClick: () => ui.openSheet({ type: 'composer', preset: { type: 'income' } }) }} />

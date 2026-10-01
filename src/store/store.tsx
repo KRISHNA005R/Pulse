@@ -615,6 +615,25 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** Remove an income source. Money already received from it stays in your history. */
+  const deleteIncome = useCallback(
+    (id: string) => {
+      const inc = ref.current.incomes.find((x) => x.id === id);
+      const before = ref.current;
+      commit((s) => void (s.incomes = s.incomes.filter((x) => x.id !== id)));
+      toast({
+        text: `${inc?.name ?? 'Income source'} removed. Past payments stay in your history.`,
+        action: {
+          label: 'Undo',
+          run: () => {
+            ref.current = before;
+            setState(before);
+          },
+        },
+      });
+    },
+    [commit, toast],
+  );
   const dismissDetection = useCallback((key: string) => commit((s) => void s.dismissedDetections.push(key)), [commit]);
   /** Replace everything with a person's own fresh start (built by createFresh). */
   const startPersonal = useCallback(
@@ -1007,6 +1026,7 @@ function useStoreImpl() {
     saveCategory,
     deleteCategory,
     saveIncome,
+    deleteIncome,
     dismissDetection,
     startPersonal,
     startDemo,
