@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
+import { previewSummary } from '../lib/stats';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
@@ -736,6 +737,22 @@ export function CategoriesScreen() {
   );
 }
 
+/** Plain note on the anonymous usage counts, with the exact summary this device sends. */
+function UsageStats() {
+  const { state } = useStore();
+  const [show, setShow] = useState(false);
+  return (
+    <div className="rounded-2xl border border-line bg-surface">
+      <p className="px-4 pt-3 text-[14px]">PULSE counts anonymous usage, like “3 expenses added today”, to learn what helps. Never amounts, names or what you bought.</p>
+      <button type="button" className="flex w-full items-center justify-between px-4 py-3 text-left text-[14px] font-semibold text-ink" onClick={() => setShow((x) => !x)} aria-expanded={show}>
+        See exactly what's sent
+        <Icon name="chevron" size={16} className={`text-ink3 transition-transform ${show ? 'rotate-90' : ''}`} />
+      </button>
+      {show && <pre className="mx-4 mb-4 max-h-72 overflow-auto rounded-xl bg-sunk p-3 font-mono text-[11.5px] leading-snug text-ink2">{JSON.stringify(previewSummary(state), null, 2)}</pre>}
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------
 // Settings sections
 // ------------------------------------------------------------------
@@ -784,9 +801,10 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       )}
       {section === 'privacy' && (
         <div className="flex flex-col gap-4 text-[15px] text-ink2">
-          <p>PULSE never asks for bank passwords or card numbers. This prototype keeps everything in your browser on this device.</p>
+          <p>PULSE never asks for bank passwords or card numbers. Your money data stays on your device. If you turn on sync, it's locked before upload so only your devices can open it.</p>
           <p>Shared budget cards only show the amount and line you type. Balances are never included.</p>
           <p>Everyone who opens PULSE on their own phone or laptop gets their own private copy. Nothing is shared between people.</p>
+          <UsageStats />
           {state.mode === 'demo' ? (
             <>
               <button type="button" className="btn-accent self-start" onClick={store.hasStash ? store.backToMine : store.replayOnboarding}>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI, type Route, type SheetSpec } from '../store/ui';
 import { askPulse, starterQuestions, type AIAnswer, type AIBlock, type AILink } from '../lib/assistant';
@@ -609,6 +610,7 @@ export function AIChat({ compact }: { compact?: boolean }) {
       ui.openSheet({ type: 'share-card', preset: 'weekend' });
       return;
     }
+    if (state.mode === 'personal') track('ai');
     const answer = askPulse(state, text);
     const aiId = uid('m');
     ui.setChat((c) => [...c, { id: uid('m'), role: 'user', text }, { id: aiId, role: 'ai', text: '', typing: true }]);

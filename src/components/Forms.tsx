@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
 import type { BudgetPeriod, CategoryId, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
 import { decodeBackup, encodeBackup } from '../lib/backupCode';
+import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
@@ -838,6 +839,7 @@ export function BackupPanel() {
     if (!code) return;
     try {
       await navigator.clipboard.writeText(code);
+      track('backup');
       haptic(10);
       store.toast({ text: 'Backup code copied. Paste it somewhere safe, like a note or a chat with yourself.', tone: 'good', emoji: '📋' });
     } catch {

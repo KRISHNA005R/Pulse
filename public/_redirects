@@ -18,6 +18,10 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 # ---- Sync API ---------------------------------------------------------------------------------
 /api/sync   /.netlify/functions/sync   200
 
+# ---- Anonymous usage stats (see src/lib/stats.ts) ----------------------------------------------
+/api/ping   /.netlify/functions/stats  200
+/api/stats  /.netlify/functions/stats  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301

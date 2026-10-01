@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PULSE stats</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face { font-family: 'Unbounded'; font-weight: 200 900; font-display: swap; src: url(/fonts/unbounded.woff2) format('woff2'); }
+    @font-face { font-family: 'Onest'; font-weight: 100 900; font-display: swap; src: url(/fonts/onest.woff2) format('woff2'); }
+    :root {
+      --bg: #F6F5F2; --surface: #FFFFFF; --sunk: #EDEBE6; --ink: #17140F; --ink2: #57524A; --ink3: #746F67; --line: #E4E1DA;
+      --accent: #EC5B2B; --accent-soft: #F5E1D8; --pos: #1F7A4D; --bar2: #C9C4BA;
+      --display: 'Unbounded', system-ui, sans-serif; --body: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; --bg: #12110F; --surface: #1C1A17; --sunk: #25221E; --ink: #F3F1EC; --ink2: #BDB8AE; --ink3: #948F86; --line: #2F2C27; --accent-soft: #3E2015; --pos: #4CC38A; --bar2: #4A453E; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .wm { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; font-size: 22px; }
+    .wm span { color: var(--accent); }
+    .muted { color: var(--ink3); font-size: 13px; }
+    h2 { font-family: var(--display); font-size: 15px; font-weight: 700; margin: 0 0 2px; letter-spacing: -0.01em; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+    .grid { display: grid; gap: 12px; }
+    .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 12px; }
+    .two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 12px; }
+    .kpi .n { font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px; }
+    .kpi .l { font-size: 13px; color: var(--ink2); font-weight: 600; }
+    .chart { display: flex; align-items: flex-end; gap: 2px; height: 160px; margin-top: 14px; border-bottom: 1px solid var(--line); }
+    .chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; min-width: 0; }
+    .chart .b { background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; }
+    .chart .b.new { background: var(--bar2); border-radius: 0; }
+    .chart .c:hover .b { opacity: .8; }
+    .axis { display: flex; justify-content: space-between; color: var(--ink3); font-size: 11.5px; margin-top: 6px; }
+    .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink2); margin-top: 8px; flex-wrap: wrap; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .rows { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .row .top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .row .top b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .track { height: 8px; background: var(--sunk); border-radius: 99px; margin-top: 5px; overflow: hidden; }
+    .fill { height: 100%; background: var(--accent); border-radius: 99px; }
+    .fill.pos { background: var(--pos); }
+    .ret { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .ret > div { background: var(--sunk); border-radius: 14px; padding: 10px 11px; min-width: 0; }
+    .ret .muted { font-size: 12px; line-height: 1.3; }
+    .ret .n { font-family: var(--display); font-size: clamp(17px, 4.6vw, 22px); font-weight: 700; margin: 4px 0 2px; white-space: nowrap; }
+    .row .top span:first-child::first-letter { text-transform: uppercase; }
+    .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 5; }
+    form { max-width: 380px; margin: 14vh auto 0; display: flex; flex-direction: column; gap: 12px; }
+    input { font: inherit; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 999px; padding: 13px 20px; background: var(--accent); color: #fff; cursor: pointer; }
+    .ghost { background: transparent; color: var(--ink2); padding: 8px 12px; font-weight: 600; font-size: 13px; border: 1px solid var(--line); }
+    select { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .err { color: #C2412D; font-size: 14px; }
+    .note { font-size: 12.5px; color: var(--ink3); margin-top: 10px; }
+  </style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="tip" id="tip"></div>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var tip = document.getElementById('tip');
+  var KEY = 'pulse-stats-key';
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var fmt = function (n) { return n == null ? '–' : Number(n).toLocaleString('en-IN'); };
+  var pct = function (n) { return n == null ? '–' : n + '%'; };
+  var short = function (d) { var x = new Date(d + 'T00:00:00'); return x.getDate() + ' ' + x.toLocaleString('en-IN', { month: 'short' }); };
+  function getKey() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { k ? localStorage.setItem(KEY, k) : localStorage.removeItem(KEY); } catch (e) {} }
+
+  function login(msg) {
+    app.innerHTML = '<form id="f"><div class="wm">PULSE<span>.</span> stats</div>' +
+      '<p class="muted" style="margin:0">Private. Enter your stats key.</p>' +
+      '<input id="k" type="password" autocomplete="current-password" placeholder="pulse-…" aria-label="Stats key" required>' +
+      (msg ? '<p class="err" role="alert" style="margin:0">' + esc(msg) + '</p>' : '') +
+      '<button type="submit">Open stats</button></form>';
+    document.getElementById('f').onsubmit = function (e) { e.preventDefault(); setKey(document.getElementById('k').value.trim()); load(); };
+  }
+
+  var days = 60;
+  function load() {
+    var key = getKey();
+    if (!key) return login();
+    app.innerHTML = '<p class="muted">Loading…</p>';
+    fetch('/api/stats?days=' + days, { headers: { 'x-stats-key': key }, cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 401) { setKey(''); login('That key is not right.'); return null; }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (d) { if (d) render(d); })
+      .catch(function (e) { app.innerHTML = '<p class="err">Could not load stats (' + esc(e.message) + '). Try again in a minute.</p>'; });
+  }
+
+  function bars(list, max, cls) {
+    return list.map(function (r) {
+      var w = max ? Math.round((r.n / max) * 100) : 0;
+      return '<div class="row"><div class="top"><span>' + esc(r.label) + '</span><b>' + fmt(r.n) + (r.of ? ' <span class="muted">· ' + pct(r.of) + '</span>' : '') + '</b></div><div class="track"><div class="fill ' + (cls || '') + '" style="width:' + w + '%"></div></div></div>';
+    }).join('');
+  }
+
+  function render(d) {
+    var t = d.totals;
+    var max = Math.max(1, Math.max.apply(null, d.daily.map(function (x) { return x.active + 0; })), Math.max.apply(null, d.daily.map(function (x) { return x.newcomers; })));
+    var cols = d.daily.map(function (x) {
+      var nNew = Math.min(x.newcomers, x.active);
+      var hOld = ((x.active - nNew) / max) * 100, hNew = (nNew / max) * 100;
+      return '<div class="c" data-tip="' + esc(short(x.day) + ': ' + x.active + ' active · ' + x.newcomers + ' new · ' + x.logs + ' logs' + (x.demo ? ' · ' + x.demo + ' demo only' : '')) + '">' +
+        '<div class="b" style="height:' + hOld + '%"></div><div class="b new" style="height:' + hNew + '%"></div></div>';
+    }).join('');
+    var top = d.funnel[0].n || 1;
+    var funnel = d.funnel.map(function (r) { return { label: r.label, n: r.n, of: Math.round((r.n / top) * 100) }; });
+    var f = d.features.slice().sort(function (a, b) { return b.n - a.n; });
+    var fMax = Math.max(1, f[0] ? f[0].n : 1);
+    var r = d.retention;
+    var retCell = function (label, x) { return '<div><div class="muted">' + label + '</div><div class="n">' + pct(x.pct) + '</div><div class="muted">' + fmt(x.came) + ' of ' + fmt(x.eligible) + '</div></div>'; };
+    var dev = function (list) { var m = Math.max.apply(null, list.map(function (x) { return x.n; }).concat(1)); return bars(list, m, 'pos'); };
+
+    app.innerHTML =
+      '<header><div><div class="wm">PULSE<span>.</span> stats</div><div class="muted">' + short(d.from) + ' – ' + short(d.today) + ' · anonymous counts, by device</div></div>' +
+      '<div style="display:flex;gap:8px;align-items:center"><select id="days" aria-label="Period">' +
+      [30, 60, 90, 120].map(function (n) { return '<option value="' + n + '"' + (n === days ? ' selected' : '') + '>Last ' + n + ' days</option>'; }).join('') +
+      '</select><button class="ghost" id="ref">Refresh</button><button class="ghost" id="out">Lock</button></div></header>' +
+
+      '<div class="grid kpis">' +
+      kpi('Active today', t.dau) + kpi('Active this week', t.wau) + kpi('Active this month', t.mau) +
+      kpi('Daily habit', pct(t.stickiness), 'of monthly users open it on a given day') + kpi('Devices seen', t.people, 'including people who only looked') +
+      '</div>' +
+
+      '<div class="card"><h2>Active users per day</h2><div class="muted">People using their own money (not the demo). Grey = started that day.</div>' +
+      '<div class="chart" id="chart">' + cols + '</div><div class="axis"><span>' + short(d.from) + '</span><span>' + short(d.today) + '</span></div>' +
+      '<div class="legend"><span><i style="background:var(--accent)"></i>Returning</span><span><i style="background:var(--bar2)"></i>New that day</span></div></div>' +
+
+      '<div class="grid two">' +
+      '<div class="card"><h2>Coming back</h2><div class="muted">Of people who started in this period</div><div class="ret">' +
+      retCell('Next day', r.d1) + retCell('After a week', r.w1) + retCell('After a month', r.m1) + '</div>' +
+      '<p class="note">“After a week” = used it again 7–13 days after starting. “After a month” = 28–35 days.</p></div>' +
+
+      '<div class="card"><h2>Daily habit</h2><div class="muted">Last 30 days</div><div class="ret">' +
+      '<div><div class="muted">Logs per active day</div><div class="n">' + d.habit.logsPerActiveDay + '</div></div>' +
+      '<div><div class="muted">Days with a log</div><div class="n">' + pct(d.habit.daysWithLogPct) + '</div></div>' +
+      '<div><div class="muted">Streak avg · best</div><div class="n">' + d.habit.streakAvg + ' · ' + d.habit.streakBest + '</div></div></div>' +
+      '<h2 style="margin-top:16px">Days active in the last 30</h2><div class="rows">' + bars(d.habit.daysActive, Math.max.apply(null, d.habit.daysActive.map(function (x) { return x.n; }).concat(1))) + '</div></div>' +
+
+      '<div class="card"><h2>Setup steps</h2><div class="muted">Everyone seen in the last 30 days, where they are now</div><div class="rows">' + bars(funnel, top) + '</div></div>' +
+
+      '<div class="card"><h2>Categories used this month</h2><div class="muted">Average ' + d.categories.avg + ' per person</div><div class="rows">' +
+      bars(d.categories.spread, Math.max.apply(null, d.categories.spread.map(function (x) { return x.n; }).concat(1))) + '</div></div>' +
+
+      '<div class="card"><h2>Features</h2><div class="muted">Devices that used each at least once, last 30 days</div><div class="rows">' + bars(f, fMax) + '</div></div>' +
+
+      '<div class="card"><h2>Devices</h2><div class="muted">Last 30 days</div><div class="rows">' + dev(d.devices.platform) + '</div>' +
+      '<div class="rows" style="margin-top:16px">' + dev(d.devices.mode) + '</div>' +
+      '<h2 style="margin-top:16px">App version</h2><div class="rows">' + dev(d.devices.version.map(function (v) { return { label: v.label.replace('T', ' ') + (v.label.length > 10 ? ' UTC' : ''), n: v.n }; })) + '</div></div>' +
+      '</div>' +
+      '<p class="note">One person on two devices counts twice. Nothing here can identify anyone or show amounts.</p>';
+
+    document.getElementById('days').onchange = function (e) { days = Number(e.target.value); load(); };
+    document.getElementById('ref').onclick = load;
+    document.getElementById('out').onclick = function () { setKey(''); login(); };
+    var chart = document.getElementById('chart');
+    chart.onmousemove = chart.ontouchstart = function (e) {
+      var c = e.target.closest && e.target.closest('.c');
+      if (!c) { tip.style.display = 'none'; return; }
+      var p = e.touches ? e.touches[0] : e;
+      tip.textContent = c.getAttribute('data-tip'); tip.style.display = 'block';
+      tip.style.left = Math.min(window.innerWidth - 90, Math.max(90, p.clientX)) + 'px'; tip.style.top = p.clientY + 'px';
+    };
+    chart.onmouseleave = function () { tip.style.display = 'none'; };
+  }
+
+  function kpi(label, n, sub) {
+    return '<div class="card kpi"><div class="l">' + esc(label) + '</div><div class="n">' + (typeof n === 'number' ? fmt(n) : esc(n)) + '</div>' + (sub ? '<div class="muted">' + esc(sub) + '</div>' : '') + '</div>';
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

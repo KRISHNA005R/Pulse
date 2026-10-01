@@ -21,6 +21,7 @@ import { CATEGORIES, createSeed } from '../data/seed';
 import { roundMoney, setCurrency } from '../lib/currency';
 import { burst } from '../lib/celebrate';
 import { streak } from '../lib/streak';
+import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
@@ -243,6 +244,7 @@ function useStoreImpl() {
   const [state, setState] = useState<State>(load);
   const ref = useRef(state);
   ref.current = state;
+  useEffect(() => startStats(() => ref.current), []);
   // Every amount on screen formats in this currency. The demo is a month in Bengaluru, so it stays in rupees.
   setCurrency(state.mode === 'demo' ? 'INR' : state.settings.currency);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -307,6 +309,7 @@ function useStoreImpl() {
     (input: NewTx, opts: { quiet?: boolean } = {}) => {
       const tx: Transaction = { status: 'completed', ...input, id: uid('t') } as Transaction;
       const before = streak(ref.current);
+      if (ref.current.mode === 'personal' && !opts.quiet) track(tx.type === 'income' ? 'income' : 'expense');
       const next = commit((s) => {
         s.transactions.unshift(tx);
         applyMoney(s, tx, 1);
@@ -386,6 +389,7 @@ function useStoreImpl() {
   const savePlan = useCallback(
     (plan: Omit<Plan, 'id' | 'contributions'> & { id?: string; contributions?: Plan['contributions'] }) => {
       let id = plan.id;
+      if (!id && ref.current.mode === 'personal') track('plan');
       commit((s) => {
         if (id) {
           const p = s.plans.find((x) => x.id === id);
@@ -448,6 +452,7 @@ function useStoreImpl() {
   // ---------- budgets ----------
   const saveBudget = useCallback(
     (b: Omit<Budget, 'id'> & { id?: string }) => {
+      if (!b.id && ref.current.mode === 'personal') track('budget');
       commit((s) => {
         if (b.id) Object.assign(s.budgets.find((x) => x.id === b.id)!, b);
         else s.budgets.push({ ...b, id: uid('b') } as Budget);
@@ -504,6 +509,7 @@ function useStoreImpl() {
   const addSplit = useCallback(
     (input: NewSplit) => {
       const id = uid('s');
+      if (ref.current.mode === 'personal') track('split');
       const next = commit((s) => {
         let transactionId: string | undefined;
         if (input.paidBy === 'me') {
@@ -661,6 +667,7 @@ function useStoreImpl() {
   }, []);
   /** Open the sample month. Anyone with their own data gets it parked, not replaced. */
   const exploreDemo = useCallback(() => {
+    markDemo();
     const parked = ref.current.mode === 'personal';
     if (parked) {
       writeStash(ref.current);
@@ -934,6 +941,7 @@ function useStoreImpl() {
   const enableSync = useCallback(async (): Promise<string | null> => {
     const mine = personalState();
     if (!mine) return null;
+    track('sync');
     const code = newSyncCode();
     saveSync({ code, rev: 0 });
     try {
@@ -949,6 +957,7 @@ function useStoreImpl() {
   /** Link this device to data already syncing elsewhere. Returns an error message, or null. */
   const joinSync = useCallback(
     async (input: string): Promise<string | null> => {
+      track('sync');
       const code = normalizeCode(input);
       if (!code) return 'That code doesn\'t look right. It has 16 letters and numbers after PULSE-.';
       let remote: Awaited<ReturnType<typeof pull>>;

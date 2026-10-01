@@ -3,5 +3,6 @@ User-agent: *
 Allow: /
 Disallow: /migrate.html
 Disallow: /sw-migrate.js
+Disallow: /stats/
 
 Sitemap: https://pulsemoney.in/sitemap.xml
