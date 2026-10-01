@@ -7,6 +7,9 @@ import '@fontsource/jetbrains-mono/700.css';
 import './index.css';
 
 import { MIGRATED_FLAG, receiveMigration } from './lib/migrate';
+import { setupUpdates } from './lib/update';
+
+setupUpdates();
 
 // Pick up data moved from the old address before the app reads storage.
 receiveMigration().then((result) => {

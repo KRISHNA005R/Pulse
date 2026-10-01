@@ -37,6 +37,7 @@ export default defineConfig(({ mode }) => {
   const artifact = mode === 'artifact';
   return {
     publicDir: artifact ? false : 'public',
+    define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
     plugins: [
       react(),
       siteUrl(),
@@ -46,7 +47,7 @@ export default defineConfig(({ mode }) => {
             preloadFonts(),
             VitePWA({
               registerType: 'autoUpdate',
-              injectRegister: 'script-defer',
+              injectRegister: false, // registered in src/lib/update.ts, which also keeps installed apps current
               includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png', 'og-image.jpg', 'robots.txt'],
               manifest: {
                 id: '/',

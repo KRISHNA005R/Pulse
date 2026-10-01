@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
+import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
@@ -101,7 +102,34 @@ export function YouScreen() {
       </section>
 
       <BrandSignature />
+      <AppVersion />
     </div>
+  );
+}
+
+/** Which build this is, and a way to pull the newest one on an installed app. */
+function AppVersion() {
+  const store = useStore();
+  const [checking, setChecking] = useState(false);
+  const built = BUILD_TIME ? new Date(BUILD_TIME).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : null;
+  return (
+    <p className="mt-2 flex flex-wrap items-center justify-center gap-x-2 text-center text-[12px] text-ink3">
+      {built && <span>Version of {built}</span>}
+      <button
+        type="button"
+        className="font-semibold text-accent underline-offset-2 hover:underline disabled:opacity-50"
+        disabled={checking}
+        onClick={async () => {
+          setChecking(true);
+          const found = await checkForUpdate(true);
+          setChecking(false);
+          if (found) store.toast({ text: 'Getting the new version…', emoji: '✨' });
+          else if (!updateReady()) store.toast({ text: "You're on the latest version." });
+        }}
+      >
+        {checking ? 'Checking…' : 'Check for updates'}
+      </button>
+    </p>
   );
 }
 

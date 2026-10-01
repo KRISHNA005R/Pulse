@@ -16,6 +16,7 @@ import { ActivityScreen } from './screens/Activity';
 import { GroupDetail, PersonDetail, PlanDetail, PlansScreen } from './screens/Plans';
 import { DemoGuideScreen, InstallScreen } from './screens/Learn';
 import { MIGRATED_FLAG } from './lib/migrate';
+import { applyUpdate, onUpdateReady } from './lib/update';
 import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
 
 function Screen() {
@@ -124,6 +125,13 @@ function Shell() {
     else if (moved === 'kept') toast({ text: 'You already had PULSE data on pulsemoney.in, so we kept that.' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // A new version installed while you were mid-way through something: offer it, don't force it.
+  useEffect(
+    () =>
+      onUpdateReady(() => toast({ text: 'A new version of PULSE is ready.', emoji: '✨', action: { label: 'Update', run: applyUpdate } })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   const ui = useUI();
   const initialTheme = useRef<string | null>(null);
 
