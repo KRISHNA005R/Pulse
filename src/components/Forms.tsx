@@ -5,7 +5,7 @@ import { decodeBackup, encodeBackup } from '../lib/backupCode';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
-import { addMonths, daysBetween, fmtDate, haptic, ordinal, rupees, rupeesShort } from '../lib/format';
+import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
 import { CYCLE_MONTHS, defaultAccount, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -475,60 +475,96 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
   const [auto, setAuto] = useState(ex?.autoCredit ?? false);
   const currentMain = mainIncome(state);
   const [main, setMain] = useState(ex ? currentMain?.id === ex.id : !currentMain);
+  const [removing, setRemoving] = useState(false);
+  const valid = name.trim() && parseFloat(expected) > 0;
+  // A compact switch row: label left, switch right, one short hint line.
+  const Switch = ({ on, set, label, hint }: { on: boolean; set: (v: boolean) => void; label: string; hint: string }) => (
+    <button type="button" role="switch" aria-checked={on} onClick={() => set(!on)} className="tap flex w-full items-center gap-3 px-3.5 py-2.5 text-left">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-medium leading-snug">{label}</span>
+        <span className="block truncate text-[12px] text-ink3">{hint}</span>
+      </span>
+      <span className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${on ? 'bg-accent' : 'bg-line'}`} aria-hidden="true">
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-surface shadow transition-transform ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+      </span>
+    </button>
+  );
+  const otherMain = currentMain && currentMain.id !== ex?.id ? currentMain : null;
+
   return (
-    <div className="flex flex-col gap-4">
-      <Field label="Source" htmlFor="inc-name">
-        <input id="inc-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Company, client or app" />
-      </Field>
-      <Field label="Kind" htmlFor="inc-kind">
-        <select id="inc-kind" className="field" value={kind} onChange={(e) => setKind(e.target.value as IncomeKind)}>
-          {(['salary', 'freelance', 'part-time', 'business', 'allowance', 'other'] as IncomeKind[]).map((k) => (
-            <option key={k} value={k}>
-              {k.charAt(0).toUpperCase() + k.slice(1)}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <Segmented label="Pattern" value={cycle} onChange={setCycle} options={[{ value: 'monthly', label: 'Fixed date' }, { value: 'irregular', label: 'Irregular' }]} />
-      <div className="grid grid-cols-2 gap-3">
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-[1.4fr_1fr] gap-2.5">
+        <Field label="Source" htmlFor="inc-name">
+          <input id="inc-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Company, client…" />
+        </Field>
+        <Field label="Kind" htmlFor="inc-kind">
+          <select id="inc-kind" className="field px-2.5" value={kind} onChange={(e) => setKind(e.target.value as IncomeKind)}>
+            {(['salary', 'freelance', 'part-time', 'business', 'allowance', 'other'] as IncomeKind[]).map((k) => (
+              <option key={k} value={k}>
+                {k.charAt(0).toUpperCase() + k.slice(1)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <Segmented label="Pattern" size="sm" value={cycle} onChange={setCycle} options={[{ value: 'monthly', label: 'Fixed date' }, { value: 'irregular', label: 'Irregular' }]} />
+      <div className="grid grid-cols-2 gap-2.5">
         <Field label={cycle === 'monthly' ? 'Amount' : 'Typical month'} htmlFor="inc-exp">
           <input id="inc-exp" inputMode="decimal" className="field num" value={expected} onChange={(e) => setExpected(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
-        {cycle === 'monthly' && (
+        {cycle === 'monthly' ? (
           <Field label="Next payday" htmlFor="inc-next">
-            <input id="inc-next" type="date" className="field" value={next} onChange={(e) => setNext(e.target.value)} />
+            <input id="inc-next" type="date" className="field px-2.5" value={next} onChange={(e) => setNext(e.target.value)} />
           </Field>
+        ) : (
+          <p className="self-end pb-2 text-[12.5px] leading-snug text-ink3">Counted when it lands, never in advance.</p>
         )}
       </div>
-      {cycle === 'monthly' && <Toggle checked={auto} onChange={setAuto} label="Add it automatically on payday" sub="Off: PULSE asks “did it land?” on payday, so a late salary isn't counted early." />}
       {cycle === 'monthly' && (
-        <Toggle
-          checked={main}
-          onChange={setMain}
-          label="This is my main payday"
-          sub={main ? 'Safe-to-spend lasts until this payday every month. Other salaries add to it when they land.' : currentMain && currentMain.id !== ex?.id ? `Your month runs on ${currentMain.name} (${ordinal(Number(currentMain.nextDate!.slice(8)))}). This one adds to it when it lands.` : 'Turn on if your month runs on this salary.'}
-        />
+        <div className="divide-y divide-line overflow-hidden rounded-2xl bg-sunk/60">
+          <Switch on={auto} set={setAuto} label="Add automatically on payday" hint={auto ? 'Recorded on its date, no tap needed' : 'Off: asks “did it land?” on payday'} />
+          <Switch on={main} set={setMain} label="This is my main payday" hint={main ? 'Safe-to-spend lasts until this one' : otherMain ? `Month runs on ${otherMain.name}; this adds when it lands` : 'Your month runs on this salary'} />
+        </div>
       )}
-      <p className="text-[13px] text-ink3">Fixed-date income sets your payday. Irregular income is counted when it lands, never in advance.</p>
-      <button
-        type="button"
-        disabled={!name.trim() || !(parseFloat(expected) > 0)}
-        className="btn-accent w-full disabled:opacity-40"
-        onClick={() => {
-          store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined, autoCredit: cycle === 'monthly' ? auto : undefined, main: cycle === 'monthly' ? main : undefined });
-          onDone();
-        }}
-      >
-        Save income source
-      </button>
-      {ex && (
-        <DeleteRow
-          label="Remove this income source"
-          onDelete={() => {
-            store.deleteIncome(ex.id);
-            onDone();
-          }}
-        />
+      {removing && ex ? (
+        <div className="flex min-h-[48px] items-center gap-2 rounded-2xl bg-sunk py-1 pl-4 pr-1" role="alert">
+          <span className="min-w-0 flex-1 leading-tight">
+            <span className="block truncate text-[14px] font-semibold">Remove {ex.name}?</span>
+            <span className="block truncate text-[12px] text-ink3">Past payments stay</span>
+          </span>
+          <button type="button" className="btn-ghost min-h-[40px] px-3" onClick={() => setRemoving(false)}>
+            Keep
+          </button>
+          <button
+            type="button"
+            className="btn min-h-[40px] bg-neg px-4 text-white"
+            onClick={() => {
+              store.deleteIncome(ex.id);
+              onDone();
+            }}
+          >
+            Remove
+          </button>
+        </div>
+      ) : (
+        <div className={`grid gap-2 ${ex ? 'grid-cols-[auto_1fr]' : 'grid-cols-1'}`}>
+          {ex && (
+            <button type="button" className="btn-quiet min-h-[48px] px-4 text-neg" onClick={() => setRemoving(true)} aria-label="Remove this income source">
+              <Icon name="trash" size={18} />
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!valid}
+            className="btn-accent min-h-[48px] w-full disabled:opacity-40"
+            onClick={() => {
+              store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined, autoCredit: cycle === 'monthly' ? auto : undefined, main: cycle === 'monthly' ? main : undefined });
+              onDone();
+            }}
+          >
+            {ex ? 'Save changes' : 'Save income source'}
+          </button>
+        </div>
       )}
     </div>
   );
