@@ -146,6 +146,18 @@ body {
   .field {
     @apply w-full rounded-xl border border-line bg-surface px-3.5 py-3 text-[15px] text-ink placeholder:text-ink3;
   }
+  /* iOS Safari gives date inputs a wide built-in minimum width and centres the text,
+     which pushes them past their column. Let them shrink like any other field. */
+  input[type='date'].field {
+    @apply min-w-0 max-w-full;
+    -webkit-appearance: none;
+    appearance: none;
+    min-height: 3.0625rem;
+  }
+  input[type='date'].field::-webkit-date-and-time-value {
+    text-align: left;
+    margin: 0;
+  }
   .btn {
     @apply tap inline-flex min-h-[44px] items-center justify-center gap-2 rounded-full px-5 text-[15px] font-semibold;
   }

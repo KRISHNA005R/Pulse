@@ -222,7 +222,7 @@ export function MoneyInput({ value, onChange, label, size = 'lg', autoFocus, id 
 // ---------- Form field ----------
 export function Field({ label, children, hint, htmlFor }: { label: string; children: ReactNode; hint?: string; htmlFor?: string }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <label htmlFor={htmlFor} className="text-[13px] font-semibold text-ink2">
         {label}
       </label>
