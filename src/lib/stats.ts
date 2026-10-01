@@ -198,11 +198,6 @@ export function markDemo() {
   save(l);
 }
 
-/** What would be sent right now. Shown in Data & privacy. */
-export function previewSummary(s: State): Summary {
-  return buildSummary(s);
-}
-
 let started = false;
 export function startStats(read: () => State) {
   getState = read;

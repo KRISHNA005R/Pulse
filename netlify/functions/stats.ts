@@ -21,7 +21,7 @@ const PLATFORMS = ['ios', 'android', 'desktop', 'other'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[0-9a-f]{32}$/;
 // SHA-256 of the dashboard key. Override with the STATS_KEY_HASH environment variable in Netlify.
-const DEFAULT_KEY_HASH = 'e9e3199e4b5f71c2ff62b56644cb88aed8cfc236e4ee90b0b2337bef883fb1c2';
+const DEFAULT_KEY_HASH = '6351fdef5f531536c8631adf33a550635c115d89fce09cc9cacde44588d1f106';
 
 export interface Rec {
   since: string;
