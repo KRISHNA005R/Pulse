@@ -472,6 +472,7 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
   const [expected, setExpected] = useState(String(ex?.expected ?? ''));
   const [cycle, setCycle] = useState<'monthly' | 'irregular'>(ex?.cycle ?? 'irregular');
   const [next, setNext] = useState(ex?.nextDate ?? addMonths(state.today, 1));
+  const [auto, setAuto] = useState(ex?.autoCredit ?? false);
   return (
     <div className="flex flex-col gap-4">
       <Field label="Source" htmlFor="inc-name">
@@ -497,13 +498,14 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
           </Field>
         )}
       </div>
+      {cycle === 'monthly' && <Toggle checked={auto} onChange={setAuto} label="Add it automatically on payday" sub="Off: PULSE asks “did it land?” on payday, so a late salary isn't counted early." />}
       <p className="text-[13px] text-ink3">Fixed-date income sets your payday. Irregular income is counted when it lands, never in advance.</p>
       <button
         type="button"
         disabled={!name.trim() || !(parseFloat(expected) > 0)}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
-          store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined });
+          store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined, autoCredit: cycle === 'monthly' ? auto : undefined });
           onDone();
         }}
       >

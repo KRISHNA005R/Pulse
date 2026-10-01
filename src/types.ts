@@ -70,6 +70,8 @@ export interface Transaction {
   toAccount?: ID;
   /** Set when this transfer is an instalment of a SIP / recurring investment. */
   investmentId?: ID;
+  /** Set when this is a payday from one of the person's income sources. */
+  incomeId?: ID;
 }
 
 export type BudgetPeriod = 'monthly' | 'weekly' | 'custom';
@@ -156,6 +158,8 @@ export interface IncomeSource {
   expected: number; // per month (average for irregular)
   cycle: 'monthly' | 'irregular';
   nextDate?: ISODate;
+  /** Record it as money in automatically on each payday, instead of asking. */
+  autoCredit?: boolean;
 }
 
 export interface Person {

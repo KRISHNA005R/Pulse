@@ -1,4 +1,4 @@
-import type { Budget, CategoryId, FundType, Investment, ISODate, Plan, State, Subscription, Transaction } from '../types';
+import type { Budget, CategoryId, FundType, IncomeSource, Investment, ISODate, Plan, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
 import {
   addDays,
@@ -536,4 +536,30 @@ export function sipProjection(monthly: number, years: number, ratePct: number, c
     invested += m;
   }
   return { invested: Math.round(invested), value: Math.round(value), gain: Math.round(value - invested) };
+}
+
+// ------------------------------------------------------------------
+// Paydays: has the salary landed?
+// ------------------------------------------------------------------
+export const incomeCategory = (kind: string): CategoryId => (kind === 'salary' ? 'salary' : kind === 'freelance' ? 'freelance' : 'income-other');
+
+/**
+ * Fixed-date income whose payday has come (in the last few days) but nothing matching has been
+ * recorded yet. PULSE asks "did it land?" instead of assuming, unless the person turned on auto-add.
+ */
+export function pendingPaydays(s: State): { income: IncomeSource; date: ISODate }[] {
+  const out: { income: IncomeSource; date: ISODate }[] = [];
+  if (s.mode !== 'personal') return out;
+  for (const i of s.incomes) {
+    if (i.cycle !== 'monthly' || !i.nextDate || !(i.expected > 0) || i.autoCredit) continue;
+    const date = i.nextDate <= s.today ? i.nextDate : addMonths(i.nextDate, -1);
+    if (date > s.today || daysBetween(date, s.today) > 6) continue;
+    if (s.dismissedDetections.includes(`payday:${i.id}:${date}`)) continue;
+    const cat = incomeCategory(i.kind);
+    const landed = s.transactions.some(
+      (t) => t.type === 'income' && t.date >= addDays(date, -4) && (t.incomeId === i.id || (!t.incomeId && t.category === cat && Math.abs(t.amount - i.expected) <= i.expected * 0.35)),
+    );
+    if (!landed) out.push({ income: i, date });
+  }
+  return out;
 }

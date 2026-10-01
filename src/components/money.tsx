@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from '
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, categoryName, groupSummary, myCost, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, categoryName, groupSummary, myCost, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addDays, daysBetween, fmtDate, fmtDayHeader, haptic, parseDate, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
@@ -57,6 +57,70 @@ export function StreakPill() {
       </span>
       <span className="num">{st.count}</span>
     </button>
+  );
+}
+
+/** Payday check-in: "Did your salary land?" One tap adds it; or a different amount; or not yet. */
+export function PaydayCard() {
+  const store = useStore();
+  const { state } = store;
+  const pending = useMemo(() => pendingPaydays(state), [state]);
+  const [edit, setEdit] = useState(false);
+  const [amt, setAmt] = useState('');
+  const [auto, setAuto] = useState(true);
+  if (!pending.length) return null;
+  const { income: i, date } = pending[0];
+  const isToday = date === state.today;
+  const what = i.kind === 'salary' ? 'salary' : i.name;
+  return (
+    <section className="relative overflow-hidden rounded-3xl bg-accent p-5 text-on-accent shadow-soft" aria-labelledby="payday-title">
+      <span className="pointer-events-none absolute -right-4 -top-6 select-none text-[96px] leading-none opacity-20" aria-hidden="true">
+        💸
+      </span>
+      <p className="eyebrow !text-current opacity-80">{isToday ? "It's payday" : `Payday was ${relDay(date, state.today).toLowerCase()}`}</p>
+      <h2 id="payday-title" className="display mt-1 text-[clamp(20px,6vw,24px)] leading-tight">
+        Did your {rupees(i.expected)} {what} land?
+      </h2>
+      <p className="mt-1 text-[14px] opacity-85">
+        {i.name} · {fmtDate(date)}. Add it and safe-to-spend updates for the month ahead.
+      </p>
+      {edit ? (
+        <form
+          className="mt-4 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const n = parseFloat(amt);
+            if (n > 0) store.confirmPayday(i.id, date, n, auto);
+          }}
+        >
+          <label htmlFor="payday-amt" className="sr-only">
+            Amount that came in
+          </label>
+          <input id="payday-amt" inputMode="decimal" autoFocus className="num min-w-0 flex-1 rounded-full bg-white/90 px-4 text-[16px] font-semibold text-ink placeholder:text-ink3 focus:outline-none" placeholder={rupees(i.expected)} value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+          <button type="submit" disabled={!(parseFloat(amt) > 0)} className="tap min-h-[46px] shrink-0 rounded-full bg-ink px-5 text-[14.5px] font-semibold text-bg disabled:opacity-50">
+            Add
+          </button>
+        </form>
+      ) : (
+        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+          <button type="button" className="tap min-h-[46px] rounded-full bg-ink px-4 text-[15px] font-semibold text-bg" onClick={() => store.confirmPayday(i.id, date, undefined, auto)}>
+            Yes, add {rupees(i.expected)}
+          </button>
+          <button type="button" className="tap min-h-[46px] rounded-full bg-white/20 px-4 text-[14px] font-semibold" onClick={() => setEdit(true)}>
+            Other amount
+          </button>
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[13px]">
+        <label className="inline-flex cursor-pointer items-center gap-2 font-medium">
+          <input type="checkbox" className="h-4 w-4 accent-[#17140F]" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+          Add it automatically every month
+        </label>
+        <button type="button" className="font-semibold underline underline-offset-2 opacity-85" onClick={() => store.skipPayday(i.id, date)}>
+          Not yet
+        </button>
+      </div>
+    </section>
   );
 }
 

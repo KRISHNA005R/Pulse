@@ -24,7 +24,7 @@ import { streak } from '../lib/streak';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { budgetFor, budgetState, categoryName, CYCLE_MONTHS, defaultAccount, netWorth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { budgetFor, budgetState, categoryName, CYCLE_MONTHS, defaultAccount, incomeCategory, netWorth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // ------------------------------------------------------------------
 // Pure state transitions. Every mutation that moves money goes through
@@ -190,7 +190,16 @@ export function refresh(input: State): State {
   for (const i of s.incomes) {
     if (i.cycle === 'monthly' && i.nextDate) {
       let guard = 0;
-      while (i.nextDate <= today && guard++ < 60) i.nextDate = addMonths(i.nextDate, 1);
+      while (i.nextDate <= today && guard++ < 60) {
+        // Auto-add: record the payday as money in (same id on every synced device).
+        const id = `pay-${i.id}-${i.nextDate}`;
+        if (i.autoCredit && i.expected > 0 && !s.transactions.some((t) => t.id === id)) {
+          const tx: Transaction = { id, merchant: i.kind === 'salary' && !/^salary$/i.test(i.name.trim()) ? `Salary · ${i.name}` : i.name, amount: i.expected, type: 'income', category: incomeCategory(i.kind), date: i.nextDate, account: defaultAccount(s), recurring: true, status: 'completed', incomeId: i.id, notes: 'Added automatically on payday' };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+        }
+        i.nextDate = addMonths(i.nextDate, 1);
+      }
     }
   }
   processDueInvestments(s);
@@ -800,6 +809,26 @@ function useStoreImpl() {
   );
   const deleteDebt = useCallback((id: string) => commit((s) => void (s.debts = s.debts.filter((x) => x.id !== id))), [commit]);
 
+  // ---------- paydays ----------
+  /** The salary landed: record it (optionally with a different amount), and maybe auto-add from now on. */
+  const confirmPayday = useCallback(
+    (incomeId: string, date: string, amount?: number, auto?: boolean) => {
+      const i = ref.current.incomes.find((x) => x.id === incomeId);
+      if (!i) return;
+      if (auto) commit((s) => void (s.incomes.find((x) => x.id === incomeId)!.autoCredit = true));
+      addTransaction({ merchant: i.kind === 'salary' && !/^salary$/i.test(i.name.trim()) ? `Salary · ${i.name}` : i.name, amount: amount && amount > 0 ? amount : i.expected, type: 'income', category: incomeCategory(i.kind), date, account: defaultAccount(ref.current), recurring: true, incomeId: i.id });
+    },
+    [commit, addTransaction],
+  );
+  /** "Not yet": stop asking about this payday. */
+  const skipPayday = useCallback(
+    (incomeId: string, date: string) => {
+      commit((s) => void s.dismissedDetections.push(`payday:${incomeId}:${date}`));
+      toast({ text: "Okay. Add it with + whenever it lands, and it'll count from then." });
+    },
+    [commit, toast],
+  );
+
   // ---------- sync across devices ----------
   const [sync, setSync] = useState<SyncStatus>(() => {
     const cfg = loadSync();
@@ -992,6 +1021,8 @@ function useStoreImpl() {
     importBackup,
     personalState,
     restoreState,
+    confirmPayday,
+    skipPayday,
     sync,
     syncNow,
     enableSync,

@@ -6,7 +6,7 @@ import { useUI } from '../store/ui';
 import { buildInsights } from '../lib/insights';
 import { detections, personBalances, socialTotals, upcoming } from '../lib/finance';
 import { addDays, greeting, relDay, rupees } from '../lib/format';
-import { InsightCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
+import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
 import { CategoryMark, EmptyState, PersonAvatar, SectionHeader } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
@@ -29,6 +29,7 @@ export function HomeScreen() {
 
   return (
     <div className="stagger flex flex-col gap-8">
+      <PaydayCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />
 
       <section aria-labelledby="h-next">
