@@ -78,3 +78,10 @@ A 3.3-second opener that plays the moment the app opens, before any JavaScript l
 - Tap or press any key to skip. With Reduce Motion on, it shows a still logo for about a second instead.
 - The status bar turns ink while it plays, and the manifest `background_color` is ink, so the phone's own launch screen blends into it.
 - Timing, colours and the reel contents live in `scripts/make-splash.py` (glyph outlines in `scripts/*-glyphs.json`). Edit it, then run `python3 scripts/make-splash.py` to rewrite the splash in `index.html`.
+
+## Deploy
+
+Netlify builds this repository on every push to `main` (see `netlify.toml`):
+the site is built with `npm run build` into `dist/`, and the sync API
+(`netlify/functions/sync.mts`, served at `/api/sync`) is deployed alongside it,
+storing only end-to-end encrypted data in Netlify Blobs.
