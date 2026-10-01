@@ -83,5 +83,5 @@ A 3.3-second opener that plays the moment the app opens, before any JavaScript l
 
 Netlify builds this repository on every push to `main` (see `netlify.toml`):
 the site is built with `npm run build` into `dist/`, and the sync API
-(`netlify/functions/sync.mts`, served at `/api/sync`) is deployed alongside it,
+(`netlify/functions/sync.ts`, served at `/api/sync`) is deployed alongside it,
 storing only end-to-end encrypted data in Netlify Blobs.

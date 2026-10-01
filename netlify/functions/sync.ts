@@ -75,4 +75,4 @@ export async function handle(req: Request, store: StoreLike): Promise<Response> 
 
 export default async (req: Request) => handle(req, getStore({ name: 'pulse-sync', consistency: 'strong' }) as unknown as StoreLike);
 
-export const config = { path: '/api/sync' };
+// Reached at /.netlify/functions/sync; public/_redirects maps /api/sync to it.

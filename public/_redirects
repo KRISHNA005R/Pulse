@@ -15,6 +15,9 @@ https://www.pulsemoney.in/*                   https://pulsemoney.in/:splat   301
 http://www.pulsemoney.in/*                    https://pulsemoney.in/:splat   301!
 http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301!
 
+# ---- Sync API ---------------------------------------------------------------------------------
+/api/sync   /.netlify/functions/sync   200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301
