@@ -403,14 +403,8 @@ export function IncomeScreen() {
   const m = incomeThisMonth(state);
   const byId = new Map(m.sources.map((x) => [x.income.id, x]));
   const sts = safeToSpend(state);
-  const waiting = m.sources.filter((x) => x.pending > 0).sort((a, b) => a.date.localeCompare(b.date));
-  const extraNote = m.extra > 0 ? ` Plus ${rupees(m.extra)} extra.` : '';
   const summary =
-    m.expected === 0
-      ? `${rupees(m.total)} received this month.`
-      : waiting.length === 0
-        ? `All your expected income is in.${extraNote}`
-        : `${rupees(m.pending)} still to come: ${waiting.length === 1 ? `${waiting[0].income.name} ${waiting[0].date < state.today ? `(was due ${fmtDate(waiting[0].date)})` : `on ${fmtDate(waiting[0].date)}`}` : `${waiting.length} sources`}.${extraNote}`;
+    m.expected === 0 ? `${rupees(m.total)} received this month.` : m.pending > 0 ? `${rupees(m.pending)} still expected this month.` : 'All expected income received this month.';
   const sourceSub = (i: (typeof state.incomes)[number]) => {
     if (i.cycle !== 'monthly') return `${incomeLabel(i.kind)} · irregular, counted when it lands`;
     const x = byId.get(i.id);
