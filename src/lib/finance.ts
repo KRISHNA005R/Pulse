@@ -91,9 +91,33 @@ export interface UpcomingItem {
   ref?: string;
 }
 
+/**
+ * The income the month runs on: the one marked main, otherwise the biggest fixed-date salary.
+ * A second job paying mid-month doesn't cut the month short.
+ */
+export function mainIncome(s: State): IncomeSource | undefined {
+  const fixed = s.incomes.filter((i) => i.cycle === 'monthly' && i.nextDate);
+  // Marked main wins; otherwise the biggest salary, skipping ones the person said aren't main.
+  return fixed.find((i) => i.main === true) ?? [...fixed].sort((a, b) => Number(a.main === false) - Number(b.main === false) || b.expected - a.expected)[0];
+}
+
+/** Next main payday after today. Safe-to-spend lasts until then. */
 export function nextPayday(s: State): ISODate {
-  const dates = s.incomes.filter((i) => i.cycle === 'monthly' && i.nextDate && i.nextDate > s.today).map((i) => i.nextDate!);
-  return dates.sort()[0] ?? addDays(endOfMonth(s.today), 1);
+  const m = mainIncome(s);
+  if (!m?.nextDate) return addDays(endOfMonth(s.today), 1);
+  let d = m.nextDate;
+  let guard = 0;
+  while (d <= s.today && guard++ < 24) d = addMonths(d, 1);
+  return d;
+}
+
+/** Other fixed-date income expected before the next main payday (not counted until it lands). */
+export function paydaysBefore(s: State, until: ISODate): { income: IncomeSource; date: ISODate }[] {
+  const m = mainIncome(s);
+  return s.incomes
+    .filter((i) => i !== m && i.cycle === 'monthly' && i.nextDate && i.nextDate > s.today && i.nextDate < until)
+    .map((i) => ({ income: i, date: i.nextDate! }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /** Every money event from today (inclusive) up to `until` (exclusive). */

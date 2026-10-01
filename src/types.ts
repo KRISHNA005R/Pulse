@@ -160,6 +160,8 @@ export interface IncomeSource {
   nextDate?: ISODate;
   /** Record it as money in automatically on each payday, instead of asking. */
   autoCredit?: boolean;
+  /** The payday the month runs on. Safe-to-spend always lasts until this one. */
+  main?: boolean;
 }
 
 export interface Person {

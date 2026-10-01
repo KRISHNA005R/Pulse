@@ -608,8 +608,14 @@ function useStoreImpl() {
   const saveIncome = useCallback(
     (inc: Omit<IncomeSource, 'id'> & { id?: string }) => {
       commit((s) => {
-        if (inc.id) Object.assign(s.incomes.find((x) => x.id === inc.id)!, inc);
-        else s.incomes.push({ ...inc, id: uid('inc') } as IncomeSource);
+        let id = inc.id;
+        if (id) Object.assign(s.incomes.find((x) => x.id === id)!, inc);
+        else {
+          id = uid('inc');
+          s.incomes.push({ ...inc, id } as IncomeSource);
+        }
+        // Only one main payday.
+        if (inc.main) for (const x of s.incomes) if (x.id !== id && x.main) x.main = undefined;
       });
       toast({ text: 'Income source saved.' });
     },

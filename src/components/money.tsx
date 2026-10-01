@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from '
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, categoryName, groupSummary, myCost, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, categoryName, groupSummary, myCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addDays, daysBetween, fmtDate, fmtDayHeader, haptic, parseDate, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
@@ -150,6 +150,8 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const amount = rupees(Math.round(shown));
   const soon = sts.daysLeft <= 1;
   const paydayIn = sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
+  // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
+  const extra = paydaysBefore(state, sts.payday)[0];
 
   return (
     <section aria-labelledby="sts-label" className="hero-card rounded-3xl border border-line bg-surface p-5 shadow-soft md:p-7">
@@ -201,7 +203,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
           <dd className="stat-amt num mt-0.5 truncate font-semibold text-accent-ink" style={{ ['--len' as string]: 7 }}>
             {fmtDate(sts.payday)}
           </dd>
-          <dd className="mt-0.5 truncate text-[12px] text-accent-ink/80">{paydayIn}</dd>
+          <dd className="mt-0.5 truncate text-[12px] text-accent-ink/80">{extra ? `+${rupees(extra.income.expected)} on ${fmtDate(extra.date)}` : paydayIn}</dd>
         </div>
       </dl>
 

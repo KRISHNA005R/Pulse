@@ -5,8 +5,8 @@ import { decodeBackup, encodeBackup } from '../lib/backupCode';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
-import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, defaultAccount, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { addMonths, daysBetween, fmtDate, haptic, ordinal, rupees, rupeesShort } from '../lib/format';
+import { CYCLE_MONTHS, defaultAccount, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
 
@@ -473,6 +473,8 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
   const [cycle, setCycle] = useState<'monthly' | 'irregular'>(ex?.cycle ?? 'irregular');
   const [next, setNext] = useState(ex?.nextDate ?? addMonths(state.today, 1));
   const [auto, setAuto] = useState(ex?.autoCredit ?? false);
+  const currentMain = mainIncome(state);
+  const [main, setMain] = useState(ex ? currentMain?.id === ex.id : !currentMain);
   return (
     <div className="flex flex-col gap-4">
       <Field label="Source" htmlFor="inc-name">
@@ -499,13 +501,21 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
         )}
       </div>
       {cycle === 'monthly' && <Toggle checked={auto} onChange={setAuto} label="Add it automatically on payday" sub="Off: PULSE asks “did it land?” on payday, so a late salary isn't counted early." />}
+      {cycle === 'monthly' && (
+        <Toggle
+          checked={main}
+          onChange={setMain}
+          label="This is my main payday"
+          sub={main ? 'Safe-to-spend lasts until this payday every month. Other salaries add to it when they land.' : currentMain && currentMain.id !== ex?.id ? `Your month runs on ${currentMain.name} (${ordinal(Number(currentMain.nextDate!.slice(8)))}). This one adds to it when it lands.` : 'Turn on if your month runs on this salary.'}
+        />
+      )}
       <p className="text-[13px] text-ink3">Fixed-date income sets your payday. Irregular income is counted when it lands, never in advance.</p>
       <button
         type="button"
         disabled={!name.trim() || !(parseFloat(expected) > 0)}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
-          store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined, autoCredit: cycle === 'monthly' ? auto : undefined });
+          store.saveIncome({ id: ex?.id, name: name.trim(), kind, expected: roundMoney(parseFloat(expected)), cycle, nextDate: cycle === 'monthly' ? next : undefined, autoCredit: cycle === 'monthly' ? auto : undefined, main: cycle === 'monthly' ? main : undefined });
           onDone();
         }}
       >
