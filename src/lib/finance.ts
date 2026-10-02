@@ -1,4 +1,4 @@
-import type { Budget, CategoryId, FundType, IncomeSource, Investment, ISODate, Plan, State, Subscription, Transaction } from '../types';
+import type { Budget, CategoryId, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
 import {
   addDays,
@@ -87,7 +87,9 @@ export interface UpcomingItem {
   name: string;
   amount: number;
   date: ISODate;
-  kind: 'subscription' | 'bill' | 'card' | 'loan' | 'income' | 'investment';
+  kind: 'subscription' | 'bill' | 'card' | 'loan' | 'income' | 'investment' | 'insurance';
+  /** Recorded by PULSE on the date (SIPs, auto-debit premiums). */
+  auto?: boolean;
   ref?: string;
 }
 
@@ -141,6 +143,10 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
     if (inv.nextDate >= s.today && inv.nextDate < until)
       out.push({ id: inv.id, name: `SIP · ${inv.name}`, amount: inv.amount, date: inv.nextDate, kind: 'investment', ref: inv.id });
   }
+  for (const p of s.insurance ?? []) {
+    // A premium that's past due and not recorded yet still has to be paid, so it stays on the list.
+    if (p.nextDate < until) out.push({ id: p.id, name: `${p.name} premium`, amount: p.premium, date: p.nextDate, kind: 'insurance', ref: p.id, auto: p.autoDebit });
+  }
   if (includeIncome) {
     for (const i of s.incomes) {
       if (i.nextDate && i.nextDate >= s.today && i.nextDate < until)
@@ -157,12 +163,55 @@ function nextDayOfMonth(today: ISODate, day: number): ISODate {
   return `${nm.slice(0, 8)}${String(day).padStart(2, '0')}`;
 }
 
+// ------------------------------------------------------------------
+// Insurance
+// ------------------------------------------------------------------
+
+export const PREMIUM_MONTHS: Record<PremiumCycle, number> = { monthly: 1, quarterly: 3, 'half-yearly': 6, yearly: 12 };
+export const PREMIUM_LABEL: Record<PremiumCycle, string> = { monthly: 'monthly', quarterly: 'every 3 months', 'half-yearly': 'every 6 months', yearly: 'yearly' };
+
+/** Start and length (in days) of the stretch a premium is saved up over. */
+function premiumPeriod(p: Insurance): { start: ISODate; days: number } {
+  const full = addMonths(p.nextDate, -PREMIUM_MONTHS[p.cycle]);
+  const start = p.since && p.since > full && p.since < p.nextDate ? p.since : full;
+  return { start, days: Math.max(1, daysBetween(start, p.nextDate)) };
+}
+
+/**
+ * How much of a big premium should already be kept aside by `by` (the next payday).
+ * A yearly ₹12,000 premium grows by about ₹1,000 each pay cycle, so the due date is never a shock.
+ * Monthly premiums, and premiums due before payday, are plain bills instead.
+ */
+export function premiumSetAside(p: Insurance, by: ISODate): number {
+  if (!p.spread || p.cycle === 'monthly' || p.nextDate < by) return 0;
+  const { start, days } = premiumPeriod(p);
+  return roundMoney((p.premium * clamp(daysBetween(start, by), 0, days)) / days);
+}
+
+/** Roughly what a premium costs per month. */
+export const premiumMonthly = (p: Insurance) => p.premium / PREMIUM_MONTHS[p.cycle];
+
+export function insuranceTotals(s: State) {
+  const list = s.insurance ?? [];
+  const next = [...list].sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0];
+  return {
+    count: list.length,
+    yearly: Math.round(list.reduce((a, p) => a + premiumMonthly(p) * 12, 0)),
+    monthly: Math.round(list.reduce((a, p) => a + premiumMonthly(p), 0)),
+    cover: list.reduce((a, p) => a + (p.cover ?? 0), 0),
+    next,
+  };
+}
+
 export interface SafeToSpend {
   available: number;
   bills: number;
   billItems: UpcomingItem[];
   /** SIPs and other investments debited before payday. */
   invest: number;
+  /** Kept aside this cycle for insurance premiums due after payday. */
+  setAside: number;
+  setAsideItems: { policy: Insurance; amount: number }[];
   investItems: UpcomingItem[];
   goals: number;
   goalItems: { plan: Plan; amount: number }[];
@@ -183,10 +232,12 @@ export function safeToSpend(s: State): SafeToSpend {
   const invest = investItems.reduce((a, b) => a + b.amount, 0);
   const goalItems = s.plans.filter((p) => p.status === 'active' && p.cycleReserve > 0).map((plan) => ({ plan, amount: plan.cycleReserve }));
   const goals = goalItems.reduce((a, g) => a + g.amount, 0);
+  const setAsideItems = (s.insurance ?? []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
+  const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
   const buffer = s.settings.buffer;
-  const safe = Math.max(0, roundMoney(available - bills - invest - goals - buffer));
+  const safe = Math.max(0, roundMoney(available - bills - invest - goals - setAside - buffer));
   const daysLeft = Math.max(1, daysBetween(s.today, payday));
-  return { available, bills, billItems, invest, investItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  return { available, bills, billItems, invest, investItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
 }
 
 // ------------------------------------------------------------------

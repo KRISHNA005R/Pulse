@@ -5,7 +5,7 @@ import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { detections, incomeThisMonth, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { detections, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, fmtMonthYear, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -20,6 +20,7 @@ export function YouScreen() {
   const ui = useUI();
   const nw = useMemo(() => netWorth(state), [state]);
   const rec = recurringTotals(state);
+  const ins = insuranceTotals(state);
   const go = (r: Route) => ui.push(r);
   return (
     <div>
@@ -47,6 +48,7 @@ export function YouScreen() {
         <NavRow icon="chart" label="Spending history" sub="Yearly report, month by month" onClick={() => go({ name: 'history' })} />
         <NavRow icon="trend" label="Net worth" sub="Everything you own minus what you owe" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
         <NavRow icon="piggy" label="Investments & SIPs" sub={investmentTotals(state).count ? `${investmentTotals(state).count} active · deducted automatically` : 'Add SIPs, RDs, PPF or NPS'} value={investmentTotals(state).monthly ? `${rupees(investmentTotals(state).monthly)}/mo` : undefined} onClick={() => go({ name: 'investments' })} />
+        <NavRow icon="shield" label="Insurance" sub={ins.count ? `${ins.count} ${ins.count === 1 ? 'policy' : 'policies'}${ins.next ? ` · next due ${fmtDate(ins.next.nextDate)}` : ''}` : 'Health, term life, bike or car premiums'} value={ins.yearly ? `${rupeesShort(ins.yearly)}/yr` : undefined} onClick={() => go({ name: 'insurance' })} />
         <NavRow icon="repeat" label="Subscriptions & bills" sub={`${rec.count} recurring payments`} value={`${rupees(rec.monthly)}/mo`} onClick={() => go({ name: 'subscriptions' })} />
         <NavRow icon="briefcase" label="Income" sub="Salary, freelance and side income" onClick={() => go({ name: 'income' })} />
         <NavRow icon="card" label="Credit cards" sub={`${state.cards.length} cards`} onClick={() => go({ name: 'cards' })} />
@@ -83,6 +85,7 @@ export function YouScreen() {
         <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
         <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
         <NavRow icon="link" label="Connected accounts" sub="None connected" onClick={() => go({ name: 'settings', section: 'connected' })} />
+        <NavRow icon="message" label="Send feedback" sub="Report a problem or ask for a feature" onClick={() => go({ name: 'feedback' })} />
         <a href="/about/" className="row-btn min-h-[56px]">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sunk text-ink2" aria-hidden="true">
             <Icon name="help" size={18} />

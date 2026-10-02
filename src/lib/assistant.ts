@@ -6,6 +6,8 @@ import {
   categoryName,
   investedBetween,
   investmentMonthly,
+  insuranceTotals,
+  PREMIUM_LABEL,
   investmentTotals,
   sipProjection,
   monthRange,
@@ -103,6 +105,21 @@ export function askPulse(s: State, question: string): AIAnswer {
   const thisM = monthName(today);
   const lastM = monthName(pStart);
 
+  // --- Insurance ---
+  if (/\b(insurance|premiums?|polic(y|ies))\b/.test(q) && !/^(add|log|spent|paid|pay|got|record)\b/.test(q)) {
+    const list = [...(s.insurance ?? [])].sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+    const link: AIBlock = { type: 'link', label: list.length ? 'Open insurance' : 'Add a policy', to: { kind: 'route', tab: 'you', route: { name: 'insurance' } } };
+    if (!list.length) return { text: "You haven't added any insurance yet. Add your health, term or vehicle policy and I'll keep the premium aside and remind you before it's due.", blocks: [link] };
+    const t = insuranceTotals(s);
+    const sts = safeToSpend(s);
+    const n = list[0];
+    return {
+      text: `You pay ${rupees(t.yearly)} a year for insurance (about ${rupees(t.monthly)} a month) across ${list.length} ${list.length === 1 ? 'policy' : 'policies'}. Next up: ${n.name}, ${rupees(n.premium)} on ${fmtDate(n.nextDate)}.${sts.setAside > 0 ? ` ${rupees(sts.setAside)} is kept aside for premiums right now.` : ''}`,
+      blocks: [{ type: 'list', rows: list.map((p) => ({ label: p.name, value: rupees(p.premium), sub: `${PREMIUM_LABEL[p.cycle]} · due ${fmtDate(p.nextDate)}${p.autoDebit ? ' · auto-debit' : ''}` })) }, link],
+      followups: ['What bills are coming up?', 'How much can I spend today?'],
+    };
+  }
+
   // --- Monthly / yearly report ---
   if (/\b(report|recap|summary|review|wrapped|overview|breakdown)\b|how did i do|how was my (month|year)|spend(ing)? history|this year|yearly|annual|whole year/.test(q) && !/\bafford\b/.test(q)) {
     const yearMatch = q.match(/\b(20\d\d)\b/);
@@ -135,6 +152,7 @@ export function askPulse(s: State, question: string): AIAnswer {
     const t = openHit[1];
     const map: [RegExp, string, AILink][] = [
       [/invest|sip/, 'Investments & SIPs', { kind: 'route', tab: 'you', route: { name: 'investments' } }],
+      [/feedback/, 'Send feedback', { kind: 'route', tab: 'you', route: { name: 'feedback' } }],
       [/subscri|bills?|recurring/, 'Subscriptions & bills', { kind: 'route', tab: 'you', route: { name: 'subscriptions' } }],
       [/net ?worth/, 'Net worth', { kind: 'route', tab: 'you', route: { name: 'networth' } }],
       [/history|year/, 'Spending history', { kind: 'route', tab: 'you', route: { name: 'history' } }],

@@ -58,6 +58,11 @@
     select { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
     .err { color: #C2412D; font-size: 14px; }
     .note { font-size: 12.5px; color: var(--ink3); margin-top: 10px; }
+    .fb { border-top: 1px solid var(--line); padding: 14px 0 12px; }
+    .fb:first-of-type { margin-top: 12px; }
+    .fbh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag { background: var(--sunk); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; }
+    .fbm { margin: 8px 0 6px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
   </style>
 </head>
 <body>
@@ -95,7 +100,14 @@
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })
-      .then(function (d) { if (d) render(d); })
+      .then(function (d) {
+        if (!d) return;
+        // Feedback is a separate, smaller request. Stats still show if it fails.
+        return fetch('/api/feedback', { headers: { 'x-stats-key': key }, cache: 'no-store' })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; })
+          .then(function (fb) { render(d, fb); });
+      })
       .catch(function (e) { app.innerHTML = '<p class="err">Could not load stats (' + esc(e.message) + '). Try again in a minute.</p>'; });
   }
 
@@ -106,7 +118,28 @@
     }).join('');
   }
 
-  function render(d) {
+  var FB = { bug: ['🐞', "Something's broken"], idea: ['💡', 'Idea'], confusing: ['😕', 'Confusing'], love: ['❤️', 'Love it'] };
+  var FACES = ['😡', '😕', '😐', '🙂', '😍'];
+  function feedback(fb) {
+    if (!fb) return '<div class="card" style="margin-top:12px"><h2>Feedback</h2><p class="muted">Could not load feedback right now.</p></div>';
+    var items = fb.items || [];
+    var rated = items.filter(function (x) { return x.rating; });
+    var avg = rated.length ? Math.round((rated.reduce(function (a, x) { return a + x.rating; }, 0) / rated.length) * 10) / 10 : null;
+    var body = items.length ? items.map(function (x) {
+      var t = FB[x.type] || FB.idea;
+      var when = new Date(x.at);
+      var dev = { ios: 'iPhone', android: 'Android', desktop: 'Computer' }[x.meta && x.meta.platform] || 'Device';
+      return '<div class="fb"><div class="fbh"><span class="tag">' + t[0] + ' ' + esc(t[1]) + '</span>' +
+        (x.rating ? '<span class="tag">' + FACES[x.rating - 1] + ' ' + x.rating + '/5</span>' : '') +
+        '<span class="muted">' + esc(when.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) + '</span></div>' +
+        '<p class="fbm">' + esc(x.message) + '</p>' +
+        '<div class="muted">' + (x.contact ? 'Reply to: <b style="color:var(--ink)">' + esc(x.contact) + '</b> · ' : '') + esc(dev) + (x.meta && x.meta.installed ? ' · installed app' : ' · browser') + '</div></div>';
+    }).join('') : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up here the moment someone sends it from You → Send feedback.</p>';
+    return '<div class="card" style="margin-top:12px"><h2>Feedback</h2><div class="muted">' + fmt(fb.total || 0) + ' message' + (fb.total === 1 ? '' : 's') +
+      (avg ? ' · average rating ' + avg + '/5' : '') + (fb.total > items.length ? ' · showing the latest ' + items.length : '') + '</div>' + body + '</div>';
+  }
+
+  function render(d, fb) {
     var t = d.totals;
     var max = Math.max(1, Math.max.apply(null, d.daily.map(function (x) { return x.active + 0; })), Math.max.apply(null, d.daily.map(function (x) { return x.newcomers; })));
     var cols = d.daily.map(function (x) {
@@ -160,6 +193,7 @@
       '<div class="rows" style="margin-top:16px">' + dev(d.devices.mode) + '</div>' +
       '<h2 style="margin-top:16px">App version</h2><div class="rows">' + dev(d.devices.version.map(function (v) { return { label: v.label.replace('T', ' ') + (v.label.length > 10 ? ' UTC' : ''), n: v.n }; })) + '</div></div>' +
       '</div>' +
+      feedback(fb) +
       '<p class="note">One person on two devices counts twice. Nothing here can identify anyone or show amounts.</p>';
 
     document.getElementById('days').onchange = function (e) { days = Number(e.target.value); load(); };

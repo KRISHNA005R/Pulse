@@ -268,6 +268,13 @@ export function SafeBreakdown() {
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
       <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
       <Row label="SIPs & investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
+      {(state.insurance ?? []).length > 0 && (
+        <Row
+          label="Insurance kept aside"
+          value={`−${rupees(sts.setAside)}`}
+          sub={sts.setAsideItems.length ? sts.setAsideItems.map((x) => `${x.policy.name} ${rupees(x.amount)}`).join(' · ') : 'Premiums due before payday are in bills above'}
+        />
+      )}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />

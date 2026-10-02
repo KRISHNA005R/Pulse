@@ -15,13 +15,13 @@ type StoreLike = {
 };
 
 const EVENTS = ['expense', 'income', 'split', 'ai', 'plan', 'budget', 'backup', 'sync'] as const;
-const NUMS = ['incomes', 'txMonth', 'catsMonth', 'plans', 'budgets', 'subs', 'invest', 'accounts', 'streak'] as const;
+const NUMS = ['incomes', 'txMonth', 'catsMonth', 'plans', 'budgets', 'subs', 'invest', 'insure', 'accounts', 'streak'] as const;
 const BOOLS = ['onboarded', 'personal', 'salary', 'sync'] as const;
 const PLATFORMS = ['ios', 'android', 'desktop', 'other'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[0-9a-f]{32}$/;
 // SHA-256 of the dashboard key. Override with the STATS_KEY_HASH environment variable in Netlify.
-const DEFAULT_KEY_HASH = '6351fdef5f531536c8631adf33a550635c115d89fce09cc9cacde44588d1f106';
+export const DEFAULT_KEY_HASH = '6351fdef5f531536c8631adf33a550635c115d89fce09cc9cacde44588d1f106';
 
 export interface Rec {
   since: string;
@@ -35,10 +35,10 @@ export interface Rec {
 }
 type DayBlob = { users: Record<string, Rec> };
 
-const json = (body: unknown, status = 200) =>
+export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
-async function sha256(s: string) {
+export async function sha256(s: string) {
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
   return [...d].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -149,6 +149,8 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
     { label: 'Logged something this month', n: count(R, (r) => r.s.txMonth > 0) },
     { label: 'Used 5+ categories this month', n: count(R, (r) => r.s.catsMonth >= 5) },
     { label: 'Made a plan', n: count(R, (r) => r.s.plans > 0) },
+    { label: 'Added a SIP', n: count(R, (r) => r.s.invest > 0) },
+    { label: 'Added insurance', n: count(R, (r) => r.s.insure > 0) },
     { label: 'Turned on sync', n: count(R, (r) => r.s.sync) },
     { label: 'Installed the app', n: count(R, (r) => r.installed) },
   ];

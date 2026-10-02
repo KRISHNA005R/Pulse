@@ -17,6 +17,8 @@ import { GroupDetail, PersonDetail, PlanDetail, PlansScreen } from './screens/Pl
 import { DemoGuideScreen, InstallScreen } from './screens/Learn';
 import { MIGRATED_FLAG } from './lib/migrate';
 import { applyUpdate, onUpdateReady } from './lib/update';
+import { InsuranceScreen } from './screens/Insurance';
+import { FeedbackScreen } from './screens/Feedback';
 import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
 
 function Screen() {
@@ -36,6 +38,10 @@ function Screen() {
         return <NetWorthScreen />;
       case 'investments':
         return <InvestmentsScreen />;
+      case 'insurance':
+        return <InsuranceScreen />;
+      case 'feedback':
+        return <FeedbackScreen />;
       case 'income':
         return <IncomeScreen />;
       case 'cards':

@@ -15,6 +15,8 @@ import type {
   Subscription,
   Transaction,
   IncomeSource,
+  Insurance,
+  ISODate,
   Investment,
 } from '../types';
 import { CATEGORIES, createSeed } from '../data/seed';
@@ -25,7 +27,7 @@ import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { budgetFor, budgetState, categoryName, CYCLE_MONTHS, defaultAccount, incomeCategory, netWorth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, defaultAccount, incomeCategory, netWorth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // ------------------------------------------------------------------
 // Pure state transitions. Every mutation that moves money goes through
@@ -163,6 +165,45 @@ export function processDueInvestments(s: State): Transaction[] {
   return made;
 }
 
+/**
+ * Record every auto-debit insurance premium that has fallen due as an expense, then move the
+ * policy to its next due date. Policies paid by hand stay due until the person marks them paid.
+ */
+export function processDueInsurance(s: State): Transaction[] {
+  const made: Transaction[] = [];
+  for (const p of s.insurance ?? []) {
+    if (!p.autoDebit) continue;
+    let guard = 0;
+    while (p.nextDate <= s.today && guard++ < 60) {
+      const tx = premiumTx(s, p, p.nextDate, 'Premium · auto-debit');
+      // Same id on every synced device, so the premium is never recorded twice.
+      if (!s.transactions.some((t) => t.id === tx.id)) {
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+        made.push(tx);
+      }
+      p.nextDate = addMonths(p.nextDate, PREMIUM_MONTHS[p.cycle]);
+    }
+  }
+  return made;
+}
+
+function premiumTx(s: State, p: Insurance, date: ISODate, notes: string, amount = p.premium): Transaction {
+  return {
+    id: `ins-${p.id}-${p.nextDate}`,
+    merchant: p.name,
+    amount,
+    type: 'expense',
+    category: 'insurance',
+    date,
+    account: s.accounts.some((a) => a.id === p.account) || s.cards.some((c) => c.id === p.account) ? p.account : defaultAccount(s),
+    recurring: true,
+    status: 'completed',
+    insuranceId: p.id,
+    notes,
+  };
+}
+
 function isState(x: unknown): x is State {
   const s = x as State;
   return !!s && typeof s.today === 'string' && Array.isArray(s.transactions) && Array.isArray(s.accounts) && Array.isArray(s.plans);
@@ -177,6 +218,7 @@ export function refresh(input: State): State {
   s.mode = s.mode ?? 'demo';
   // Older saves: add anything newer versions expect.
   s.investments = s.investments ?? [];
+  s.insurance = s.insurance ?? [];
   s.settings.currency = s.settings.currency ?? 'INR';
   for (const c of CATEGORIES) if (!s.categories.some((x) => x.id === c.id)) s.categories.push(structuredClone(c));
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
@@ -204,6 +246,7 @@ export function refresh(input: State): State {
     }
   }
   processDueInvestments(s);
+  processDueInsurance(s);
   for (const sub of s.subscriptions) {
     const step = sub.cycle === 'yearly' ? 12 : 1;
     let guard = 0;
@@ -800,6 +843,74 @@ function useStoreImpl() {
     [commit, toast],
   );
 
+  // ---------- insurance ----------
+  const saveInsurance = useCallback(
+    (p: Omit<Insurance, 'id' | 'since'> & { id?: string }) => {
+      let made: Transaction[] = [];
+      const next = commit((s) => {
+        s.insurance = s.insurance ?? [];
+        if (p.id) Object.assign(s.insurance.find((x) => x.id === p.id)!, p);
+        else s.insurance.push({ ...p, id: uid('ins'), since: s.today } as Insurance);
+        made = processDueInsurance(s);
+      });
+      haptic(12);
+      const sts = safeToSpend(next);
+      const kept = sts.setAsideItems.find((x) => x.policy.name === p.name)?.amount ?? 0;
+      toast({
+        text: made.length
+          ? `${p.name} saved and ${rupees(made.reduce((a, t) => a + t.amount, 0))} recorded for today. Safe to spend: ${rupees(sts.safe)}.`
+          : p.id
+            ? `${p.name} updated.`
+            : kept > 0
+              ? `${p.name} added. ${rupees(kept)} kept aside so far for ${fmtDate(p.nextDate)}.`
+              : `${p.name} added. ${rupees(p.premium)} is due on ${fmtDate(p.nextDate)}.`,
+        tone: 'good',
+        emoji: p.id ? undefined : '🛡️',
+      });
+    },
+    [commit, toast],
+  );
+  /** A premium paid by hand: record it and move the policy to its next due date. */
+  const payInsurance = useCallback(
+    (id: string, amount?: number) => {
+      let name = '';
+      const next = commit((s) => {
+        const p = (s.insurance ?? []).find((x) => x.id === id);
+        if (!p) return;
+        name = p.name;
+        const tx = premiumTx(s, p, s.today, 'Premium', amount && amount > 0 ? amount : p.premium);
+        if (!s.transactions.some((t) => t.id === tx.id)) {
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+        }
+        let guard = 0;
+        do p.nextDate = addMonths(p.nextDate, PREMIUM_MONTHS[p.cycle]);
+        while (p.nextDate <= s.today && guard++ < 60);
+      });
+      if (!name) return;
+      haptic(14);
+      const p = (next.insurance ?? []).find((x) => x.id === id)!;
+      toast({ text: `${name} premium recorded. Next one is due ${fmtDate(p.nextDate)}.`, tone: 'good', emoji: '🛡️' });
+    },
+    [commit, toast],
+  );
+  const deleteInsurance = useCallback(
+    (id: string) => {
+      const before = ref.current;
+      const p = (before.insurance ?? []).find((x) => x.id === id);
+      if (!p) return;
+      commit((s) => void (s.insurance = (s.insurance ?? []).filter((x) => x.id !== id)));
+      toast({
+        text: `${p.name} removed. Past premiums stay in your history.`,
+        action: {
+          label: 'Undo',
+          run: () => commit((s) => void (s.insurance = [...(s.insurance ?? []), p])),
+        },
+      });
+    },
+    [commit, toast],
+  );
+
   // ---------- accounts, cards, debts ----------
   const saveAccount = useCallback(
     (a: Omit<Account, 'id'> & { id?: string }) => {
@@ -1066,6 +1177,9 @@ function useStoreImpl() {
     saveAccount,
     deleteAccount,
     saveInvestment,
+    saveInsurance,
+    payInsurance,
+    deleteInsurance,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

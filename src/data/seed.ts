@@ -43,6 +43,7 @@ export const CATEGORIES: Category[] = [
   { id: 'pets', name: 'Pets', icon: 'heart', emoji: '🐶', kind: 'expense' },
   { id: 'family', name: 'Family', icon: 'users', emoji: '👨‍👩‍👧', kind: 'expense' },
   { id: 'donations', name: 'Donations', icon: 'heart', emoji: '🙏', kind: 'expense' },
+  { id: 'insurance', name: 'Insurance', icon: 'shield', emoji: '🛡️', kind: 'expense' },
   { id: 'other', name: 'Other', icon: 'dots', emoji: '✨', kind: 'expense' },
   { id: 'salary', name: 'Salary', icon: 'briefcase', emoji: '💼', kind: 'income' },
   { id: 'freelance', name: 'Freelance', icon: 'spark', emoji: '🎨', kind: 'income' },

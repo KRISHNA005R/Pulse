@@ -271,7 +271,7 @@ function mergeStrings(base: string[] = [], local: string[] = [], remote: string[
   return [...new Set([...local.filter((x) => keep(x, remote)), ...remote.filter((x) => keep(x, local))])];
 }
 
-const LISTS = ['accounts', 'cards', 'debts', 'categories', 'transactions', 'budgets', 'plans', 'subscriptions', 'investments', 'incomes', 'people', 'groups', 'splits', 'settlements'] as const;
+const LISTS = ['accounts', 'cards', 'debts', 'categories', 'transactions', 'budgets', 'plans', 'subscriptions', 'investments', 'insurance', 'incomes', 'people', 'groups', 'splits', 'settlements'] as const;
 
 /**
  * Merge this device's data with another device's. `base` is the last synced copy (null the first

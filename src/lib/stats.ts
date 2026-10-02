@@ -53,6 +53,7 @@ export interface Summary {
     budgets: number;
     subs: number;
     invest: number;
+    insure: number;
     accounts: number;
     sync: boolean;
     streak: number;
@@ -87,7 +88,7 @@ function save(l: Local) {
   }
 }
 
-function platform(): Summary['platform'] {
+export function platform(): Summary['platform'] {
   const ua = navigator.userAgent;
   if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
   if (/Android/.test(ua)) return 'android';
@@ -134,11 +135,12 @@ export function buildSummary(s: State, l: Local = load()): Summary {
           budgets: s.budgets.length,
           subs: s.subscriptions.length,
           invest: s.investments.length,
+          insure: (s.insurance ?? []).length,
           accounts: s.accounts.length,
           sync: syncOn(),
           streak: streak(s).count,
         }
-      : { onboarded: false, personal: false, incomes: 0, salary: false, txMonth: 0, catsMonth: 0, plans: 0, budgets: 0, subs: 0, invest: 0, accounts: 0, sync: false, streak: 0 },
+      : { onboarded: false, personal: false, incomes: 0, salary: false, txMonth: 0, catsMonth: 0, plans: 0, budgets: 0, subs: 0, invest: 0, insure: 0, accounts: 0, sync: false, streak: 0 },
   };
 }
 
@@ -173,6 +175,9 @@ function flush(force = false, beacon = false) {
   save(l);
   post(buildSummary(s, l), beacon);
 }
+
+/** The day this device first opened PULSE. */
+export const firstSeen = () => load().since;
 
 /** Count something the person did (adding an expense, asking the AI…). */
 export function track(e: StatEvent) {

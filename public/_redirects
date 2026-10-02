@@ -22,6 +22,9 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 /api/ping   /.netlify/functions/stats  200
 /api/stats  /.netlify/functions/stats  200
 
+# ---- Feedback (see netlify/functions/feedback.ts) --------------------------------------------
+/api/feedback  /.netlify/functions/feedback  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301

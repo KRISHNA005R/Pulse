@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PULSE feedback form</title>
+</head>
+<body>
+  <!--
+    Nobody visits this page. It exists so Netlify can see the "feedback" form when the site is
+    deployed. The app sends each feedback message to this form, and Netlify emails it to the
+    address set under Forms → Form notifications in the Netlify dashboard.
+  -->
+  <form name="feedback" method="POST" data-netlify="true" netlify-honeypot="website">
+    <input name="website">
+    <input name="subject">
+    <input name="type">
+    <input name="rating">
+    <textarea name="message"></textarea>
+    <input name="contact">
+    <input name="device">
+    <input name="version">
+  </form>
+</body>
+</html>

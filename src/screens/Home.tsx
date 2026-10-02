@@ -5,19 +5,22 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { buildInsights } from '../lib/insights';
 import { detections, personBalances, socialTotals, upcoming } from '../lib/finance';
-import { addDays, greeting, relDay, rupees } from '../lib/format';
+import { addDays, daysBetween, fmtDate, greeting, relDay, rupees } from '../lib/format';
+import { firstSeen } from '../lib/stats';
 import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
 import { CategoryMark, EmptyState, PersonAvatar, SectionHeader } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
 export function HomeScreen() {
-  const { state } = useStore();
+  const { state, updateSettings } = useStore();
   const ui = useUI();
+  // Once, after about five days of real use: ask how it's going.
+  const askFeedback = state.mode === 'personal' && state.onboarding.done && !state.settings.feedbackAsked && daysBetween(firstSeen(), state.today) >= 5;
   // Soon (next 3 days), payday, and any big payment in the next 10 days.
   const next = useMemo(() => {
     const all = upcoming(state, addDays(state.today, 10), true);
     const soon = addDays(state.today, 3);
-    return all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.amount >= scaled(5000)).slice(0, 5);
+    return all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.kind === 'insurance' || u.amount >= scaled(5000)).slice(0, 5);
   }, [state]);
   const plans = state.plans.filter((p) => p.status === 'active').slice(0, 3);
   const recent = useMemo(() => [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4), [state.transactions]);
@@ -37,11 +40,11 @@ export function HomeScreen() {
         <ul className="flex flex-col">
           {next.map((u) => (
             <li key={u.id}>
-              <button type="button" className="row-btn" onClick={() => (u.kind === 'income' ? ui.push({ name: 'income' }, 'you') : u.kind === 'investment' ? ui.push({ name: 'investments' }, 'you') : u.kind === 'card' ? ui.push({ name: 'cards' }, 'you') : ui.openSheet({ type: 'sub-form', subId: u.ref }))}>
-                <CategoryMark state={state} category={u.kind === 'income' ? 'salary' : u.kind === 'investment' ? 'investments' : u.kind === 'subscription' ? 'subscriptions' : 'bills'} size={40} />
+              <button type="button" className="row-btn" onClick={() => (u.kind === 'income' ? ui.push({ name: 'income' }, 'you') : u.kind === 'investment' ? ui.push({ name: 'investments' }, 'you') : u.kind === 'insurance' ? ui.push({ name: 'insurance' }, 'you') : u.kind === 'card' ? ui.push({ name: 'cards' }, 'you') : ui.openSheet({ type: 'sub-form', subId: u.ref }))}>
+                <CategoryMark state={state} category={u.kind === 'income' ? 'salary' : u.kind === 'investment' ? 'investments' : u.kind === 'insurance' ? 'insurance' : u.kind === 'subscription' ? 'subscriptions' : 'bills'} size={40} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{u.name}</span>
-                  <span className="block text-[13px] text-ink3">{relDay(u.date, state.today)}{u.kind === 'investment' ? ' · auto-debit' : ''}</span>
+                  <span className="block text-[13px] text-ink3">{u.kind === 'insurance' && u.date < state.today ? `Was due ${fmtDate(u.date)}` : relDay(u.date, state.today)}{u.kind === 'investment' || u.auto ? ' · auto-debit' : ''}</span>
                 </span>
                 <span className={`num text-[15.5px] font-semibold ${u.kind === 'income' ? 'text-pos' : ''}`}>{u.kind === 'income' ? rupees(u.amount, { sign: true }) : rupees(u.amount)}</span>
               </button>
@@ -74,6 +77,24 @@ export function HomeScreen() {
           )}
         </ul>
       </section>
+
+      {askFeedback && (
+        <section aria-label="Feedback" className="-mt-2 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-[22px]" aria-hidden="true">
+            💬
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-semibold leading-tight">How's PULSE so far?</p>
+            <p className="mt-0.5 text-[13px] text-ink3">Tell us what to fix or build next. Takes 20 seconds.</p>
+            <button type="button" className="btn-primary mt-3 min-h-[38px] px-4 text-[14px]" onClick={() => ui.push({ name: 'feedback' }, 'you')}>
+              Share feedback
+            </button>
+          </div>
+          <button type="button" className="tap -mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center self-start rounded-full text-ink3 hover:bg-sunk" aria-label="Not now" onClick={() => updateSettings({ feedbackAsked: true })}>
+            <Icon name="x" size={16} />
+          </button>
+        </section>
+      )}
 
       <section aria-labelledby="h-plans">
         <SectionHeader id="h-plans" title="Your plans" action={{ label: 'See all', onClick: () => { ui.setPlansSegment('plans'); ui.resetTo('plans'); } }} />

@@ -70,6 +70,8 @@ export interface Transaction {
   toAccount?: ID;
   /** Set when this transfer is an instalment of a SIP / recurring investment. */
   investmentId?: ID;
+  /** Premium payment for this insurance policy. */
+  insuranceId?: ID;
   /** Set when this is a payday from one of the person's income sources. */
   incomeId?: ID;
 }
@@ -131,6 +133,32 @@ export interface Investment {
   lastStepUp?: ISODate;
   /** Money put in before the person started using PULSE (older instalments). */
   priorInvested?: number;
+}
+
+export type InsuranceKind = 'health' | 'life' | 'vehicle' | 'travel' | 'other';
+export type PremiumCycle = 'monthly' | 'quarterly' | 'half-yearly' | 'yearly';
+
+/** An insurance policy the person pays a premium for. A tracker only: PULSE never recommends policies. */
+export interface Insurance {
+  id: ID;
+  name: string;
+  kind: InsuranceKind;
+  premium: number;
+  cycle: PremiumCycle;
+  nextDate: ISODate;
+  /** Account the premium is paid from. */
+  account: ID;
+  /** Record the premium automatically on the due date (like a SIP). */
+  autoDebit: boolean;
+  /** For quarterly / half-yearly / yearly premiums: keep a share aside every month so the due date isn't a shock. */
+  spread: boolean;
+  /** When the policy was added to PULSE. The first keep-aside period starts here. */
+  since: ISODate;
+  /** Sum insured (optional). */
+  cover?: number;
+  /** Who it covers, e.g. "Me", "Parents" (optional). */
+  covers?: string;
+  notes?: string;
 }
 
 export type FundType = 'large' | 'index' | 'flexi' | 'hybrid' | 'mid' | 'small' | 'elss' | 'debt';
@@ -252,6 +280,8 @@ export interface Settings {
   appLock: boolean;
   /** The "explore the demo" banner on Home was dismissed. */
   hideDemoPrompt?: boolean;
+  /** The "how's PULSE so far?" card was answered or dismissed. */
+  feedbackAsked?: boolean;
 }
 
 export interface Onboarding {
@@ -276,6 +306,8 @@ export interface State {
   plans: Plan[];
   subscriptions: Subscription[];
   investments: Investment[];
+  /** Insurance policies. Missing on saves from before this existed. */
+  insurance?: Insurance[];
   incomes: IncomeSource[];
   people: Person[];
   groups: Group[];
