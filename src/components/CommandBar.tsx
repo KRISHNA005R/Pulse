@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { INSURANCE_ON } from '../lib/features';
+import { INSURANCE_ON, RECEIPT_SCAN_ON } from '../lib/features';
 import { AMOUNT_PREFIX, ex } from '../lib/currency';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -97,7 +97,7 @@ export function CommandBar({ initial = '' }: { initial?: string; onClose?: () =>
       [/feedback|bug|problem|suggest/, { id: 's-fb', icon: 'message', label: 'Send feedback', run: go(() => ui.resetTo('you', { name: 'feedback' })) }],
       [/debt|loan|emi/, { id: 's-debt', icon: 'bank', label: 'Debt', run: go(() => ui.resetTo('you', { name: 'debt' })) }],
       [/income|salary|payday/, { id: 's-inc', icon: 'briefcase', label: 'Income', run: go(() => ui.resetTo('you', { name: 'income' })) }],
-      [/scan|receipt/, { id: 's-scan', icon: 'scan', label: 'Scan a receipt', run: go(() => ui.openSheet({ type: 'receipt' })) }],
+      ...(RECEIPT_SCAN_ON ? ([[/scan|receipt/, { id: 's-scan', icon: 'scan', label: 'Scan a receipt', run: go(() => ui.openSheet({ type: 'receipt' })) }]] as [RegExp, Cmd][]) : []),
       [/share|loud/, { id: 's-share', icon: 'share', label: 'Share a budget card', run: go(() => ui.openSheet({ type: 'share-card' })) }],
     ];
     screens.forEach(([re, c]) => re.test(lower) && out.push(c));

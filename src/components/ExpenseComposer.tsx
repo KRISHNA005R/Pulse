@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { RECEIPT_SCAN_ON } from '../lib/features';
 import { hasCents, sym } from '../lib/currency';
 import type { CategoryId, SplitMode, TxType } from '../types';
 import { useStore } from '../store/store';
@@ -183,9 +184,11 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             );
           })}
         </div>
-        <button type="button" onClick={() => ui.replaceSheet({ type: 'receipt' })} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-line text-ink hover:border-ink/50" aria-label="Scan a receipt">
-          <Icon name="scan" size={19} />
-        </button>
+        {RECEIPT_SCAN_ON && (
+          <button type="button" onClick={() => ui.replaceSheet({ type: 'receipt' })} className="tap grid h-11 w-11 shrink-0 place-items-center rounded-full border-[1.5px] border-line text-ink hover:border-ink/50" aria-label="Scan a receipt">
+            <Icon name="scan" size={19} />
+          </button>
+        )}
       </div>
 
       {/* Amount */}

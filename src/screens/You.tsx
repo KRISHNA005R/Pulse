@@ -63,7 +63,7 @@ export function YouScreen() {
         <NavRow icon="user" label="Profile" onClick={() => go({ name: 'settings', section: 'profile' })} />
         <NavRow icon="tags" label="Categories" sub={`${state.categories.filter((c) => c.kind === 'expense').length} categories`} onClick={() => go({ name: 'categories' })} />
         <NavRow icon="sliders" label="Budget preferences" sub={`Safety buffer ${rupees(state.settings.buffer)}`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
-        <NavRow icon="bell" label="Notifications" onClick={() => go({ name: 'settings', section: 'notifications' })} />
+        <NavRow icon="spark" label="Money moments" sub={state.settings.notifications.moments ? 'On · a small win after you log something' : 'Off'} onClick={() => go({ name: 'settings', section: 'notifications' })} />
         <NavRow icon="palette" label="Appearance" sub={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
         <NavRow icon="rupee" label="Currency" sub={`${currencyOf(state.settings.currency).name} (${currencyOf(state.settings.currency).symbol})`} onClick={() => go({ name: 'settings', section: 'currency' })} />
       </section>
@@ -81,11 +81,10 @@ export function YouScreen() {
 
       <section aria-labelledby="you-privacy" className="mb-8">
         <SectionHeader id="you-privacy" title="Privacy & data" />
-        <NavRow icon="lock" label="Security" onClick={() => go({ name: 'settings', section: 'security' })} />
+        <NavRow icon="lock" label="Hide balances" sub={state.settings.hideBalances ? 'On · tap the number to show it' : 'Off'} onClick={() => go({ name: 'settings', section: 'security' })} />
         <NavRow icon="shield" label="Data & privacy" onClick={() => go({ name: 'settings', section: 'privacy' })} />
         <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
         <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
-        <NavRow icon="link" label="Connected accounts" sub="None connected" onClick={() => go({ name: 'settings', section: 'connected' })} />
         <NavRow icon="message" label="Send feedback" sub="Spill the tea: bugs, ideas, vibes" onClick={() => go({ name: 'feedback' })} />
         <a href="/about/" className="row-btn min-h-[56px]">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sunk text-ink2" aria-hidden="true">
@@ -752,8 +751,8 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
   const [nm, setNm] = useState(state.user.fullName);
 
   const titles: Record<typeof section, string> = {
-    notifications: 'Notifications',
-    security: 'Security',
+    notifications: 'Money moments',
+    security: 'Hide balances',
     privacy: 'Data & privacy',
     appearance: 'Appearance',
     currency: 'Currency',
@@ -774,15 +773,11 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       <TopNavigation title={titles[section]} onBack={ui.pop} />
       {section === 'notifications' && (
         <div className="divide-y divide-line">
-          <Toggle label="Bills and renewals" sub="A heads-up the day before something is due" checked={s.notifications.bills} onChange={(v) => updateSettings({ notifications: { ...s.notifications, bills: v } })} />
-          <Toggle label="Money moments" sub="Small wins after you log something. Never more than one a day." checked={s.notifications.moments} onChange={(v) => updateSettings({ notifications: { ...s.notifications, moments: v } })} />
-          <Toggle label="Weekly check-in" sub="Sunday evening summary" checked={s.notifications.weekly} onChange={(v) => updateSettings({ notifications: { ...s.notifications, weekly: v } })} />
-          <Toggle label="Splits and settle-ups" sub="When friends add or settle expenses" checked={s.notifications.splits} onChange={(v) => updateSettings({ notifications: { ...s.notifications, splits: v } })} />
+          <Toggle label="Money moments" sub="A small win shown in the app after you log something. Never more than one a day." checked={s.notifications.moments} onChange={(v) => updateSettings({ notifications: { ...s.notifications, moments: v } })} />
         </div>
       )}
       {section === 'security' && (
         <div className="divide-y divide-line">
-          <Toggle label="App lock" sub="Ask for your device PIN or biometrics on open" checked={s.appLock} onChange={(v) => updateSettings({ appLock: v })} />
           <Toggle label="Hide balances" sub="Blur the safe-to-spend number until you tap it" checked={s.hideBalances} onChange={(v) => updateSettings({ hideBalances: v })} />
         </div>
       )}
@@ -878,9 +873,6 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
             <Icon name="copy" size={16} /> Copy CSV
           </button>
         </div>
-      )}
-      {section === 'connected' && (
-        <EmptyState icon="link" title="Nothing connected." body="Bank sync is not part of this prototype. Everything is entered by you or scanned from receipts." />
       )}
     </div>
   );

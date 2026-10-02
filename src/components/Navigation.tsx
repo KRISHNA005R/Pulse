@@ -114,7 +114,7 @@ export function SideNavigation() {
         <Icon name="spark" size={17} /> Ask PULSE AI
       </button>
       <div className="mt-auto px-3 text-[12px] leading-relaxed text-ink3">
-        {state.mode === 'demo' ? `Demo data for ${state.user.name}.` : `Signed in as ${state.user.name} on this device.`} Nothing leaves this page.
+        {state.mode === 'demo' ? 'Demo data. None of these numbers are real.' : `${state.user.name}'s money, saved on this device.`}
       </div>
     </nav>
   );

@@ -46,7 +46,7 @@ export function InsuranceScreen() {
       />
 
       {list.length === 0 ? (
-        <EmptyState icon="shield" title="No policies yet." body="Add your health, term or vehicle insurance. PULSE keeps the premium aside, records it on the due date and tells you before it renews." action={{ label: 'Add a policy', onClick: add }} />
+        <EmptyState icon="shield" title="No policies yet." body="Add your health, term or vehicle insurance. PULSE keeps the premium aside, records it on the due date and shows it in Up next before it's due." action={{ label: 'Add a policy', onClick: add }} />
       ) : (
         <>
           <section className="rounded-3xl border border-line bg-surface p-5" aria-labelledby="ins-total">

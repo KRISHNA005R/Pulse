@@ -110,7 +110,7 @@ export function askPulse(s: State, question: string): AIAnswer {
   if (INSURANCE_ON && /\b(insurance|premiums?|polic(y|ies))\b/.test(q) && !/^(add|log|spent|paid|pay|got|record)\b/.test(q)) {
     const list = [...(s.insurance ?? [])].sort((a, b) => a.nextDate.localeCompare(b.nextDate));
     const link: AIBlock = { type: 'link', label: list.length ? 'Open insurance' : 'Add a policy', to: { kind: 'route', tab: 'you', route: { name: 'insurance' } } };
-    if (!list.length) return { text: "You haven't added any insurance yet. Add your health, term or vehicle policy and I'll keep the premium aside and remind you before it's due.", blocks: [link] };
+    if (!list.length) return { text: "You haven't added any insurance yet. Add your health, term or vehicle policy and I'll keep the premium aside and show it in Up next before it's due.", blocks: [link] };
     const t = insuranceTotals(s);
     const sts = safeToSpend(s);
     const n = list[0];

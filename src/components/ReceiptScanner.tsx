@@ -74,7 +74,7 @@ export function ReceiptScanner({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
-        <p className="mt-3 text-[12.5px] text-ink3">Prototype: text reading is simulated, your photo never leaves this page.</p>
+        <p className="mt-3 text-[12.5px] text-ink3">Reading the photo isn't built yet, so this shows a sample bill. Your photo never leaves this page.</p>
       </div>
     );
 
