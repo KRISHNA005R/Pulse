@@ -32,7 +32,7 @@ export function Sheet({
   useEffect(() => {
     opener.current = document.activeElement;
     const el = ref.current;
-    const first = el?.querySelector<HTMLElement>('[data-autofocus]') ?? el?.querySelector<HTMLElement>('input, button, textarea, select, [tabindex]:not([tabindex="-1"])');
+    const first = el?.querySelector<HTMLElement>('[data-autofocus]') ?? el?.querySelector<HTMLElement>('input, button:not([data-grab]), textarea, select, [tabindex]:not([tabindex="-1"])');
     window.setTimeout(() => first?.focus(), 30);
     const onKey = (e: KeyboardEvent) => {
       const dialogs = document.querySelectorAll('[role="dialog"]');

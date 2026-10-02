@@ -18,6 +18,9 @@ import { DemoGuideScreen, InstallScreen } from './screens/Learn';
 import { MIGRATED_FLAG } from './lib/migrate';
 import { applyUpdate, onUpdateReady } from './lib/update';
 import { InsuranceScreen } from './screens/Insurance';
+import { useInstallNudge } from './components/InstallPrompt';
+import { RemindersScreen } from './screens/Reminders';
+import { syncReminders } from './lib/reminders';
 import { FeedbackScreen } from './screens/Feedback';
 import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
 
@@ -42,6 +45,8 @@ function Screen() {
         return <InsuranceScreen />;
       case 'feedback':
         return <FeedbackScreen />;
+      case 'reminders':
+        return <RemindersScreen />;
       case 'income':
         return <IncomeScreen />;
       case 'cards':
@@ -139,6 +144,12 @@ function Shell() {
     [],
   );
   const ui = useUI();
+  useInstallNudge();
+  // Keep this device's queued reminders in step with the data (a few seconds after things settle).
+  useEffect(() => {
+    const t = window.setTimeout(() => void syncReminders(state), 6000);
+    return () => window.clearTimeout(t);
+  }, [state]);
   const initialTheme = useRef<string | null>(null);
 
   // Theme: explicit choice wins; "match device" hands control back to the page default.

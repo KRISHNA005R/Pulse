@@ -14,6 +14,7 @@ export type Route =
   | { name: 'investments' }
   | { name: 'insurance' }
   | { name: 'feedback' }
+  | { name: 'reminders' }
   | { name: 'income' }
   | { name: 'cards' }
   | { name: 'debt' }
@@ -49,6 +50,7 @@ export type SheetSpec =
   | { type: 'category-form'; categoryId?: string; kind?: 'expense' | 'income'; name?: string; onSaved?: (id: string) => void }
   | { type: 'investment-form'; investmentId?: string }
   | { type: 'insurance-form'; insuranceId?: string }
+  | { type: 'install' }
   | { type: 'card-form'; cardId?: string }
   | { type: 'debt-form'; debtId?: string }
   | { type: 'confirm'; title: string; body: string; confirm: string; run: () => void };

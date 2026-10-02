@@ -282,6 +282,21 @@ export interface Settings {
   hideDemoPrompt?: boolean;
   /** The "how's PULSE so far?" card was answered or dismissed. */
   feedbackAsked?: boolean;
+  /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
+  reminders?: ReminderPrefs;
+}
+
+export interface ReminderPrefs {
+  /** A nudge to log the day's spends, at `dailyAt` (HH:MM, the person's local time). */
+  daily: boolean;
+  dailyAt: string;
+  payday: boolean;
+  /** Bills, subscriptions, card bills, EMIs and SIPs due tomorrow. */
+  bills: boolean;
+  streak: boolean;
+  weekly: boolean;
+  /** Put names and amounts in the reminder text. Off keeps the text generic. */
+  details: boolean;
 }
 
 export interface Onboarding {

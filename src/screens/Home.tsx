@@ -10,6 +10,8 @@ import { firstSeen } from '../lib/stats';
 import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
 import { CategoryMark, EmptyState, PersonAvatar, SectionHeader } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
+import { InstallBanner } from '../components/InstallPrompt';
+import { ReminderCard } from './Reminders';
 
 export function HomeScreen() {
   const { state, updateSettings } = useStore();
@@ -33,6 +35,8 @@ export function HomeScreen() {
   return (
     <div className="stagger flex flex-col gap-8">
       <PaydayCard />
+      <InstallBanner />
+      <ReminderCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />
 
       <section aria-labelledby="h-next">

@@ -3,6 +3,7 @@ import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { INSURANCE_ON } from '../lib/features';
+import { remindersSummary } from './Reminders';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
@@ -63,6 +64,7 @@ export function YouScreen() {
         <NavRow icon="user" label="Profile" onClick={() => go({ name: 'settings', section: 'profile' })} />
         <NavRow icon="tags" label="Categories" sub={`${state.categories.filter((c) => c.kind === 'expense').length} categories`} onClick={() => go({ name: 'categories' })} />
         <NavRow icon="sliders" label="Budget preferences" sub={`Safety buffer ${rupees(state.settings.buffer)}`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
+        <NavRow icon="bell" label="Reminders" sub={remindersSummary()} onClick={() => go({ name: 'reminders' })} />
         <NavRow icon="spark" label="Money moments" sub={state.settings.notifications.moments ? 'On · a small win after you log something' : 'Off'} onClick={() => go({ name: 'settings', section: 'notifications' })} />
         <NavRow icon="palette" label="Appearance" sub={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
         <NavRow icon="rupee" label="Currency" sub={`${currencyOf(state.settings.currency).name} (${currencyOf(state.settings.currency).symbol})`} onClick={() => go({ name: 'settings', section: 'currency' })} />

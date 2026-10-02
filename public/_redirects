@@ -25,6 +25,9 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 # ---- Feedback: saved, then emailed through Resend (see netlify/functions/feedback.ts) ---------
 /api/feedback  /.netlify/functions/feedback  200
 
+# ---- Reminders by web push (see netlify/functions/push.ts) --------------------------------------
+/api/push  /.netlify/functions/push  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301

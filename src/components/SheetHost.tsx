@@ -1,5 +1,6 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
+import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
 import { Sheet } from './ui/Sheet';
 import { ExpenseComposer } from './ExpenseComposer';
@@ -119,6 +120,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Erase all data?" onClose={close} size="sm" z={z}>
           <EraseForm onDone={close} />
+        </Sheet>
+      );
+    case 'install':
+      return (
+        <Sheet title="Keep PULSE on your home screen" onClose={close} size="sm" z={z}>
+          <InstallPrompt onDone={close} />
         </Sheet>
       );
     case 'insurance-form':

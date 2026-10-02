@@ -106,7 +106,12 @@
         return fetch('/api/feedback', { headers: { 'x-stats-key': key }, cache: 'no-store' })
           .then(function (r) { return r.ok ? r.json() : null; })
           .catch(function () { return null; })
-          .then(function (fb) { render(d, fb); });
+          .then(function (fb) {
+            return fetch('/api/push?status=1', { headers: { 'x-stats-key': key }, cache: 'no-store' })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; })
+              .then(function (push) { render(d, fb, push); });
+          });
       })
       .catch(function (e) { app.innerHTML = '<p class="err">Could not load stats (' + esc(e.message) + '). Try again in a minute.</p>'; });
   }
@@ -135,7 +140,20 @@
       (fb.total ? '' : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up the moment someone sends it from You → Send feedback.</p>') + '</div>';
   }
 
-  function render(d, fb) {
+  function reminders(p) {
+    if (!p) return '';
+    var last = p.lastRun ? new Date(p.lastRun) : null;
+    var mins = last ? Math.round((Date.now() - last.getTime()) / 60000) : null;
+    var late = mins != null && mins > 40;
+    return '<div class="card" style="margin-top:12px"><h2>Reminders</h2><div class="muted">Notifications sent to phones that turned them on</div><div class="ret">' +
+      '<div><div class="muted">Devices with reminders on</div><div class="n">' + fmt(p.devices || 0) + '</div></div>' +
+      '<div><div class="muted">Sent today</div><div class="n">' + fmt(p.sentToday || 0) + '</div></div>' +
+      '<div><div class="muted">Sender last ran</div><div class="n" style="font-size:16px' + (late ? ';color:#C2412D' : '') + '">' + (mins == null ? 'Never' : mins < 2 ? 'Just now' : mins < 120 ? mins + ' min ago' : Math.round(mins / 60) + ' h ago') + '</div></div></div>' +
+      (mins == null ? '<p class="note">The sender runs every 15 minutes. If this still says “Never” an hour after the deploy, the schedule did not start: tell Claude.</p>'
+        : late ? '<p class="note err">The sender should run every 15 minutes. It looks stuck.</p>' : '') + '</div>';
+  }
+
+  function render(d, fb, push) {
     var t = d.totals;
     var max = Math.max(1, Math.max.apply(null, d.daily.map(function (x) { return x.active + 0; })), Math.max.apply(null, d.daily.map(function (x) { return x.newcomers; })));
     var cols = d.daily.map(function (x) {
@@ -190,6 +208,7 @@
       '<h2 style="margin-top:16px">App version</h2><div class="rows">' + dev(d.devices.version.map(function (v) { return { label: v.label.replace('T', ' ') + (v.label.length > 10 ? ' UTC' : ''), n: v.n }; })) + '</div></div>' +
       '</div>' +
       feedback(fb) +
+      reminders(push) +
       '<p class="note">One person on two devices counts twice. Nothing here can identify anyone or show amounts.</p>';
 
     document.getElementById('days').onchange = function (e) { days = Number(e.target.value); load(); };

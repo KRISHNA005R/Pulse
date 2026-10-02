@@ -9,3 +9,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+# Reminders: send whatever has fallen due, every 15 minutes.
+[functions."push-cron"]
+  schedule = "*/15 * * * *"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { inFrame, isIOS, isStandalone } from '../lib/pwa';
 import { CURRENCIES, detectCurrency, setCurrency, sym, type CurrencyCode } from '../lib/currency';
 import { useStore } from '../store/store';
 import { createFresh, nextFirstOfMonth } from '../data/seed';
@@ -22,6 +23,8 @@ export function Onboarding() {
   // Opened from a sync QR/link: go straight to linking this device.
   const [linkCode] = useState(() => takeSyncLink());
   const [step, setStep] = useState<Step>(linkCode ? 'join' : 'welcome');
+  // On iPhone the home-screen app keeps its own data, so it's better to install before setting up.
+  const iosBrowser = isIOS() && !isStandalone() && !inFrame();
   const [name, setName] = useState(state.mode === 'personal' ? state.user.fullName : '');
   const [reasons, setReasons] = useState<string[]>([]);
   const [pay, setPay] = useState('');
@@ -132,6 +135,11 @@ export function Onboarding() {
                 <button type="button" className="btn-ghost w-full" onClick={closeOnboarding}>
                   Cancel, keep my data
                 </button>
+              )}
+              {iosBrowser && (
+                <p className="rounded-2xl bg-sunk p-3 text-[13.5px] leading-snug text-ink2">
+                  <b className="text-ink">On iPhone?</b> Add PULSE to your Home Screen first (tap Share, then <b className="text-ink">Add to Home Screen</b>) and set up there. The home-screen app keeps its own data.
+                </p>
               )}
               <p className="text-center text-[12.5px] text-ink3">Your numbers stay in this browser on this device. No bank login needed.</p>
             </div>
