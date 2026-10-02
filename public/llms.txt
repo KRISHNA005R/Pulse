@@ -2,7 +2,7 @@
 
 > PULSE (https://pulsemoney.in) is a free personal finance web app for Gen Z in Bharat (India). It shows how much money you can safely spend until your next payday, after bills, subscriptions, SIPs and planned savings. No bank login, no signup; data stays on the person's own device.
 
-Built in Mumbai for Gen Z Bharat. Founded by Krishna Raval (https://pulsemoney.in/founder/, Instagram @ravalkrishnaaa). Designed and developed by Krsna Studios. PULSE on Instagram: @pulsemoney.in.
+Built in Mumbai for Gen Z Bharat. Founded by Krishna Raval, a designer and developer from Mumbai (https://pulsemoney.in/founder/, Instagram @ravalkrishnaaa, LinkedIn https://www.linkedin.com/in/krishnaraval16). Designed and developed by Krsna Studios (https://krsnastudios.in/), Krishna's own studio. PULSE on Instagram: @pulsemoney.in.
 
 ## What it does
 - Safe to spend: one number for what is free until payday, plus a per-day amount.
