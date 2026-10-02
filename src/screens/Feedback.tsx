@@ -39,17 +39,23 @@ const writeDraft = (t: string) => {
 /** Send to our own store (always) and to the Netlify form (which emails it). Either one arriving is a success. */
 async function send(payload: { type: TypeId; rating: number | null; message: string; contact: string; device: string; version: string; installed: boolean; platform: string }) {
   const t = TYPES.find((x) => x.id === payload.type)!;
+  // Every message gets its own reference and time. Without them, two messages of the same type
+  // have identical subject lines and Gmail folds them into one conversation, so the second looks lost.
+  const ref = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[b % 31]).join('');
+  const sent = new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
   const saved = fetch('/api/feedback', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: payload.type, rating: payload.rating, message: payload.message, contact: payload.contact, meta: { ver: payload.version, platform: payload.platform, installed: payload.installed, screen: `${window.innerWidth}x${window.innerHeight}` } }),
+    body: JSON.stringify({ ref, type: payload.type, rating: payload.rating, message: payload.message, contact: payload.contact, meta: { ver: payload.version, platform: payload.platform, installed: payload.installed, screen: `${window.innerWidth}x${window.innerHeight}` } }),
   }).then((r) => r.ok);
   const mailed = fetch('/feedback-form.html', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       'form-name': 'feedback',
-      subject: `PULSE feedback: ${t.emoji} ${t.label}${payload.rating ? ` (${payload.rating}/5)` : ''}`,
+      subject: `PULSE feedback #${ref} · ${t.emoji} ${t.label}${payload.rating ? ` (${payload.rating}/5)` : ''} · ${sent}`,
+      ref,
+      sent,
       type: `${t.emoji} ${t.label}`,
       rating: payload.rating ? `${payload.rating}/5 ${FACES[payload.rating - 1]}` : 'Not given',
       message: payload.message,

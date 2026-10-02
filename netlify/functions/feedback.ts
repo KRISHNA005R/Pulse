@@ -21,6 +21,7 @@ const str = (x: unknown, max: number) => (typeof x === 'string' ? x.trim().slice
 
 export interface Feedback {
   at: string;
+  ref: string;
   type: string;
   rating: number | null;
   message: string;
@@ -36,6 +37,7 @@ export function cleanFeedback(b: Record<string, unknown> | null): Feedback | nul
   const rating = typeof b.rating === 'number' && b.rating >= 1 && b.rating <= 5 ? Math.round(b.rating) : null;
   return {
     at: new Date().toISOString(),
+    ref: str(b.ref, 8),
     type: TYPES.includes(b.type as string) ? (b.type as string) : 'idea',
     rating,
     message,

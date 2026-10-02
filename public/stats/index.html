@@ -131,6 +131,7 @@
       var dev = { ios: 'iPhone', android: 'Android', desktop: 'Computer' }[x.meta && x.meta.platform] || 'Device';
       return '<div class="fb"><div class="fbh"><span class="tag">' + t[0] + ' ' + esc(t[1]) + '</span>' +
         (x.rating ? '<span class="tag">' + FACES[x.rating - 1] + ' ' + x.rating + '/5</span>' : '') +
+        (x.ref ? '<span class="muted">#' + esc(x.ref) + '</span>' : '') +
         '<span class="muted">' + esc(when.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) + '</span></div>' +
         '<p class="fbm">' + esc(x.message) + '</p>' +
         '<div class="muted">' + (x.contact ? 'Reply to: <b style="color:var(--ink)">' + esc(x.contact) + '</b> · ' : '') + esc(dev) + (x.meta && x.meta.installed ? ' · installed app' : ' · browser') + '</div></div>';
