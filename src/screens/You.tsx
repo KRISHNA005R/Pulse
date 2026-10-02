@@ -65,7 +65,6 @@ export function YouScreen() {
         <NavRow icon="tags" label="Categories" sub={`${state.categories.filter((c) => c.kind === 'expense').length} categories`} onClick={() => go({ name: 'categories' })} />
         <NavRow icon="sliders" label="Budget preferences" sub={`Safety buffer ${rupees(state.settings.buffer)}`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
         <NavRow icon="bell" label="Reminders" sub={remindersSummary()} onClick={() => go({ name: 'reminders' })} />
-        <NavRow icon="spark" label="Money moments" sub={state.settings.notifications.moments ? 'On · a small win after you log something' : 'Off'} onClick={() => go({ name: 'settings', section: 'notifications' })} />
         <NavRow icon="palette" label="Appearance" sub={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
         <NavRow icon="rupee" label="Currency" sub={`${currencyOf(state.settings.currency).name} (${currencyOf(state.settings.currency).symbol})`} onClick={() => go({ name: 'settings', section: 'currency' })} />
       </section>
@@ -83,7 +82,6 @@ export function YouScreen() {
 
       <section aria-labelledby="you-privacy" className="mb-8">
         <SectionHeader id="you-privacy" title="Privacy & data" />
-        <NavRow icon="lock" label="Hide balances" sub={state.settings.hideBalances ? 'On · tap the number to show it' : 'Off'} onClick={() => go({ name: 'settings', section: 'security' })} />
         <NavRow icon="shield" label="Data & privacy" onClick={() => go({ name: 'settings', section: 'privacy' })} />
         <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
         <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />

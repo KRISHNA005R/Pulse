@@ -221,6 +221,10 @@ export function refresh(input: State): State {
   // Older saves: add anything newer versions expect.
   s.investments = s.investments ?? [];
   s.insurance = s.insurance ?? [];
+  // These two no longer have a switch in You. Money moments are always on; balances are always shown,
+  // so nobody is left stuck with a setting they can't change. The code behind both is kept.
+  s.settings.notifications = { ...s.settings.notifications, moments: true };
+  s.settings.hideBalances = false;
   s.settings.currency = s.settings.currency ?? 'INR';
   for (const c of CATEGORIES) if (!s.categories.some((x) => x.id === c.id)) s.categories.push(structuredClone(c));
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
