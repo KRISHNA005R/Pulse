@@ -45,46 +45,78 @@ export interface Mail {
 const button = (label: string, href: string, kind: 'accent' | 'dark' | 'quiet' = 'accent') => {
   const bg = kind === 'accent' ? C.accent : kind === 'dark' ? C.ink : C.sunk;
   const fg = kind === 'dark' ? '#FFFFFF' : C.ink;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px"><tr><td style="border-radius:999px;background:${bg}">
-<a href="${href}" target="_blank" style="display:inline-block;padding:14px 26px;font-family:${BODY};font-size:15px;font-weight:700;color:${fg};text-decoration:none;border-radius:999px">${label}</a></td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 10px"><tr><td class="${kind === 'dark' ? 'e-bdark' : kind === 'quiet' ? 'e-bquiet' : ''}" style="border-radius:999px;background:${bg}">
+<a href="${href}" target="_blank" class="${kind === 'dark' ? 'e-bdark-a' : kind === 'quiet' ? 'e-bquiet-a' : ''}" style="display:inline-block;padding:14px 26px;font-family:${BODY};font-size:15px;font-weight:700;color:${fg};text-decoration:none;border-radius:999px">${label}</a></td></tr></table>`;
 };
 
 const chip = (text: string, on = false) =>
-  `<span style="display:inline-block;margin:0 6px 6px 0;padding:6px 12px;border-radius:999px;font-family:${BODY};font-size:13px;font-weight:600;background:${on ? C.ink : C.sunk};color:${on ? '#FFFFFF' : C.ink2}">${text}</span>`;
+  `<span class="${on ? 'e-chipon' : 'e-chip'}" style="display:inline-block;margin:0 6px 6px 0;padding:6px 12px;border-radius:999px;font-family:${BODY};font-size:13px;font-weight:600;background:${on ? C.ink : C.sunk};color:${on ? '#FFFFFF' : C.ink2}">${text}</span>`;
 
 /** The five vibes in a row, with the chosen one lit up. */
 const vibeMeter = (rating: number | null) =>
   `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="table-layout:fixed"><tr>${VIBES.map(([emoji, label], i) => {
     const on = rating === i + 1;
-    return `<td align="center" style="padding:0 3px"><div style="border-radius:16px;padding:10px 2px 8px;border:2px solid ${on ? C.accent : C.line};background:${on ? C.soft : C.card}">
+    return `<td align="center" style="padding:0 3px"><div class="${on ? 'e-von' : 'e-voff'}" style="border-radius:16px;padding:10px 2px 8px;border:2px solid ${on ? C.accent : C.line};background:${on ? C.soft : C.card}">
 <div style="font-size:24px;line-height:1.1${on ? '' : ';opacity:.45'}">${emoji}</div>
-<div style="font-family:${BODY};font-size:11px;font-weight:700;color:${on ? C.accent : C.ink3};margin-top:3px">${label}</div></div></td>`;
+<div class="${on ? '' : 'e-ink3'}" style="font-family:${BODY};font-size:11px;font-weight:700;color:${on ? C.accent : C.ink3};margin-top:3px">${label}</div></div></td>`;
   }).join('')}</tr></table>`;
 
-/** Page frame: dark PULSE header, a white card, a quiet footer. */
+// Dark theme: the same colours the app uses at night. Apple Mail and most modern mail apps follow
+// the device theme through this media query; Outlook uses the [data-ogsc]/[data-ogsb] copies.
+// Gmail ignores both and darkens emails its own way, which the plain colours below survive.
+const DARK: [string, string][] = [
+  ['.e-bg', 'background:#12110F'],
+  ['.e-head', 'background:#25221E'],
+  ['.e-card', 'background:#1C1A17;border-color:#2F2C27'],
+  ['.e-box', 'background:#25221E;color:#F3F1EC'],
+  ['.e-sunk', 'background:#25221E'],
+  ['.e-ink', 'color:#F3F1EC'],
+  ['.e-ink2', 'color:#BDB8AE'],
+  ['.e-ink3', 'color:#948F86'],
+  ['.e-von', 'background:#3E2015'],
+  ['.e-voff', 'background:#1C1A17;border-color:#2F2C27'],
+  ['.e-chip', 'background:#25221E;color:#BDB8AE'],
+  ['.e-chipon', 'background:#F3F1EC;color:#17140F'],
+  ['.e-bdark', 'background:#F3F1EC'],
+  ['.e-bdark-a', 'color:#17140F'],
+  ['.e-bquiet', 'background:#25221E'],
+  ['.e-bquiet-a', 'color:#F3F1EC'],
+];
+const important = (decl: string) => decl.split(';').map((d) => `${d} !important`).join(';');
+const DARK_CSS =
+  `@media (prefers-color-scheme:dark){${DARK.map(([sel, decl]) => `${sel}{${important(decl)}}`).join('')}}` +
+  DARK.map(([sel, decl]) => `[data-ogsc] ${sel},[data-ogsb] ${sel}{${important(decl)}}`).join('');
+
+/** Page frame: PULSE header with the submark, a card, a quiet footer. Light or dark with the device. */
 function shell(opts: { preheader: string; tag: string; body: string; footer: string }) {
   return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light only">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">
 <style>@import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Onest:wght@400;600;700&display=swap');
-@media (max-width:520px){.pad{padding:22px 18px !important}.h1{font-size:24px !important}}</style></head>
-<body style="margin:0;padding:0;background:${C.bg}">
+:root{color-scheme:light dark;supported-color-schemes:light dark}
+@media (max-width:520px){.pad{padding:22px 18px !important}.h1{font-size:24px !important}}
+${DARK_CSS}</style></head>
+<body class="e-bg" style="margin:0;padding:0;background:${C.bg}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.bg}">${opts.preheader}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.bg}"><tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="e-bg" style="background:${C.bg}"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px">
-<tr><td style="background:${C.ink};border-radius:24px 24px 0 0;padding:20px 26px">
+<tr><td class="e-head" style="background:${C.ink};border-radius:24px 24px 0 0;padding:18px 24px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
-    <td style="font-family:${DISPLAY};font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#FFFFFF">PULSE<span style="color:${C.accent}">.</span></td>
-    <td align="right" style="font-family:${BODY};font-size:12.5px;font-weight:600;color:#BDB8AE">${opts.tag}</td>
+    <td width="46" valign="middle"><img src="${SITE}/email/mark.png" width="36" height="36" alt="" style="display:block;border:0;border-radius:11px"></td>
+    <td valign="middle" style="font-family:${DISPLAY};font-size:22px;font-weight:800;letter-spacing:-0.5px;color:#FFFFFF">PULSE<span style="color:${C.accent}">.</span></td>
+    <td align="right" valign="middle" style="font-family:${BODY};font-size:12.5px;font-weight:600;color:#BDB8AE">${opts.tag}</td>
   </tr></table>
 </td></tr>
-<tr><td class="pad" style="background:${C.card};border:1px solid ${C.line};border-top:0;border-radius:0 0 24px 24px;padding:28px 26px">${opts.body}</td></tr>
-<tr><td style="padding:18px 12px 0;font-family:${BODY};font-size:12px;line-height:1.6;color:${C.ink3};text-align:center">${opts.footer}</td></tr>
+<tr><td class="pad e-card" style="background:${C.card};border:1px solid ${C.line};border-top:0;border-radius:0 0 24px 24px;padding:28px 26px">${opts.body}</td></tr>
+<tr><td class="e-ink3" style="padding:18px 12px 0;font-family:${BODY};font-size:12px;line-height:1.6;color:${C.ink3};text-align:center">${opts.footer}</td></tr>
 </table></td></tr></table></body></html>`;
 }
 
-const h1 = (t: string) => `<h1 class="h1" style="margin:0 0 10px;font-family:${DISPLAY};font-size:27px;line-height:1.15;font-weight:800;letter-spacing:-0.6px;color:${C.ink}">${t}</h1>`;
-const p = (t: string, color = C.ink2) => `<p style="margin:0 0 14px;font-family:${BODY};font-size:16px;line-height:1.55;color:${color}">${t}</p>`;
-const label = (t: string) => `<p style="margin:22px 0 8px;font-family:${BODY};font-size:11.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${C.ink3}">${t}</p>`;
+/** Which dark-theme class goes with a text colour. */
+const tone = (color: string) => (color === C.ink ? 'e-ink' : color === C.ink3 ? 'e-ink3' : 'e-ink2');
+const h1 = (t: string) => `<h1 class="h1 e-ink" style="margin:0 0 10px;font-family:${DISPLAY};font-size:27px;line-height:1.15;font-weight:800;letter-spacing:-0.6px;color:${C.ink}">${t}</h1>`;
+const p = (t: string, color = C.ink2) => `<p class="${tone(color)}" style="margin:0 0 14px;font-family:${BODY};font-size:16px;line-height:1.55;color:${color}">${t}</p>`;
+const label = (t: string) => `<p class="e-ink3" style="margin:22px 0 8px;font-family:${BODY};font-size:11.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:${C.ink3}">${t}</p>`;
 const when = (iso: string) => new Date(iso).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 const deviceOf = (fb: Feedback) => `${{ ios: 'iPhone', android: 'Android', desktop: 'Computer' }[fb.meta.platform] ?? 'Device'} · ${fb.meta.installed ? 'installed app' : 'browser'}`;
 
@@ -105,19 +137,19 @@ export function ownerEmail(fb: Feedback): Mail {
     button('See all feedback', `${SITE}/stats/feedback/`, isEmail || handle ? 'quiet' : 'accent');
 
   const body =
-    `<p style="margin:0 0 8px;font-family:${BODY};font-size:13px;color:${C.ink3}">#${esc(fb.ref)} · ${esc(time)}</p>` +
+    `<p class="e-ink3" style="margin:0 0 8px;font-family:${BODY};font-size:13px;color:${C.ink3}">#${esc(fb.ref)} · ${esc(time)}</p>` +
     h1(`${emoji} ${esc(name)}`) +
     (fb.message
-      ? `<div style="margin:16px 0 4px;background:${C.bg};border-left:4px solid ${C.accent};border-radius:6px 16px 16px 6px;padding:16px 18px;font-family:${BODY};font-size:17px;line-height:1.5;color:${C.ink};white-space:pre-wrap">${esc(fb.message)}</div>`
+      ? `<div class="e-box" style="margin:16px 0 4px;background:${C.bg};border-left:4px solid ${C.accent};border-radius:6px 16px 16px 6px;padding:16px 18px;font-family:${BODY};font-size:17px;line-height:1.5;color:${C.ink};white-space:pre-wrap">${esc(fb.message)}</div>`
       : p('No message this time, just taps.', C.ink3)) +
     label('Their vibe') +
     (fb.rating ? vibeMeter(fb.rating) : p('Not given', C.ink3)) +
     (wants.length ? label('Wants next') + `<div>${wants.map((w) => chip(esc(w), true)).join('')}</div>` : '') +
     label('From') +
-    `<table role="presentation" cellpadding="0" cellspacing="0" style="font-family:${BODY};font-size:14.5px;color:${C.ink}">
-<tr><td style="padding:3px 16px 3px 0;color:${C.ink3}">Contact</td><td style="padding:3px 0"><b>${fb.contact ? esc(fb.contact) : 'Not given'}</b></td></tr>
-<tr><td style="padding:3px 16px 3px 0;color:${C.ink3}">Device</td><td style="padding:3px 0">${esc(deviceOf(fb))}</td></tr>
-<tr><td style="padding:3px 16px 3px 0;color:${C.ink3}">Version</td><td style="padding:3px 0">${esc(fb.meta.ver.replace('T', ' ')) || 'Unknown'}</td></tr></table>` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" class="e-ink" style="font-family:${BODY};font-size:14.5px;color:${C.ink}">
+<tr><td class="e-ink3" style="padding:3px 16px 3px 0;color:${C.ink3}">Contact</td><td style="padding:3px 0"><b>${fb.contact ? esc(fb.contact) : 'Not given'}</b></td></tr>
+<tr><td class="e-ink3" style="padding:3px 16px 3px 0;color:${C.ink3}">Device</td><td style="padding:3px 0">${esc(deviceOf(fb))}</td></tr>
+<tr><td class="e-ink3" style="padding:3px 16px 3px 0;color:${C.ink3}">Version</td><td style="padding:3px 0">${esc(fb.meta.ver.replace('T', ' ')) || 'Unknown'}</td></tr></table>` +
     `<div style="margin-top:24px">${actions}</div>`;
 
   const text = [
@@ -175,18 +207,18 @@ export function thanksEmail(fb: Feedback): Mail {
     p(t.line) +
     (low ? p('Also: sorry PULSE wasn’t it for you this time. We’d rather hear “mid” than hear nothing. 🤝') : '') +
     (fb.rating ? label('Your vibe') + vibeMeter(fb.rating) : '') +
-    (wants.length ? label('You voted for') + `<div>${wants.map((w) => chip(`✓ ${esc(w)}`, true)).join('')}</div>` + `<p style="margin:6px 0 0;font-family:${BODY};font-size:13px;color:${C.ink3}">Every vote is counted.</p>` : '') +
+    (wants.length ? label('You voted for') + `<div>${wants.map((w) => chip(`✓ ${esc(w)}`, true)).join('')}</div>` + `<p class="e-ink3" style="margin:6px 0 0;font-family:${BODY};font-size:13px;color:${C.ink3}">Every vote is counted.</p>` : '') +
     label('What happens now') +
     `<table role="presentation" cellpadding="0" cellspacing="0" width="100%">${steps
       .map(
         ([e, a, b]) =>
-          `<tr><td width="44" valign="top" style="padding:0 0 12px"><div style="width:36px;height:36px;line-height:36px;text-align:center;font-size:18px;background:${C.sunk};border-radius:12px">${e}</div></td>
-<td valign="top" style="padding:0 0 12px;font-family:${BODY}"><div style="font-size:15px;font-weight:700;color:${C.ink}">${a}</div><div style="font-size:13.5px;color:${C.ink3}">${b}</div></td></tr>`,
+          `<tr><td width="44" valign="top" style="padding:0 0 12px"><div class="e-sunk" style="width:36px;height:36px;line-height:36px;text-align:center;font-size:18px;background:${C.sunk};border-radius:12px">${e}</div></td>
+<td valign="top" style="padding:0 0 12px;font-family:${BODY}"><div class="e-ink" style="font-size:15px;font-weight:700;color:${C.ink}">${a}</div><div class="e-ink3" style="font-size:13.5px;color:${C.ink3}">${b}</div></td></tr>`,
       )
       .join('')}</table>` +
     `<div style="margin-top:18px">${button('Open PULSE', `${SITE}/?source=thanks`)}${button('Send PULSE to your broke friend 💸', `https://wa.me/?text=${shareText}`, 'dark')}${button('Follow @pulsemoney.in', INSTAGRAM, 'quiet')}</div>` +
-    `<p style="margin:18px 0 0;font-family:${BODY};font-size:14.5px;line-height:1.5;color:${C.ink2}">Got more to say? Just hit reply. It goes to a human, not a void.</p>` +
-    `<p style="margin:14px 0 0;font-family:${BODY};font-size:15px;font-weight:700;color:${C.ink}">Team PULSE 🧡</p>`;
+    `<p class="e-ink2" style="margin:18px 0 0;font-family:${BODY};font-size:14.5px;line-height:1.5;color:${C.ink2}">Got more to say? Just hit reply. It goes to a human, not a void.</p>` +
+    `<p class="e-ink" style="margin:14px 0 0;font-family:${BODY};font-size:15px;font-weight:700;color:${C.ink}">Team PULSE 🧡</p>`;
 
   const text = [
     t.title,
@@ -213,7 +245,7 @@ export function thanksEmail(fb: Feedback): Mail {
       preheader: 'Your feedback landed. Here’s what happens now.',
       tag: 'Feedback received ✓',
       body,
-      footer: `You got this because someone sent feedback from PULSE with this email address (ref #${esc(fb.ref)}).<br>Not you? Ignore this, you won’t hear from us again. · <a href="${SITE}" style="color:${C.ink3}">pulsemoney.in</a>`,
+      footer: `You got this because someone sent feedback from PULSE with this email address (ref #${esc(fb.ref)}).<br>Not you? Ignore this, you won’t hear from us again. · <a href="${SITE}" class="e-ink3" style="color:${C.ink3}">pulsemoney.in</a>`,
     }),
     text,
   };
