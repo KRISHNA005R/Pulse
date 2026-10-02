@@ -4,14 +4,21 @@
 //   GET  /api/feedback  header x-stats-key                                        -> { total, items, wants } newest first
 //
 // Every message is saved first (so nothing is lost), then emailed through Resend. Whether the
-// email went out is saved with the message and shown on the private stats page.
+// emails went out is saved with the message and shown on the private feedback page.
+//
+// Two emails (templates in netlify/lib/emails.ts):
+//   1. to the person who builds PULSE, always
+//   2. a thank-you to the user, if they left an email address AND the domain is verified in Resend
 //
 // Netlify environment variables:
 //   RESEND_API_KEY   required for email. Without it, messages are only saved.
-//   FEEDBACK_TO      optional, where the email goes (defaults to the address below).
-//   FEEDBACK_FROM    optional, e.g. "PULSE <feedback@pulsemoney.in>" once the domain is verified in Resend.
+//   FEEDBACK_TO      optional, where the first email goes (defaults to the address below).
+//   FEEDBACK_FROM    e.g. "PULSE <hello@pulsemoney.in>". Set this once pulsemoney.in is verified in
+//                    Resend. It also switches the thank-you emails on: Resend's shared test sender
+//                    can only deliver to the account's own address, never to users.
 import { getStore } from '@netlify/blobs';
 import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
+import { EMAIL, ownerEmail, thanksEmail, TYPES, WANTS, type Mail } from '../lib/emails';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -26,6 +33,8 @@ export interface Env {
   to: string;
   from: string;
   keyHash: string;
+  /** Thank-you emails to users need a verified sending domain. */
+  canThank: boolean;
   fetch: typeof fetch;
 }
 
@@ -33,26 +42,7 @@ const DEFAULT_TO = 'krsnastudios16@gmail.com';
 // Resend's shared sender. It can only deliver to the Resend account's own address, which is all this needs.
 const DEFAULT_FROM = 'PULSE Feedback <onboarding@resend.dev>';
 
-export const TYPES: Record<string, [string, string]> = {
-  bug: ['🐞', 'Something broke'],
-  idea: ['💡', 'Build this pls'],
-  confusing: ['😵‍💫', "I'm confused"],
-  love: ['❤️', 'Just vibes'],
-};
-export const WANTS: Record<string, string> = {
-  widget: 'Home screen widget',
-  upi: 'Auto-read UPI spends',
-  reminders: 'Bill reminders',
-  challenges: 'Savings challenges',
-  friends: 'Compete with friends',
-  hindi: 'Hindi and more languages',
-};
-export const VIBES = ['💀 Nah', '😬 Mid', '😐 Okay', '😎 Solid', '🔥 Obsessed'];
-
 const str = (x: unknown, max: number) => (typeof x === 'string' ? x.trim().slice(0, max) : '');
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]{2,}$/;
-
 export interface Feedback {
   at: string;
   ref: string;
@@ -62,9 +52,12 @@ export interface Feedback {
   message: string;
   contact: string;
   meta: { ver: string; platform: string; installed: boolean; screen: string };
-  /** Did the email go out? */
+  /** Did the email to the PULSE team go out? */
   mailed?: boolean;
   mailNote?: string;
+  /** Did the thank-you to the user go out? Absent when they left no email address. */
+  thanked?: boolean;
+  thankNote?: string;
 }
 
 export function cleanFeedback(b: Record<string, unknown> | null): Feedback | null {
@@ -87,39 +80,13 @@ export function cleanFeedback(b: Record<string, unknown> | null): Feedback | nul
   };
 }
 
-export function emailFor(fb: Feedback): { subject: string; html: string; text: string; replyTo?: string } {
-  const [emoji, label] = TYPES[fb.type];
-  const when = new Date(fb.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-  const device = `${{ ios: 'iPhone', android: 'Android', desktop: 'Computer' }[fb.meta.platform] ?? 'Device'} · ${fb.meta.installed ? 'installed app' : 'browser'}`;
-  const vibe = fb.rating ? `${VIBES[fb.rating - 1]} (${fb.rating}/5)` : 'Not given';
-  const wants = fb.wants.map((w) => WANTS[w]);
-  const row = (k: string, v: string) => `<tr><td style="padding:6px 14px 6px 0;color:#746F67;font-size:13px;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:6px 0;font-size:14px;color:#17140F">${v}</td></tr>`;
-  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:8px">
-  <p style="font-size:13px;color:#746F67;margin:0 0 6px">PULSE feedback · #${esc(fb.ref)} · ${esc(when)}</p>
-  <h2 style="font-size:20px;margin:0 0 14px;color:#17140F">${emoji} ${esc(label)}</h2>
-  ${fb.message ? `<div style="background:#F6F5F2;border-radius:14px;padding:14px 16px;font-size:16px;line-height:1.5;color:#17140F;white-space:pre-wrap">${esc(fb.message)}</div>` : '<p style="color:#746F67;font-size:14px">No message, just taps.</p>'}
-  <table style="border-collapse:collapse;margin-top:16px">
-    ${row('Vibe', esc(vibe))}
-    ${wants.length ? row('Wants next', esc(wants.join(', '))) : ''}
-    ${row('Reply to', fb.contact ? `<b>${esc(fb.contact)}</b>` : 'Not given')}
-    ${row('Device', esc(device))}
-    ${row('App version', esc(fb.meta.ver.replace('T', ' ')) || 'Unknown')}
-  </table>
-  <p style="font-size:12.5px;color:#746F67;margin-top:18px">All feedback: https://pulsemoney.in/stats${EMAIL.test(fb.contact) ? ' · Hit Reply to answer this person directly.' : ''}</p>
-</div>`;
-  const text = [`${emoji} ${label}  (#${fb.ref}, ${when})`, '', fb.message || '(no message, just taps)', '', `Vibe: ${vibe}`, wants.length ? `Wants next: ${wants.join(', ')}` : '', `Reply to: ${fb.contact || 'Not given'}`, `Device: ${device}`, `App version: ${fb.meta.ver}`].filter((l) => l !== '').join('\n');
-  // The reference and time keep every subject different, so Gmail never folds two messages together.
-  return { subject: `PULSE feedback #${fb.ref} · ${emoji} ${label}${fb.rating ? ` · ${fb.rating}/5` : ''} · ${when}`, html, text, replyTo: EMAIL.test(fb.contact) ? fb.contact : undefined };
-}
-
-async function sendEmail(fb: Feedback, env: Env): Promise<{ ok: boolean; note: string }> {
+async function send(mail: Mail, to: string, env: Env, replyTo?: string): Promise<{ ok: boolean; note: string }> {
   if (!env.resendKey) return { ok: false, note: 'RESEND_API_KEY is not set in Netlify' };
-  const mail = emailFor(fb);
   try {
     const res = await env.fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { authorization: `Bearer ${env.resendKey}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ from: env.from, to: [env.to], subject: mail.subject, html: mail.html, text: mail.text, ...(mail.replyTo ? { reply_to: mail.replyTo } : {}) }),
+      body: JSON.stringify({ from: env.from, to: [to], subject: mail.subject, html: mail.html, text: mail.text, ...(replyTo ? { reply_to: replyTo } : {}) }),
     });
     if (res.ok) return { ok: true, note: '' };
     const detail = await res.text().catch(() => '');
@@ -133,6 +100,30 @@ async function sendEmail(fb: Feedback, env: Env): Promise<{ ok: boolean; note: s
   } catch (e) {
     return { ok: false, note: `Could not reach Resend: ${String((e as Error)?.message ?? e).slice(0, 120)}` };
   }
+}
+
+const THANKS_PER_DAY = 200;
+
+/**
+ * Thank the user, carefully. Anyone can type any address into the form, so: the email never
+ * repeats what was typed, one address gets at most one thank-you a day, and there's a daily cap.
+ */
+async function thank(fb: Feedback, store: StoreLike, env: Env): Promise<{ ok: boolean; note: string } | null> {
+  if (!EMAIL.test(fb.contact)) return null; // no email given (or an Instagram handle): nothing to send
+  if (!env.resendKey) return { ok: false, note: 'RESEND_API_KEY is not set in Netlify' };
+  if (!env.canThank) return { ok: false, note: 'Off until pulsemoney.in is verified in Resend and FEEDBACK_FROM is set' };
+  const day = fb.at.slice(0, 10);
+  const who = `thanks/${await sha256(fb.contact.toLowerCase())}`;
+  const last = (await store.get(who, { type: 'json' })) as { at?: string } | null;
+  if (last?.at && Date.parse(fb.at) - Date.parse(last.at) < 24 * 3600e3) return { ok: false, note: 'Already thanked this address today' };
+  const tally = ((await store.get(`thanks-day/${day}`, { type: 'json' })) as { n?: number } | null)?.n ?? 0;
+  if (tally >= THANKS_PER_DAY) return { ok: false, note: 'Daily thank-you limit reached' };
+  const res = await send(thanksEmail(fb), fb.contact, env, env.to);
+  if (res.ok) {
+    await store.setJSON(who, { at: fb.at });
+    await store.setJSON(`thanks-day/${day}`, { n: tally + 1 });
+  }
+  return res;
 }
 
 export async function handle(req: Request, store: StoreLike, env: Env): Promise<Response> {
@@ -153,8 +144,9 @@ export async function handle(req: Request, store: StoreLike, env: Env): Promise<
       // Keys sort by time, so the newest are easy to find. Save before emailing: the message is never lost.
       const key = `fb/${fb.at}-${fb.ref}`;
       await store.setJSON(key, fb);
-      const mail = await sendEmail(fb, env);
-      await store.setJSON(key, { ...fb, mailed: mail.ok, mailNote: mail.note || undefined });
+      const owner = ownerEmail(fb);
+      const [mail, thanks] = await Promise.all([send(owner, env.to, env, owner.replyTo), thank(fb, store, env)]);
+      await store.setJSON(key, { ...fb, mailed: mail.ok, mailNote: mail.note || undefined, ...(thanks ? { thanked: thanks.ok, thankNote: thanks.note || undefined } : {}) });
       if (!mail.ok) console.warn('feedback email not sent:', mail.note);
       return json({ ok: true });
     }
@@ -168,7 +160,7 @@ export async function handle(req: Request, store: StoreLike, env: Env): Promise<
       const tally: Record<string, number> = {};
       for (const f of items) for (const w of f.wants ?? []) tally[w] = (tally[w] ?? 0) + 1;
       const wants = Object.entries(tally).sort((a, b) => b[1] - a[1]).map(([id, n]) => ({ label: WANTS[id] ?? id, n }));
-      return json({ total: keys.length, items, wants, wantNames: WANTS, emailOn: !!env.resendKey });
+      return json({ total: keys.length, items, wants, wantNames: WANTS, typeNames: TYPES, emailOn: !!env.resendKey, thanksOn: !!env.resendKey && env.canThank });
     }
 
     return json({ error: 'method not allowed' }, 405);
@@ -183,6 +175,7 @@ export default async (req: Request) =>
     resendKey: process.env.RESEND_API_KEY,
     to: process.env.FEEDBACK_TO || DEFAULT_TO,
     from: process.env.FEEDBACK_FROM || DEFAULT_FROM,
+    canThank: !!process.env.FEEDBACK_FROM,
     keyHash: process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH,
     fetch,
   });

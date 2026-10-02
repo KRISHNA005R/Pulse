@@ -118,9 +118,6 @@
     }).join('');
   }
 
-  var FB = { bug: ['🐞', 'Something broke'], idea: ['💡', 'Build this pls'], confusing: ['😵‍💫', "I'm confused"], love: ['❤️', 'Just vibes'] };
-  var VIBES = ['💀 Nah', '😬 Mid', '😐 Okay', '😎 Solid', '🔥 Obsessed'];
-  var fbOpen = false;
   function feedback(fb) {
     if (!fb) return '<div class="card" style="margin-top:12px"><h2>Feedback</h2><p class="muted">Could not load feedback right now.</p></div>';
     var items = fb.items || [];
@@ -128,28 +125,14 @@
     var avg = rated.length ? Math.round((rated.reduce(function (a, x) { return a + x.rating; }, 0) / rated.length) * 10) / 10 : null;
     var failed = items.filter(function (x) { return x.mailed === false; }).length;
     var wants = fb.wants || [];
-    var list = items.map(function (x) {
-      var t = FB[x.type] || FB.idea;
-      var when = new Date(x.at);
-      var dev = { ios: 'iPhone', android: 'Android', desktop: 'Computer' }[x.meta && x.meta.platform] || 'Device';
-      return '<div class="fb"><div class="fbh"><span class="tag">' + t[0] + ' ' + esc(t[1]) + '</span>' +
-        (x.rating ? '<span class="tag">' + esc(VIBES[x.rating - 1]) + '</span>' : '') +
-        (x.ref ? '<span class="muted">#' + esc(x.ref) + '</span>' : '') +
-        '<span class="muted">' + esc(when.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) + '</span>' +
-        (x.mailed === true ? '<span class="muted">· emailed ✓</span>' : x.mailed === false ? '<span class="err" style="font-size:12.5px" title="' + esc(x.mailNote || '') + '">· email not sent</span>' : '') + '</div>' +
-        (x.message ? '<p class="fbm">' + esc(x.message) + '</p>' : '<p class="fbm muted">No message, just taps.</p>') +
-        (x.wants && x.wants.length ? '<div class="muted" style="margin-bottom:4px">Wants next: <b style="color:var(--ink)">' + esc(x.wants.map(function (id) { return (fb.wantNames || {})[id] || id; }).join(', ')) + '</b></div>' : '') +
-        '<div class="muted">' + (x.contact ? 'Reply to: <b style="color:var(--ink)">' + esc(x.contact) + '</b> · ' : '') + esc(dev) + (x.meta && x.meta.installed ? ' · installed app' : ' · browser') + '</div>' +
-        (x.mailed === false && x.mailNote ? '<div class="err" style="font-size:12.5px;margin-top:4px">' + esc(x.mailNote) + '</div>' : '') + '</div>';
-    }).join('');
     var wMax = Math.max.apply(null, wants.map(function (x) { return x.n; }).concat(1));
     return '<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">' +
       '<div><h2>Feedback</h2><div class="muted">' + fmt(fb.total || 0) + ' message' + (fb.total === 1 ? '' : 's') +
       (avg ? ' · average vibe ' + avg + '/5' : '') + (fb.emailOn === false ? ' · <span class="err">email is off: RESEND_API_KEY is missing in Netlify</span>' : failed ? ' · <span class="err">' + failed + ' not emailed</span>' : '') + '</div></div>' +
-      (items.length ? '<button id="fbtoggle" style="padding:10px 18px;font-size:14px" aria-expanded="' + fbOpen + '" aria-controls="fblist">' + (fbOpen ? 'Hide messages' : 'Show ' + (items.length === 1 ? 'the message' : 'all ' + items.length + ' messages')) + '</button>' : '') + '</div>' +
+      '<a href="/stats/feedback/" id="fbopen" style="display:inline-block;text-decoration:none;font-weight:700;border-radius:999px;padding:10px 18px;font-size:14px;background:var(--accent);color:#fff">' +
+      (fb.total ? 'Open all ' + fmt(fb.total) + ' message' + (fb.total === 1 ? '' : 's') + ' →' : 'Open feedback page →') + '</a></div>' +
       (wants.length ? '<h2 style="margin-top:16px">Most wanted</h2><div class="rows">' + bars(wants, wMax) + '</div>' : '') +
-      (items.length ? '<div id="fblist"' + (fbOpen ? '' : ' hidden') + '>' + list + (fb.total > items.length ? '<p class="note">Showing the latest ' + items.length + '.</p>' : '') + '</div>'
-        : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up here the moment someone sends it from You → Send feedback.</p>') + '</div>';
+      (fb.total ? '' : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up the moment someone sends it from You → Send feedback.</p>') + '</div>';
   }
 
   function render(d, fb) {
@@ -211,13 +194,6 @@
 
     document.getElementById('days').onchange = function (e) { days = Number(e.target.value); load(); };
     document.getElementById('ref').onclick = load;
-    var tg = document.getElementById('fbtoggle');
-    if (tg) tg.onclick = function () {
-      fbOpen = !fbOpen;
-      document.getElementById('fblist').hidden = !fbOpen;
-      tg.setAttribute('aria-expanded', fbOpen);
-      tg.textContent = fbOpen ? 'Hide messages' : 'Show ' + (fb.items.length === 1 ? 'the message' : 'all ' + fb.items.length + ' messages');
-    };
     document.getElementById('out').onclick = function () { setKey(''); login(); };
     var chart = document.getElementById('chart');
     chart.onmousemove = chart.ontouchstart = function (e) {

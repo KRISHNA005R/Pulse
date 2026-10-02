@@ -184,7 +184,7 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.onboarding.done, store.sync.enabled]);
 
-  // Home-screen shortcuts and deep links: /?action=add | afford | ai, /?tab=plans|activity|you
+  // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback, /?tab=plans|activity|you
   useEffect(() => {
     if (!state.onboarding.done) return;
     const q = new URLSearchParams(location.search);
@@ -195,6 +195,7 @@ function Shell() {
     if (action === 'add') ui.openSheet({ type: 'composer' });
     if (action === 'afford') ui.openSheet({ type: 'afford' });
     if (action === 'ai') ui.openSheet({ type: 'ai' });
+    if (action === 'feedback') ui.resetTo('you', { name: 'feedback' });
     q.delete('action');
     q.delete('tab');
     q.delete('source');
