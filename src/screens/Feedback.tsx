@@ -35,6 +35,15 @@ const WANTS = [
 const DEVICE: Record<string, string> = { ios: 'iPhone', android: 'Android', desktop: 'Computer', other: 'Other device' };
 
 const DRAFT = 'pulse-feedback-draft';
+const SAVED_EMAIL = 'pulse-feedback-email';
+const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]{2,}$/;
+const readEmail = () => {
+  try {
+    return localStorage.getItem(SAVED_EMAIL) ?? '';
+  } catch {
+    return '';
+  }
+};
 const readDraft = () => {
   try {
     return localStorage.getItem(DRAFT) ?? '';
@@ -62,14 +71,16 @@ export function FeedbackScreen() {
   const [typePicked, setTypePicked] = useState(false);
   const [wants, setWants] = useState<string[]>([]);
   const [message, setMessage] = useState(readDraft);
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState(readEmail);
+  const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const device = `${DEVICE[platform()]} · ${isStandalone() ? 'installed app' : 'browser'}`;
   const version = BUILD_TIME.slice(0, 16);
   // One tap is enough: a vibe, a wish, or a few words.
-  const ok = message.trim().length >= 3 || rating !== null || wants.length > 0;
+  const said = message.trim().length >= 3 || rating !== null || wants.length > 0;
+  const emailOk = EMAIL.test(contact.trim());
   const steps = [rating !== null, wants.length > 0, message.trim().length >= 3].filter(Boolean).length;
 
   const pickVibe = (n: number) => {
@@ -82,7 +93,14 @@ export function FeedbackScreen() {
   };
 
   const submit = async () => {
-    if (!ok || busy) return;
+    if (busy || !said) return;
+    if (!emailOk) {
+      setTouched(true);
+      document.getElementById('fb-contact')?.focus();
+      return;
+    }
+    // Close the keyboard before the thank-you screen appears.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     if (!navigator.onLine) return setErr("You're offline. Your message is saved here. Send it when you're back online.");
     setBusy(true);
     setErr(null);
@@ -104,6 +122,11 @@ export function FeedbackScreen() {
     setBusy(false);
     if (!sent) return setErr("Couldn't send right now. Your message is saved here. Try again in a minute.");
     writeDraft('');
+    try {
+      localStorage.setItem(SAVED_EMAIL, contact.trim());
+    } catch {
+      /* ignore */
+    }
     haptic(18);
     burst({ kind: 'confetti', power: 1.2 });
     store.updateSettings({ feedbackAsked: true });
@@ -114,14 +137,14 @@ export function FeedbackScreen() {
     return (
       <div>
         <TopNavigation title="Spill the tea" onBack={ui.pop} />
-        <div className="flex flex-col items-center px-6 py-12 text-center">
-          <span className="grid h-16 w-16 animate-boing place-items-center rounded-3xl bg-accent-soft text-[32px]" aria-hidden="true">
-            🫡
+        <div className="flex flex-col items-center overflow-hidden px-6 py-12 text-center">
+          <span className="grid h-[72px] w-[72px] animate-boing place-items-center rounded-3xl bg-accent-soft" aria-hidden="true">
+            <span className="block w-[1.4em] text-center text-[34px] leading-[1.2]">🙌</span>
           </span>
           <h2 className="display mt-5 text-[22px]">You're a real one.</h2>
           <p className="mt-2 max-w-[32ch] text-[15px] text-ink2">
             That just landed with the person who builds PULSE. {wants.length ? 'Your votes are counted. ' : ''}
-            {contact.trim() ? "We'll hit you back if we need details." : 'This is how PULSE gets better.'}
+            We'll hit you back if we need details.
           </p>
           <button type="button" className="btn-primary mt-6" onClick={ui.pop}>
             Done
@@ -132,6 +155,7 @@ export function FeedbackScreen() {
 
   return (
     <form
+      noValidate
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
@@ -178,7 +202,7 @@ export function FeedbackScreen() {
           <p id="fb-wants" className="mb-2.5 text-[15px] font-semibold">
             What should we build next? <span className="font-normal text-ink3">Tap all you want.</span>
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {WANTS.map((w) => {
               const on = wants.includes(w.id);
               return (
@@ -192,9 +216,12 @@ export function FeedbackScreen() {
                     setWants((xs) => (on ? xs.filter((x) => x !== w.id) : [...xs, w.id]));
                     setErr(null);
                   }}
-                  className={`tap flex items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-2 text-[14px] font-semibold ${on ? 'border-ink bg-ink text-bg' : 'border-line text-ink2'}`}
+                  className={`tap flex min-h-[56px] min-w-0 items-center gap-2.5 rounded-2xl border-[1.5px] px-3 py-2 text-left text-[14px] font-semibold leading-tight ${on ? 'border-ink bg-ink text-bg' : 'border-line text-ink2'}`}
                 >
-                  <span aria-hidden="true">{on ? '✓' : w.emoji}</span> {w.label}
+                  <span className="grid h-6 w-6 shrink-0 place-items-center text-[18px] leading-none" aria-hidden="true">
+                    {on ? '✓' : w.emoji}
+                  </span>
+                  <span className="min-w-0">{w.label}</span>
                 </button>
               );
             })}
@@ -243,9 +270,29 @@ export function FeedbackScreen() {
 
         <section>
           <label htmlFor="fb-contact" className="mb-1.5 block text-[15px] font-semibold">
-            Your @ or email <span className="font-normal text-ink3">(only if you want a reply)</span>
+            Your email <span className="font-normal text-ink3">so we can reply</span>
           </label>
-          <input id="fb-contact" className="field" value={contact} maxLength={120} onChange={(e) => setContact(e.target.value)} placeholder="@yourhandle or you@email.com" autoCapitalize="none" autoCorrect="off" />
+          <input
+            id="fb-contact"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            required
+            aria-invalid={touched && !emailOk}
+            aria-describedby="fb-contact-hint"
+            className={`field ${touched && !emailOk ? 'border-warn' : ''}`}
+            value={contact}
+            maxLength={120}
+            onChange={(e) => setContact(e.target.value)}
+            onBlur={() => setTouched(true)}
+            placeholder="you@email.com"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <p id="fb-contact-hint" className={`mt-1.5 text-[12.5px] ${touched && !emailOk ? 'font-medium text-warn' : 'text-ink3'}`}>
+            {touched && !emailOk ? (contact.trim() ? "That email doesn't look right. Check it once." : 'Add your email to send this.') : 'Only for replies and a quick thank-you. Nothing else.'}
+          </p>
         </section>
 
         {err && (
@@ -255,11 +302,11 @@ export function FeedbackScreen() {
         )}
 
         <div>
-          <button type="submit" disabled={!ok || busy} className="btn-accent w-full disabled:opacity-40">
-            {busy ? 'Sending…' : ok ? 'Send it 🚀' : 'Pick a vibe to start'}
+          <button type="submit" disabled={!said || busy} className={`btn-accent w-full disabled:opacity-40 ${said && !emailOk ? 'opacity-60' : ''}`}>
+            {busy ? 'Sending…' : !said ? 'Pick a vibe to start' : !emailOk ? 'Add your email to send' : 'Send it 🚀'}
           </button>
           <p className="mt-2 text-center text-[12.5px] text-ink3" aria-live="polite">
-            {steps === 0 ? 'One tap is enough. Seriously.' : steps === 1 ? 'Nice. Add more if you feel like it.' : steps === 2 ? "Now you're cooking." : 'Full send. You legend.'}
+            {steps === 0 ? 'One tap and your email. That’s it.' : steps === 1 ? 'Nice. Add more if you feel like it.' : steps === 2 ? "Now you're cooking." : 'Full send. You legend.'}
           </p>
           <p className="mt-4 flex items-start gap-2 px-1 text-[12.5px] text-ink3">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0" />

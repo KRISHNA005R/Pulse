@@ -3,6 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      // iPhone and iPad zoom the whole page when you tap a text box with small text, and stay
+      // zoomed afterwards (sideways scrolling, cut-off content). Capping the scale stops that.
+      // iOS still lets people pinch to zoom, so nothing is lost for accessibility.
+      if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+        var vp = document.querySelector('meta[name="viewport"]');
+        if (vp) vp.setAttribute('content', vp.getAttribute('content') + ', maximum-scale=1');
+      }
+    </script>
 
     <!-- Primary -->
     <title>PULSE: Safe-to-spend money app for Gen Z Bharat</title>
