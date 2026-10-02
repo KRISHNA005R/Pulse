@@ -102,25 +102,23 @@ async function send(mail: Mail, to: string, env: Env, replyTo?: string): Promise
   }
 }
 
-const THANKS_PER_DAY = 200;
+// A backstop against someone flooding the form, set well above normal use. Raise it if you need to.
+const THANKS_PER_DAY = 1000;
 
 /**
- * Thank the user, carefully. Anyone can type any address into the form, so: the email never
- * repeats what was typed, one address gets at most one thank-you a day, and there's a daily cap.
+ * Thank the user. Every message with an email address gets one, however many that person sends.
+ * Anyone can type any address into the form, so the email never repeats what was typed, and
+ * there's a high overall daily cap as a backstop.
  */
 async function thank(fb: Feedback, store: StoreLike, env: Env): Promise<{ ok: boolean; note: string } | null> {
   if (!EMAIL.test(fb.contact)) return null; // no email given (or an Instagram handle): nothing to send
   if (!env.resendKey) return { ok: false, note: 'RESEND_API_KEY is not set in Netlify' };
   if (!env.canThank) return { ok: false, note: 'Off until pulsemoney.in is verified in Resend and FEEDBACK_FROM is set' };
   const day = fb.at.slice(0, 10);
-  const who = `thanks/${await sha256(fb.contact.toLowerCase())}`;
-  const last = (await store.get(who, { type: 'json' })) as { at?: string } | null;
-  if (last?.at && Date.parse(fb.at) - Date.parse(last.at) < 24 * 3600e3) return { ok: false, note: 'Already thanked this address today' };
   const tally = ((await store.get(`thanks-day/${day}`, { type: 'json' })) as { n?: number } | null)?.n ?? 0;
-  if (tally >= THANKS_PER_DAY) return { ok: false, note: 'Daily thank-you limit reached' };
+  if (tally >= THANKS_PER_DAY) return { ok: false, note: `Daily limit of ${THANKS_PER_DAY} thank-you emails reached` };
   const res = await send(thanksEmail(fb), fb.contact, env, env.to);
   if (res.ok) {
-    await store.setJSON(who, { at: fb.at });
     await store.setJSON(`thanks-day/${day}`, { n: tally + 1 });
   }
   return res;

@@ -236,7 +236,7 @@ export function thanksEmail(fb: Feedback): Mail {
     'Got more to say? Just hit reply.',
     'Team PULSE',
     '',
-    `You got this because someone sent feedback from PULSE with this email address (ref #${fb.ref}). Not you? Ignore it, you won't hear from us again.`,
+    `You got this because someone sent feedback from PULSE with this email address (ref #${fb.ref}). Not you? You can ignore this.`,
   ].join('\n');
 
   return {
@@ -245,7 +245,7 @@ export function thanksEmail(fb: Feedback): Mail {
       preheader: 'Your feedback landed. Here’s what happens now.',
       tag: 'Feedback received ✓',
       body,
-      footer: `You got this because someone sent feedback from PULSE with this email address (ref #${esc(fb.ref)}).<br>Not you? Ignore this, you won’t hear from us again. · <a href="${SITE}" class="e-ink3" style="color:${C.ink3}">pulsemoney.in</a>`,
+      footer: `You got this because someone sent feedback from PULSE with this email address (ref #${esc(fb.ref)}).<br>Not you? You can ignore this. · <a href="${SITE}" class="e-ink3" style="color:${C.ink3}">pulsemoney.in</a>`,
     }),
     text,
   };
