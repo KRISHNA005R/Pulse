@@ -10,6 +10,7 @@ import type { State } from '../types';
 import { BUILD_TIME } from './update';
 import { isStandalone } from './pwa';
 import { streak } from './streak';
+import { INSURANCE_ON } from './features';
 
 const KEY = 'pulse-stats-v1';
 const ENDPOINT = '/api/ping';
@@ -135,7 +136,7 @@ export function buildSummary(s: State, l: Local = load()): Summary {
           budgets: s.budgets.length,
           subs: s.subscriptions.length,
           invest: s.investments.length,
-          insure: (s.insurance ?? []).length,
+          insure: INSURANCE_ON ? (s.insurance ?? []).length : 0,
           accounts: s.accounts.length,
           sync: syncOn(),
           streak: streak(s).count,

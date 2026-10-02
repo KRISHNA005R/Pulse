@@ -84,10 +84,10 @@ export function HomeScreen() {
             💬
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-semibold leading-tight">How's PULSE so far?</p>
-            <p className="mt-0.5 text-[13px] text-ink3">Tell us what to fix or build next. Takes 20 seconds.</p>
+            <p className="text-[15px] font-semibold leading-tight">Vibe check 👀 How's PULSE treating you?</p>
+            <p className="mt-0.5 text-[13px] text-ink3">One tap is enough. Vote on what we build next.</p>
             <button type="button" className="btn-primary mt-3 min-h-[38px] px-4 text-[14px]" onClick={() => ui.push({ name: 'feedback' }, 'you')}>
-              Share feedback
+              Spill the tea
             </button>
           </div>
           <button type="button" className="tap -mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center self-start rounded-full text-ink3 hover:bg-sunk" aria-label="Not now" onClick={() => updateSettings({ feedbackAsked: true })}>

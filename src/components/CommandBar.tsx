@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { INSURANCE_ON } from '../lib/features';
 import { AMOUNT_PREFIX, ex } from '../lib/currency';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -92,7 +93,7 @@ export function CommandBar({ initial = '' }: { initial?: string; onClose?: () =>
       [/recap|wrapped|month/, { id: 's-recap', icon: 'spark', label: 'Monthly recap', run: go(() => ui.openSheet({ type: 'recap' })) }],
       [/card|credit/, { id: 's-cards', icon: 'card', label: 'Credit cards', run: go(() => ui.resetTo('you', { name: 'cards' })) }],
       [/\bsips?\b|invest|mutual|\bppf\b|\bnps\b|\brd\b/, { id: 's-inv', icon: 'trend', label: 'Investments & SIPs', run: go(() => ui.resetTo('you', { name: 'investments' })) }],
-      [/insur|premium|polic/, { id: 's-ins', icon: 'shield', label: 'Insurance', run: go(() => ui.resetTo('you', { name: 'insurance' })) }],
+      ...(INSURANCE_ON ? ([[/insur|premium|polic/, { id: 's-ins', icon: 'shield', label: 'Insurance', run: go(() => ui.resetTo('you', { name: 'insurance' })) }]] as [RegExp, Cmd][]) : []),
       [/feedback|bug|problem|suggest/, { id: 's-fb', icon: 'message', label: 'Send feedback', run: go(() => ui.resetTo('you', { name: 'feedback' })) }],
       [/debt|loan|emi/, { id: 's-debt', icon: 'bank', label: 'Debt', run: go(() => ui.resetTo('you', { name: 'debt' })) }],
       [/income|salary|payday/, { id: 's-inc', icon: 'briefcase', label: 'Income', run: go(() => ui.resetTo('you', { name: 'income' })) }],

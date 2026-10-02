@@ -22,6 +22,7 @@ import type {
 import { CATEGORIES, createSeed } from '../data/seed';
 import { roundMoney, setCurrency } from '../lib/currency';
 import { burst } from '../lib/celebrate';
+import { INSURANCE_ON } from '../lib/features';
 import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
@@ -171,6 +172,7 @@ export function processDueInvestments(s: State): Transaction[] {
  */
 export function processDueInsurance(s: State): Transaction[] {
   const made: Transaction[] = [];
+  if (!INSURANCE_ON) return made;
   for (const p of s.insurance ?? []) {
     if (!p.autoDebit) continue;
     let guard = 0;

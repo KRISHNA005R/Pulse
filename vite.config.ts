@@ -86,9 +86,9 @@ export default defineConfig(({ mode }) => {
               },
               workbox: {
                 globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,jpg,webmanifest}'],
-                globIgnores: ['stats/**', 'feedback-form.html', 'screenshots/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
+                globIgnores: ['stats/**', 'screenshots/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
                 navigateFallback: '/index.html',
-                navigateFallbackDenylist: [/^\/stats/, /^\/feedback-form/, /^\/about/, /^\/404/, /^\/migrate/, /^\/api\//, /\.(xml|txt)$/],
+                navigateFallbackDenylist: [/^\/stats/, /^\/about/, /^\/404/, /^\/migrate/, /^\/api\//, /\.(xml|txt)$/],
                 cleanupOutdatedCaches: true,
                 clientsClaim: true,
                 skipWaiting: true,

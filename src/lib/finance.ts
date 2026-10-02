@@ -1,5 +1,6 @@
 import type { Budget, CategoryId, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
+import { INSURANCE_ON } from './features';
 import {
   addDays,
   addMonths,
@@ -143,7 +144,7 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
     if (inv.nextDate >= s.today && inv.nextDate < until)
       out.push({ id: inv.id, name: `SIP · ${inv.name}`, amount: inv.amount, date: inv.nextDate, kind: 'investment', ref: inv.id });
   }
-  for (const p of s.insurance ?? []) {
+  for (const p of INSURANCE_ON ? (s.insurance ?? []) : []) {
     // A premium that's past due and not recorded yet still has to be paid, so it stays on the list.
     if (p.nextDate < until) out.push({ id: p.id, name: `${p.name} premium`, amount: p.premium, date: p.nextDate, kind: 'insurance', ref: p.id, auto: p.autoDebit });
   }
@@ -232,7 +233,7 @@ export function safeToSpend(s: State): SafeToSpend {
   const invest = investItems.reduce((a, b) => a + b.amount, 0);
   const goalItems = s.plans.filter((p) => p.status === 'active' && p.cycleReserve > 0).map((plan) => ({ plan, amount: plan.cycleReserve }));
   const goals = goalItems.reduce((a, g) => a + g.amount, 0);
-  const setAsideItems = (s.insurance ?? []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
+  const setAsideItems = (INSURANCE_ON ? (s.insurance ?? []) : []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
   const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
   const buffer = s.settings.buffer;
   const safe = Math.max(0, roundMoney(available - bills - invest - goals - setAside - buffer));

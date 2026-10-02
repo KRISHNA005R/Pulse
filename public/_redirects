@@ -22,7 +22,7 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 /api/ping   /.netlify/functions/stats  200
 /api/stats  /.netlify/functions/stats  200
 
-# ---- Feedback (see netlify/functions/feedback.ts) --------------------------------------------
+# ---- Feedback: saved, then emailed through Resend (see netlify/functions/feedback.ts) ---------
 /api/feedback  /.netlify/functions/feedback  200
 
 # ---- Paths ----------------------------------------------------------------------------------

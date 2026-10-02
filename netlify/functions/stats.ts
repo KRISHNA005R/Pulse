@@ -150,7 +150,6 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
     { label: 'Used 5+ categories this month', n: count(R, (r) => r.s.catsMonth >= 5) },
     { label: 'Made a plan', n: count(R, (r) => r.s.plans > 0) },
     { label: 'Added a SIP', n: count(R, (r) => r.s.invest > 0) },
-    { label: 'Added insurance', n: count(R, (r) => r.s.insure > 0) },
     { label: 'Turned on sync', n: count(R, (r) => r.s.sync) },
     { label: 'Installed the app', n: count(R, (r) => r.installed) },
   ];

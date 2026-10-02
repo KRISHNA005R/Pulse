@@ -5,18 +5,33 @@ import { haptic } from '../lib/format';
 import { isStandalone } from '../lib/pwa';
 import { platform } from '../lib/stats';
 import { BUILD_TIME } from '../lib/update';
+import { burst } from '../lib/celebrate';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
+// Keep these ids and labels in step with netlify/functions/feedback.ts.
+const VIBES = [
+  { emoji: '💀', label: 'Nah', react: "Oof. Tell us what went wrong and we'll fix it.", type: 'bug' },
+  { emoji: '😬', label: 'Mid', react: 'Fair. What would make it better?', type: 'confusing' },
+  { emoji: '😐', label: 'Okay', react: "Okay isn't the goal. What's missing?", type: 'idea' },
+  { emoji: '😎', label: 'Solid', react: 'Love that. What would make it a 🔥?', type: 'idea' },
+  { emoji: '🔥', label: 'Obsessed', react: "We're blushing. What do you love most?", type: 'love' },
+] as const;
 const TYPES = [
-  { id: 'bug', emoji: '🐞', label: "Something's broken", ask: 'What happened, and what did you expect?' },
-  { id: 'idea', emoji: '💡', label: 'I have an idea', ask: 'What would you like PULSE to do?' },
-  { id: 'confusing', emoji: '😕', label: "Something's confusing", ask: 'Which part was confusing?' },
-  { id: 'love', emoji: '❤️', label: 'I love it', ask: 'What do you like most?' },
+  { id: 'bug', emoji: '🐞', label: 'Something broke', ask: 'What happened? What did you expect instead?' },
+  { id: 'idea', emoji: '💡', label: 'Build this pls', ask: 'What should PULSE do for you?' },
+  { id: 'confusing', emoji: '😵‍💫', label: "I'm confused", ask: 'Which part made no sense?' },
+  { id: 'love', emoji: '❤️', label: 'Just vibes', ask: 'What do you like most?' },
 ] as const;
 type TypeId = (typeof TYPES)[number]['id'];
-const FACES = ['😡', '😕', '😐', '🙂', '😍'];
-const FACE_LABEL = ['Terrible', 'Not good', 'Okay', 'Good', 'Love it'];
+const WANTS = [
+  { id: 'widget', emoji: '📱', label: 'Home screen widget' },
+  { id: 'upi', emoji: '⚡', label: 'Auto-read UPI spends' },
+  { id: 'reminders', emoji: '🔔', label: 'Bill reminders' },
+  { id: 'challenges', emoji: '🏆', label: 'Savings challenges' },
+  { id: 'friends', emoji: '👯', label: 'Compete with friends' },
+  { id: 'hindi', emoji: '🗣️', label: 'Hindi and more languages' },
+] as const;
 const DEVICE: Record<string, string> = { ios: 'iPhone', android: 'Android', desktop: 'Computer', other: 'Other device' };
 
 const DRAFT = 'pulse-feedback-draft';
@@ -36,43 +51,16 @@ const writeDraft = (t: string) => {
   }
 };
 
-/** Send to our own store (always) and to the Netlify form (which emails it). Either one arriving is a success. */
-async function send(payload: { type: TypeId; rating: number | null; message: string; contact: string; device: string; version: string; installed: boolean; platform: string }) {
-  const t = TYPES.find((x) => x.id === payload.type)!;
-  // Every message gets its own reference and time. Without them, two messages of the same type
-  // have identical subject lines and Gmail folds them into one conversation, so the second looks lost.
-  const ref = Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[b % 31]).join('');
-  const sent = new Date().toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
-  const saved = fetch('/api/feedback', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ref, type: payload.type, rating: payload.rating, message: payload.message, contact: payload.contact, meta: { ver: payload.version, platform: payload.platform, installed: payload.installed, screen: `${window.innerWidth}x${window.innerHeight}` } }),
-  }).then((r) => r.ok);
-  const mailed = fetch('/feedback-form.html', {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      'form-name': 'feedback',
-      subject: `PULSE feedback #${ref} · ${t.emoji} ${t.label}${payload.rating ? ` (${payload.rating}/5)` : ''} · ${sent}`,
-      ref,
-      sent,
-      type: `${t.emoji} ${t.label}`,
-      rating: payload.rating ? `${payload.rating}/5 ${FACES[payload.rating - 1]}` : 'Not given',
-      message: payload.message,
-      contact: payload.contact || 'Not given',
-      device: payload.device,
-      version: payload.version,
-    }).toString(),
-  }).then((r) => r.ok);
-  const results = await Promise.allSettled([saved, mailed]);
-  return results.some((r) => r.status === 'fulfilled' && r.value);
-}
+/** Every message gets its own short reference, shown in the email subject and on the stats page. */
+const newRef = () => Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[b % 31]).join('');
 
 export function FeedbackScreen() {
   const store = useStore();
   const ui = useUI();
-  const [type, setType] = useState<TypeId>('idea');
   const [rating, setRating] = useState<number | null>(null);
+  const [type, setType] = useState<TypeId>('idea');
+  const [typePicked, setTypePicked] = useState(false);
+  const [wants, setWants] = useState<string[]>([]);
   const [message, setMessage] = useState(readDraft);
   const [contact, setContact] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,18 +68,44 @@ export function FeedbackScreen() {
   const [done, setDone] = useState(false);
   const device = `${DEVICE[platform()]} · ${isStandalone() ? 'installed app' : 'browser'}`;
   const version = BUILD_TIME.slice(0, 16);
-  const ok = message.trim().length >= 3;
+  // One tap is enough: a vibe, a wish, or a few words.
+  const ok = message.trim().length >= 3 || rating !== null || wants.length > 0;
+  const steps = [rating !== null, wants.length > 0, message.trim().length >= 3].filter(Boolean).length;
+
+  const pickVibe = (n: number) => {
+    haptic(10);
+    const next = rating === n ? null : n;
+    setRating(next);
+    // The vibe suggests what the message is about, until the person picks for themselves.
+    if (next && !typePicked) setType(VIBES[next - 1].type);
+    setErr(null);
+  };
 
   const submit = async () => {
     if (!ok || busy) return;
     if (!navigator.onLine) return setErr("You're offline. Your message is saved here. Send it when you're back online.");
     setBusy(true);
     setErr(null);
-    const sent = await send({ type, rating, message: message.trim(), contact: contact.trim(), device, version, installed: isStandalone(), platform: platform() }).catch(() => false);
+    const sent = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ref: newRef(),
+        type,
+        rating,
+        wants,
+        message: message.trim(),
+        contact: contact.trim(),
+        meta: { ver: version, platform: platform(), installed: isStandalone(), screen: `${window.innerWidth}x${window.innerHeight}` },
+      }),
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
     setBusy(false);
     if (!sent) return setErr("Couldn't send right now. Your message is saved here. Try again in a minute.");
     writeDraft('');
-    haptic(16);
+    haptic(18);
+    burst({ kind: 'confetti', power: 1.2 });
     store.updateSettings({ feedbackAsked: true });
     setDone(true);
   };
@@ -99,13 +113,16 @@ export function FeedbackScreen() {
   if (done)
     return (
       <div>
-        <TopNavigation title="Send feedback" onBack={ui.pop} />
+        <TopNavigation title="Spill the tea" onBack={ui.pop} />
         <div className="flex flex-col items-center px-6 py-12 text-center">
           <span className="grid h-16 w-16 animate-boing place-items-center rounded-3xl bg-accent-soft text-[32px]" aria-hidden="true">
-            🙌
+            🫡
           </span>
-          <h2 className="display mt-5 text-[22px]">Got it. Thank you!</h2>
-          <p className="mt-2 max-w-[32ch] text-[15px] text-ink2">Every message is read. {contact.trim() ? "We'll get back to you if we need more details." : 'This is how PULSE gets better.'}</p>
+          <h2 className="display mt-5 text-[22px]">You're a real one.</h2>
+          <p className="mt-2 max-w-[32ch] text-[15px] text-ink2">
+            That just landed with the person who builds PULSE. {wants.length ? 'Your votes are counted. ' : ''}
+            {contact.trim() ? "We'll hit you back if we need details." : 'This is how PULSE gets better.'}
+          </p>
           <button type="button" className="btn-primary mt-6" onClick={ui.pop}>
             Done
           </button>
@@ -120,34 +137,99 @@ export function FeedbackScreen() {
         void submit();
       }}
     >
-      <TopNavigation title="Send feedback" onBack={ui.pop} sub="Found a problem or want something new? Tell us." />
+      <TopNavigation title="Spill the tea" onBack={ui.pop} sub="Roast us, hype us or tell us what broke. Every message gets read." />
 
-      <div className="flex flex-col gap-6">
-        <div role="radiogroup" aria-label="What is this about?" className="grid grid-cols-2 gap-2">
-          {TYPES.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="radio"
-              aria-checked={type === t.id}
-              onClick={() => setType(t.id)}
-              className={`tap flex min-h-[56px] items-center gap-2.5 rounded-2xl border-[1.5px] px-3.5 text-left text-[14px] font-semibold leading-tight ${type === t.id ? 'border-ink bg-surface' : 'border-line text-ink2'}`}
-            >
-              <span className="text-[20px]" aria-hidden="true">
-                {t.emoji}
-              </span>
-              {t.label}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col gap-7">
+        {/* 1. Vibe check: one tap */}
+        <section aria-labelledby="fb-vibe">
+          <p id="fb-vibe" className="mb-2.5 text-[15px] font-semibold">
+            Vibe check 👀 <span className="font-normal text-ink3">How's PULSE treating you?</span>
+          </p>
+          <div role="radiogroup" aria-labelledby="fb-vibe" className="grid grid-cols-5 gap-1.5">
+            {VIBES.map((v, i) => {
+              const on = rating === i + 1;
+              return (
+                <button
+                  key={v.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  aria-label={v.label}
+                  onClick={() => pickVibe(i + 1)}
+                  className={`tap flex min-h-[68px] flex-col items-center justify-center gap-0.5 rounded-2xl border-[1.5px] px-0.5 transition-transform ${on ? 'scale-105 border-accent bg-accent-soft' : 'border-line'}`}
+                >
+                  <span className={`text-[26px] leading-none ${on ? 'animate-boing' : rating ? 'opacity-50 grayscale' : ''}`} aria-hidden="true">
+                    {v.emoji}
+                  </span>
+                  <span className={`text-[11.5px] font-semibold ${on ? 'text-accent-ink' : 'text-ink3'}`}>{v.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {rating && (
+            <p className="mt-2.5 animate-toast text-[14px] font-medium text-ink2" aria-live="polite">
+              {VIBES[rating - 1].react}
+            </p>
+          )}
+        </section>
 
-        <div>
-          <label htmlFor="fb-msg" className="mb-1.5 block text-[13px] font-semibold text-ink2">
+        {/* 2. Vote on what's next: taps, no typing */}
+        <section aria-labelledby="fb-wants">
+          <p id="fb-wants" className="mb-2.5 text-[15px] font-semibold">
+            What should we build next? <span className="font-normal text-ink3">Tap all you want.</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {WANTS.map((w) => {
+              const on = wants.includes(w.id);
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() => {
+                    haptic(8);
+                    setWants((xs) => (on ? xs.filter((x) => x !== w.id) : [...xs, w.id]));
+                    setErr(null);
+                  }}
+                  className={`tap flex items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-2 text-[14px] font-semibold ${on ? 'border-ink bg-ink text-bg' : 'border-line text-ink2'}`}
+                >
+                  <span aria-hidden="true">{on ? '✓' : w.emoji}</span> {w.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[12.5px] text-ink3">Every vote is counted.</p>
+        </section>
+
+        {/* 3. Say it in your own words */}
+        <section aria-labelledby="fb-say">
+          <p id="fb-say" className="mb-2.5 text-[15px] font-semibold">
+            Say it your way <span className="font-normal text-ink3">(optional)</span>
+          </p>
+          <div role="radiogroup" aria-label="What is this about?" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
+            {TYPES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="radio"
+                aria-checked={type === t.id}
+                onClick={() => {
+                  setType(t.id);
+                  setTypePicked(true);
+                }}
+                className={`tap flex shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-2 text-[14px] font-semibold ${type === t.id ? 'border-ink bg-surface text-ink' : 'border-line text-ink3'}`}
+              >
+                <span aria-hidden="true">{t.emoji}</span> {t.label}
+              </button>
+            ))}
+          </div>
+          <label htmlFor="fb-msg" className="sr-only">
             {TYPES.find((t) => t.id === type)!.ask}
           </label>
           <textarea
             id="fb-msg"
-            className="field min-h-[132px] resize-y leading-snug"
+            className="field mt-2.5 min-h-[112px] resize-y leading-snug"
             value={message}
             maxLength={2000}
             onChange={(e) => {
@@ -155,37 +237,16 @@ export function FeedbackScreen() {
               writeDraft(e.target.value);
               setErr(null);
             }}
-            placeholder="Write it like you'd text a friend"
+            placeholder={`${TYPES.find((t) => t.id === type)!.ask} No filter, type like you're texting a friend.`}
           />
-        </div>
+        </section>
 
-        <div>
-          <p id="fb-rate" className="mb-2 text-[13px] font-semibold text-ink2">
-            How's PULSE so far? <span className="font-normal text-ink3">(optional)</span>
-          </p>
-          <div role="radiogroup" aria-labelledby="fb-rate" className="flex justify-between gap-1.5">
-            {FACES.map((f, i) => (
-              <button
-                key={f}
-                type="button"
-                role="radio"
-                aria-checked={rating === i + 1}
-                aria-label={FACE_LABEL[i]}
-                onClick={() => setRating(rating === i + 1 ? null : i + 1)}
-                className={`tap grid h-[52px] flex-1 place-items-center rounded-2xl border-[1.5px] text-[26px] transition-transform ${rating === i + 1 ? 'scale-105 border-accent bg-accent-soft' : 'border-line grayscale-[0.6]'}`}
-              >
-                <span aria-hidden="true">{f}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <label htmlFor="fb-contact" className="mb-1.5 block text-[13px] font-semibold text-ink2">
-            Email or Instagram <span className="font-normal text-ink3">(only if you want a reply)</span>
+        <section>
+          <label htmlFor="fb-contact" className="mb-1.5 block text-[15px] font-semibold">
+            Your @ or email <span className="font-normal text-ink3">(only if you want a reply)</span>
           </label>
-          <input id="fb-contact" className="field" value={contact} maxLength={120} onChange={(e) => setContact(e.target.value)} placeholder="you@email.com or @handle" autoCapitalize="none" autoCorrect="off" />
-        </div>
+          <input id="fb-contact" className="field" value={contact} maxLength={120} onChange={(e) => setContact(e.target.value)} placeholder="@yourhandle or you@email.com" autoCapitalize="none" autoCorrect="off" />
+        </section>
 
         {err && (
           <p className="rounded-2xl bg-warn/10 px-4 py-3 text-[14px] font-medium text-warn" role="alert">
@@ -195,12 +256,15 @@ export function FeedbackScreen() {
 
         <div>
           <button type="submit" disabled={!ok || busy} className="btn-accent w-full disabled:opacity-40">
-            {busy ? 'Sending…' : 'Send feedback'}
+            {busy ? 'Sending…' : ok ? 'Send it 🚀' : 'Pick a vibe to start'}
           </button>
-          <p className="mt-3 flex items-start gap-2 px-1 text-[12.5px] text-ink3">
+          <p className="mt-2 text-center text-[12.5px] text-ink3" aria-live="polite">
+            {steps === 0 ? 'One tap is enough. Seriously.' : steps === 1 ? 'Nice. Add more if you feel like it.' : steps === 2 ? "Now you're cooking." : 'Full send. You legend.'}
+          </p>
+          <p className="mt-4 flex items-start gap-2 px-1 text-[12.5px] text-ink3">
             <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
             <span>
-              Sent with your message: {device}, app version {version.replace('T', ' ')}. Nothing about your money.
+              Sent with it: {device}, app version {version.replace('T', ' ')}. Nothing about your money.
             </span>
           </p>
         </div>
