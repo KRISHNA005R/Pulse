@@ -196,18 +196,75 @@ export async function disableReminders() {
   save({ ...l, on: false, hash: undefined });
   try {
     await post({ action: 'off', id: l.id });
-    (await subscription(false))?.unsubscribe().catch(() => {});
+    // Waited for, so turning reminders straight back on gets a fresh address and not the one being closed.
+    await (await subscription(false))?.unsubscribe().catch(() => {});
   } catch {
     /* offline: the server drops the device the first time a send fails */
   }
 }
 
-export async function sendTestReminder(): Promise<boolean> {
+/** Throw away this device's push address and get a new one. Fixes an address that expired or was made with an old key. */
+async function resubscribe(): Promise<PushSubscription | null> {
+  const reg = await worker();
+  if (!reg) return null;
+  await (await reg.pushManager.getSubscription())?.unsubscribe().catch(() => {});
+  return subscription(true);
+}
+
+export interface TestResult {
+  /** Step 1: a notification shown straight from this device. Proves the phone lets PULSE show notifications. */
+  local: 'shown' | 'failed';
+  /** Step 2: a notification sent by the server, the way real reminders travel. 'fixed' = it failed, was repaired, then worked. */
+  push: 'sent' | 'fixed' | 'offline' | 'failed';
+  /** Why step 2 failed, for the message on screen: the server's reason, and the push service's status code. */
+  reason?: string;
+  code?: number;
+}
+
+/**
+ * The "Send a test" button. Two notifications, so it's clear which half is broken when one doesn't
+ * arrive: the first is shown by the phone itself, the second comes through the server. If the server
+ * can't deliver, the device signs up again from scratch and tries once more.
+ */
+export async function runReminderTest(s: State): Promise<TestResult> {
+  let local: TestResult['local'] = 'failed';
   try {
-    return (await post({ action: 'test', id: load().id })).ok;
+    const reg = await worker();
+    if (reg) {
+      // `renotify` isn't in TypeScript's list of options yet.
+      await reg.showNotification('Test 1 of 2 🔔', { body: 'Shown by this phone. PULSE is allowed to notify you.', tag: 'test-local', renotify: true, icon: '/icon-192.png', badge: '/favicon-96.png', data: { url: '/' } } as NotificationOptions);
+      local = 'shown';
+    }
   } catch {
-    return false;
+    /* reported as failed */
   }
+  const ask = async (): Promise<{ ok: boolean; reason?: string; code?: number }> => {
+    try {
+      const res = await post({ action: 'test', id: load().id });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; status?: number; reason?: string };
+      return { ok: res.ok && j.ok !== false, reason: j.reason, code: j.status };
+    } catch {
+      return { ok: false, reason: 'offline' };
+    }
+  };
+  let r = await ask();
+  if (r.ok) return { local, push: 'sent' };
+  if (r.reason === 'offline') return { local, push: 'offline' };
+  // The server couldn't deliver. Start this device's sign-up again and try once more.
+  try {
+    const sub = r.reason === 'unreachable' ? await subscription(true) : await resubscribe();
+    if (sub) {
+      save({ ...load(), hash: undefined });
+      if (await syncReminders(s, true)) {
+        const again = await ask();
+        if (again.ok) return { local, push: 'fixed' };
+        r = again;
+      }
+    }
+  } catch {
+    /* falls through to failed */
+  }
+  return { local, push: r.reason === 'offline' ? 'offline' : 'failed', reason: r.reason, code: r.code };
 }
 
 /** Send this device's reminders to the server, if they changed. Safe to call often. */

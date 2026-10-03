@@ -143,13 +143,23 @@ export async function removeDevice(store: StoreLike, id: string) {
   await store.delete(`dev/${id}`);
 }
 
+/**
+ * Send one notification now. When it can't, `reason` says which part failed, so the app can
+ * repair itself (subscribe again) or tell the person what to do:
+ *   no-device    the server doesn't know this device (it was dropped, or never finished signing up)
+ *   gone         the phone's push address has expired (404 / 410)
+ *   rejected     the push service refused it (401 / 403: the address was made with a different key)
+ *   unreachable  the push service didn't answer, or had an error of its own
+ */
 export async function sendTest(store: StoreLike, id: string, send: Sender, vapid: Vapid) {
-  if (!ID.test(id)) return { ok: false, status: 400 };
+  if (!ID.test(id)) return { ok: false, status: 400, reason: 'no-device' };
   const dev = (await store.get(`dev/${id}`, { type: 'json' })) as Device | null;
-  if (!dev) return { ok: false, status: 404 };
-  const status = await send(dev.sub, { title: 'Reminders are on 🔔', body: 'This is what a PULSE reminder looks like.', url: '/', tag: 'test' }, vapid).catch(() => 0);
+  if (!dev) return { ok: false, status: 404, reason: 'no-device' };
+  // A new tag each time, so a second test isn't swallowed as an update of the first.
+  const status = await send(dev.sub, { title: 'Test 2 of 2 🔔', body: 'Sent over the internet, the way real reminders arrive.', url: '/', tag: `test-${Date.now().toString(36)}` }, vapid).catch(() => 0);
   if (status === 404 || status === 410) await removeDevice(store, id);
-  return { ok: status >= 200 && status < 300, status };
+  const ok = status >= 200 && status < 300;
+  return { ok, status, ...(ok ? {} : { reason: status === 404 || status === 410 ? 'gone' : status === 401 || status === 403 ? 'rejected' : 'unreachable' }) };
 }
 
 /** Send everything that has fallen due in the last two hours. Run every 15 minutes. */

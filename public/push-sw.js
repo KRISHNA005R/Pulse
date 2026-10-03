@@ -11,8 +11,13 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(d.title || 'PULSE', {
       body: d.body || '',
       tag: d.tag || 'pulse',
+      // Without this, a notification that replaces an older one with the same tag arrives silently.
+      renotify: true,
       icon: '/icon-192.png',
       badge: '/favicon-96.png',
+      // A short double beat. Phones that set vibration per app (most newer Android versions) ignore it.
+      // The sound can't be chosen from here at all: the phone plays its own notification sound.
+      vibrate: [90, 70, 90],
       data: { url: d.url || '/' },
     }),
   );

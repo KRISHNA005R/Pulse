@@ -30,7 +30,10 @@ export const send: Sender = async (sub, payload, vapid) => {
     const res = await webpush.sendNotification(sub, JSON.stringify(payload), {
       vapidDetails: { subject: CONTACT, publicKey: vapid.publicKey, privateKey: vapid.privateKey },
       TTL: 6 * 3600, // a reminder that can't be delivered within six hours isn't worth showing
-      urgency: 'normal',
+      // 'high' wakes a sleeping phone. With 'normal', Android holds the message until the phone is next
+      // used, so a 9 pm reminder could turn up the next morning. Every push here shows a notification,
+      // which is what high urgency is meant for.
+      urgency: 'high',
     });
     return res.statusCode;
   } catch (e) {
