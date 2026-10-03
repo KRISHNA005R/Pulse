@@ -211,60 +211,31 @@ async function resubscribe(): Promise<PushSubscription | null> {
   return subscription(true);
 }
 
-export interface TestResult {
-  /** Step 1: a notification shown straight from this device. Proves the phone lets PULSE show notifications. */
-  local: 'shown' | 'failed';
-  /** Step 2: a notification sent by the server, the way real reminders travel. 'fixed' = it failed, was repaired, then worked. */
-  push: 'sent' | 'fixed' | 'offline' | 'failed';
-  /** Why step 2 failed, for the message on screen: the server's reason, and the push service's status code. */
-  reason?: string;
-  code?: number;
-}
-
 /**
- * The "Send a test" button. Two notifications, so it's clear which half is broken when one doesn't
- * arrive: the first is shown by the phone itself, the second comes through the server. If the server
- * can't deliver, the device signs up again from scratch and tries once more.
+ * The "Send a test" button: one notification, sent by the server the way real reminders travel.
+ * If the server can't deliver, this device signs up again from scratch and tries once more.
  */
-export async function runReminderTest(s: State): Promise<TestResult> {
-  let local: TestResult['local'] = 'failed';
-  try {
-    const reg = await worker();
-    if (reg) {
-      // `renotify` isn't in TypeScript's list of options yet.
-      await reg.showNotification('Test 1 of 2 🔔', { body: 'Shown by this phone. PULSE is allowed to notify you.', tag: 'test-local', renotify: true, icon: '/icon-192.png', badge: '/favicon-96.png', data: { url: '/' } } as NotificationOptions);
-      local = 'shown';
-    }
-  } catch {
-    /* reported as failed */
-  }
-  const ask = async (): Promise<{ ok: boolean; reason?: string; code?: number }> => {
+export async function runReminderTest(s: State): Promise<boolean> {
+  const ask = async (): Promise<{ ok: boolean; reason?: string }> => {
     try {
       const res = await post({ action: 'test', id: load().id });
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; status?: number; reason?: string };
-      return { ok: res.ok && j.ok !== false, reason: j.reason, code: j.status };
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; reason?: string };
+      return { ok: res.ok && j.ok !== false, reason: j.reason };
     } catch {
       return { ok: false, reason: 'offline' };
     }
   };
-  let r = await ask();
-  if (r.ok) return { local, push: 'sent' };
-  if (r.reason === 'offline') return { local, push: 'offline' };
-  // The server couldn't deliver. Start this device's sign-up again and try once more.
+  const r = await ask();
+  if (r.ok) return true;
+  if (r.reason === 'offline') return false;
   try {
     const sub = r.reason === 'unreachable' ? await subscription(true) : await resubscribe();
-    if (sub) {
-      save({ ...load(), hash: undefined });
-      if (await syncReminders(s, true)) {
-        const again = await ask();
-        if (again.ok) return { local, push: 'fixed' };
-        r = again;
-      }
-    }
+    if (!sub) return false;
+    save({ ...load(), hash: undefined });
+    return (await syncReminders(s, true)) && (await ask()).ok;
   } catch {
-    /* falls through to failed */
+    return false;
   }
-  return { local, push: r.reason === 'offline' ? 'offline' : 'failed', reason: r.reason, code: r.code };
 }
 
 /** Send this device's reminders to the server, if they changed. Safe to call often. */

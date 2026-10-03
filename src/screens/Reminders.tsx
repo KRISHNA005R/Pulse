@@ -4,7 +4,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { haptic } from '../lib/format';
 import { isIOS, isStandalone } from '../lib/pwa';
-import { buildReminders, disableReminders, enableReminders, markReminderAsked, prefsOf, pushPermission, pushSupported, reminderAsked, remindersOn, runReminderTest, syncReminders, type TestResult } from '../lib/reminders';
+import { buildReminders, disableReminders, enableReminders, markReminderAsked, prefsOf, pushPermission, pushSupported, reminderAsked, remindersOn, runReminderTest, syncReminders } from '../lib/reminders';
 import { Toggle, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
@@ -32,7 +32,6 @@ export function RemindersScreen() {
   const [on, setOn] = useState(remindersOn);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<TestResult | null>(null);
   const supported = pushSupported();
   const blocked = supported && pushPermission() === 'denied';
   const demo = state.mode !== 'personal';
@@ -61,16 +60,13 @@ export function RemindersScreen() {
     await disableReminders();
     setBusy(false);
     setOn(false);
-    setResult(null);
     store.toast({ text: 'Reminders are off for this device.' });
   };
   const test = async () => {
     setTesting(true);
-    setResult(null);
-    const r = await runReminderTest(state);
+    const ok = await runReminderTest(state);
     setTesting(false);
-    setResult(r);
-    haptic(10);
+    store.toast({ text: ok ? 'Test sent.' : "Couldn't send a test. Try again in a minute.", emoji: ok ? '🔔' : undefined });
   };
 
   return (
@@ -113,13 +109,12 @@ export function RemindersScreen() {
             <>
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button type="button" className="btn-primary min-h-[44px] text-[14px]" disabled={testing} onClick={() => void test()}>
-                  {testing ? 'Testing…' : 'Send a test'}
+                  {testing ? 'Sending…' : 'Send a test'}
                 </button>
                 <button type="button" className="btn-quiet min-h-[44px] text-[14px]" disabled={busy} onClick={() => void turnOff()}>
                   Turn off
                 </button>
               </div>
-              {result && <TestReport r={result} />}
             </>
           ) : (
             <button type="button" className="btn-accent mt-4 w-full" disabled={busy} onClick={() => void turnOn()}>
@@ -148,42 +143,6 @@ export function RemindersScreen() {
         </div>
       </section>
 
-      <section className="mt-8" aria-labelledby="rem-help">
-        <h2 id="rem-help" className="eyebrow mb-1 px-1">
-          Help
-        </h2>
-        <div className="divide-y divide-line">
-          <Help title="Reminders not arriving?">
-            {isIOS() ? (
-              <>
-                <li>iPhone Settings → Notifications → PULSE: turn on Allow Notifications.</li>
-                <li>A Focus mode (Sleep, Work, Do Not Disturb) hides notifications until it ends.</li>
-                <li>Reminders only work when PULSE is opened from the Home Screen icon.</li>
-              </>
-            ) : (
-              <>
-                <li>Phone Settings → Apps → PULSE (or Chrome, if you use PULSE in the browser) → Notifications: switch on, and not set to Silent.</li>
-                <li>Same place → Battery: choose “No restrictions”. On Xiaomi, Realme, Oppo and Vivo phones, also allow Autostart.</li>
-                <li>Do Not Disturb and Battery saver hold notifications back.</li>
-              </>
-            )}
-            <li>Then tap “Send a test” above. It shows which part is not working.</li>
-          </Help>
-          <Help title="Change the notification sound">
-            <li>A web app can’t pick its own sound. Your phone plays its usual one.</li>
-            {isIOS() ? (
-              <li>On iPhone the sound is fixed. You can turn it on or off in Settings → Notifications → PULSE → Sounds.</li>
-            ) : (
-              <>
-                <li>You can set a different sound just for PULSE: phone Settings → Apps → PULSE → Notifications → tap the category → Sound.</li>
-                <li>Using PULSE inside Chrome? Settings → Apps → Chrome → Notifications → pulsemoney.in → Sound.</li>
-                <li>Menu names differ a little from phone to phone.</li>
-              </>
-            )}
-          </Help>
-        </div>
-      </section>
-
       <section className="mt-8" aria-labelledby="rem-priv">
         <h2 id="rem-priv" className="eyebrow mb-1 px-1">
           What the reminder says
@@ -200,56 +159,6 @@ export function RemindersScreen() {
         </p>
       </section>
     </div>
-  );
-}
-
-/** What "Send a test" found: two steps, so it's clear which half isn't working. */
-function TestReport({ r }: { r: TestResult }) {
-  const delivered = r.push === 'sent' || r.push === 'fixed';
-  const why = `${r.reason ?? 'unknown'}${r.code ? ` ${r.code}` : ''}`;
-  const second =
-    r.push === 'sent'
-      ? 'Test 2 of 2 was sent from PULSE’s server. It should arrive in a few seconds.'
-      : r.push === 'fixed'
-        ? 'Reminders had stopped reaching this phone. That’s repaired now, and Test 2 of 2 is on its way.'
-        : r.push === 'offline'
-          ? 'Couldn’t reach PULSE’s server. Check your internet and try again.'
-          : r.reason === 'unreachable'
-            ? `PULSE’s server couldn’t reach your phone’s notification service (${why}). Try again in a minute.`
-            : `Couldn’t set this phone up again (${why}). Turn reminders off, turn them on, and test once more.`;
-  const Row = ({ ok, children }: { ok: boolean; children: React.ReactNode }) => (
-    <li className="flex items-start gap-2">
-      <span aria-hidden="true">{ok ? '✅' : '⚠️'}</span>
-      <span className="min-w-0">{children}</span>
-    </li>
-  );
-  return (
-    <div className="mt-3 rounded-2xl bg-sunk p-3 text-[13.5px] leading-snug" role="status">
-      <ul className="flex flex-col gap-2">
-        <Row ok={r.local === 'shown'}>{r.local === 'shown' ? 'Test 1 of 2 was shown by this phone.' : 'This phone didn’t let PULSE show a notification.'}</Row>
-        <Row ok={delivered}>{second}</Row>
-      </ul>
-      <p className="mt-2.5 text-ink2">
-        {r.local === 'shown' && delivered
-          ? 'Got both? You’re all set. Only the first one: your phone is stopping PULSE in the background. Neither: notifications are muted for PULSE. The fix for both is under Help below.'
-          : r.local !== 'shown'
-            ? 'Notifications look blocked or muted for PULSE on this phone. See Help below.'
-            : 'If the first test showed up, your phone is fine and the problem is on the sending side.'}
-      </p>
-    </div>
-  );
-}
-
-/** A fold-out help item. */
-function Help({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <details className="group px-2 py-3">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[15px] font-semibold [&::-webkit-details-marker]:hidden">
-        {title}
-        <Icon name="chevron" size={18} className="shrink-0 text-ink3 transition-transform group-open:rotate-90" />
-      </summary>
-      <ul className="mt-2 flex list-disc flex-col gap-1.5 pl-5 text-[13.5px] leading-snug text-ink2">{children}</ul>
-    </details>
   );
 }
 
