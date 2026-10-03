@@ -348,7 +348,9 @@ function useStoreImpl() {
         else toast({ text: `That puts ${cat} ${rupees(-st.left)} over its ${per} budget. Safe to spend: ${rupees(sts.safe)}.`, tone: 'heads-up' });
         return;
       }
-      toast({ text: `Added. Safe to spend is now ${rupees(sts.safe)}.` });
+      // Paid in cash: say what's left in the wallet, so it's clear which balance moved.
+      const from = next.accounts.find((a) => a.id === tx.account);
+      toast({ text: from?.type === 'cash' ? `Paid in cash. ${rupees(from.balance)} cash left. Safe to spend is now ${rupees(sts.safe)}.` : `Added. Safe to spend is now ${rupees(sts.safe)}.` });
     },
     [toast],
   );
@@ -928,6 +930,14 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** The cash account's id. Makes an empty one if the person removed theirs, so "paid in cash" always works. */
+  const ensureCashAccount = useCallback(() => {
+    const ex = ref.current.accounts.find((a) => a.type === 'cash');
+    if (ex) return ex.id;
+    const id = uid('acct');
+    commit((s) => void s.accounts.push({ id, name: 'Cash', institution: 'Wallet', type: 'cash', balance: 0, spendable: true }));
+    return id;
+  }, [commit]);
   const deleteAccount = useCallback(
     (id: string) => {
       commit((s) => void (s.accounts = s.accounts.filter((x) => x.id !== id)));
@@ -1181,6 +1191,7 @@ function useStoreImpl() {
     joinSync,
     disableSync,
     saveAccount,
+    ensureCashAccount,
     deleteAccount,
     saveInvestment,
     saveInsurance,

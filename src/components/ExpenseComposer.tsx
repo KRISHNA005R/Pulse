@@ -29,7 +29,10 @@ export interface ComposerPreset {
   toAccount?: string;
 }
 
-type Panel = null | 'category' | 'date' | 'account' | 'plan' | 'people' | 'paidby';
+type Panel = null | 'category' | 'date' | 'plan' | 'people' | 'paidby';
+
+/** Stands in for the cash account when the person has removed theirs. One is made when they save. */
+const NEW_CASH = '__new-cash';
 
 export function resolveShares(amount: number, ids: string[], mode: SplitMode, values: Record<string, string>) {
   const num = (id: string) => parseFloat(values[id] ?? '') || 0;
@@ -64,7 +67,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const [panel, setPanel] = useState<Panel>(preset?.openPanel ?? null);
   const [cat, setCat] = useState<CategoryId | null>(preset?.category ?? null);
   const [date, setDate] = useState(preset?.date ?? state.today);
-  const [account, setAccount] = useState(preset?.account ?? defaultAccount(state));
+  const [picked, setAccount] = useState(preset?.account ?? defaultAccount(state));
   const [toAccount, setToAccount] = useState(() => {
     if (preset?.toAccount) return preset.toAccount;
     const p = state.plans.find((x) => x.status === 'active');
@@ -84,6 +87,8 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   // Inference fills anything the user hasn't set by hand.
   const effAmount = parseFloat(amount) || (parsed.amount ?? 0);
   const effType: TxType = type !== 'expense' ? type : parsed.type === 'income' ? 'income' : 'expense';
+  // Only a spend can go on a credit card. Switching to Got or Moved falls back to the main account.
+  const account = effType !== 'expense' && state.cards.some((c) => c.id === picked) ? defaultAccount(state) : picked;
   const effCat: CategoryId = cat ?? (effType === 'income' ? (parsed.type === 'income' && /freelance|client/i.test(text) ? 'freelance' : /salary/i.test(text) ? 'salary' : 'income-other') : parsed.category ?? 'other');
   const effPlan = plan === undefined ? parsed.plan : plan;
   const effDate = preset?.date || date !== state.today ? date : parsed.date ?? date;
@@ -102,7 +107,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
 
   // Live preview of what this does to the week
   const sts = safeToSpend(state);
-  const spendable = state.accounts.find((a) => a.id === account)?.spendable ?? false;
+  const spendable = account === NEW_CASH || (state.accounts.find((a) => a.id === account)?.spendable ?? false);
   const impact = effType === 'expense' && spendable && paidBy === 'me' ? effAmount : 0;
   const budget = effType === 'expense' ? budgetFor(state, effCat) : undefined;
   const bLeft = budget ? budgetState(state, budget).left - myShare : null;
@@ -126,24 +131,41 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     // Create any new people typed in the description
     const created = pendingNew.map((n) => store.addPerson(n).id);
     const ids = [...effPeople, ...created];
+    const from = account === NEW_CASH ? store.ensureCashAccount() : account;
     if (effType === 'transfer') {
       const toInvest = state.accounts.find((a) => a.id === toAccount)?.type === 'investment';
-      const tx = { merchant: toAccount.startsWith('pot:') ? `Moved to ${state.plans.find((p) => `pot:${p.id}` === toAccount)?.name}` : toInvest ? `Invested · ${state.accounts.find((a) => a.id === toAccount)?.name}` : `Transfer to ${state.accounts.find((a) => a.id === toAccount)?.name}`, amount: effAmount, type: 'transfer' as const, direction: 'out' as const, toAccount, category: toInvest ? 'investments' : 'transfer', date: effDate, account, recurring, notes: text || undefined, plan: toAccount.startsWith('pot:') ? toAccount.slice(4) : undefined };
-      if (toAccount.startsWith('pot:')) store.contribute(toAccount.slice(4), effAmount, account);
+      const tx = { merchant: toAccount.startsWith('pot:') ? `Moved to ${state.plans.find((p) => `pot:${p.id}` === toAccount)?.name}` : toInvest ? `Invested · ${state.accounts.find((a) => a.id === toAccount)?.name}` : `Transfer to ${state.accounts.find((a) => a.id === toAccount)?.name}`, amount: effAmount, type: 'transfer' as const, direction: 'out' as const, toAccount, category: toInvest ? 'investments' : 'transfer', date: effDate, account: from, recurring, notes: text || undefined, plan: toAccount.startsWith('pot:') ? toAccount.slice(4) : undefined };
+      if (toAccount.startsWith('pot:')) store.contribute(toAccount.slice(4), effAmount, from);
       else store.addTransaction(tx);
     } else if (hasSplit) {
       const finalShares = shares.map((s) => (s.person.startsWith('new:') ? { ...s, person: created[pendingNew.indexOf(s.person.slice(4))] } : s));
-      store.addSplit({ group: preset?.group, description: merchant, amount: effAmount, paidBy, date: effDate, mode, shares: finalShares, category: effCat, plan: effPlan ?? undefined, account, notes: undefined });
+      store.addSplit({ group: preset?.group, description: merchant, amount: effAmount, paidBy, date: effDate, mode, shares: finalShares, category: effCat, plan: effPlan ?? undefined, account: from, notes: undefined });
       void ids;
     } else {
-      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined });
+      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined });
     }
     if (preset?.replaceTx) store.deleteTransaction(preset.replaceTx, { quiet: true });
     setSaved(true);
     window.setTimeout(onDone, 650);
   };
 
-  const accountName = (id: string) => state.accounts.find((a) => a.id === id)?.name ?? (state.cards.find((c) => c.id === id) ? `${state.cards.find((c) => c.id === id)!.name} card` : 'Account');
+  // Where the money comes from (or lands): bank accounts, cash, wallets, and cards for spends.
+  const banks = state.accounts.filter((a) => a.type === 'bank');
+  const cashAcct = state.accounts.find((a) => a.type === 'cash');
+  const sources: { id: string; label: string; emoji: string; sub: string; balance?: number; cash?: boolean }[] = [
+    ...banks.map((a) => ({ id: a.id, label: banks.length === 1 ? 'Bank' : a.name, emoji: '🏦', sub: rupees(a.balance), balance: a.balance })),
+    ...state.accounts.filter((a) => a.type === 'wallet' && a.spendable).map((a) => ({ id: a.id, label: a.name, emoji: '👛', sub: rupees(a.balance), balance: a.balance })),
+    ...(effType === 'expense' ? state.cards.map((c) => ({ id: c.id, label: c.name, emoji: '💳', sub: `Card ··${c.last4}` })) : []),
+  ];
+  // Cash sits second, right after the main bank, so both are on screen without scrolling.
+  sources.splice(Math.min(1, banks.length), 0, { id: cashAcct?.id ?? NEW_CASH, label: 'Cash', emoji: '💵', sub: rupees(cashAcct?.balance ?? 0), balance: cashAcct?.balance ?? 0, cash: true });
+  // Opened with some other account already chosen (say, from an old entry): keep it selectable.
+  const other = state.accounts.find((a) => a.id === account);
+  if (other && !sources.some((o) => o.id === account)) sources.push({ id: other.id, label: other.name, emoji: '🏦', sub: rupees(other.balance), balance: other.balance });
+  const source = sources.find((o) => o.id === account);
+  // The account isn't touched when a friend paid for a split.
+  const showSource = effType !== 'transfer' && !(hasSplit && paidBy !== 'me');
+  const short = showSource && effType === 'expense' && source?.balance != null && effAmount > source.balance;
   const dateLabel = effDate === state.today ? 'Today' : effDate === addDays(state.today, -1) ? 'Yesterday' : fmtDate(effDate);
   const catName = state.categories.find((c) => c.id === effCat)?.name ?? 'Other';
 
@@ -278,6 +300,48 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
         </p>
       )}
 
+      {/* Bank or cash: always visible, because it decides which balance moves */}
+      {showSource && (
+        <div className="mt-4">
+          <p id="composer-source" className="text-[12.5px] font-semibold text-ink3">
+            {effType === 'income' ? 'Received in' : 'Paid from'}
+          </p>
+          <div role="radiogroup" aria-labelledby="composer-source" className={sources.length <= 2 ? 'mt-1.5 grid grid-cols-2 gap-2' : 'no-scrollbar -mx-5 mt-1.5 flex gap-2 overflow-x-auto px-5 pb-1'}>
+            {sources.map((o) => {
+              const on = account === o.id;
+              return (
+                <button
+                  key={o.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    haptic(6);
+                    setAccount(o.id);
+                  }}
+                  className={`tap flex items-center gap-2.5 rounded-2xl border-[1.5px] px-3 py-2 text-left transition-colors ${sources.length <= 2 ? 'min-w-0' : 'min-w-[132px] max-w-[180px] shrink-0'} ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-line bg-bg text-ink2 hover:border-ink/40'}`}
+                >
+                  <span className="text-[20px] leading-none" aria-hidden="true">
+                    {o.emoji}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[14.5px] font-semibold leading-tight">{o.label}</span>
+                    <span className={`num mt-0.5 block truncate text-[12.5px] leading-tight ${on ? 'opacity-80' : 'text-ink3'}`}>{o.sub}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {short && source && (
+            <p className="mt-2 text-[12.5px] leading-snug text-ink2" role="status">
+              {source.cash
+                ? `PULSE shows ${rupees(Math.max(0, source.balance ?? 0))} in cash. Took cash out of the bank? Log that with Moved.`
+                : `That's more than the ${rupees(Math.max(0, source.balance ?? 0))} PULSE shows in ${source.label === 'Bank' ? 'your bank' : source.label}.`}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Details, one swipeable row */}
       {effType !== 'transfer' ? (
         <div className="no-scrollbar -mx-5 mt-4 flex gap-1.5 overflow-x-auto px-5 pb-1">
@@ -286,9 +350,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
           </button>
           <button type="button" className="chip shrink-0" aria-expanded={panel === 'date'} onClick={() => togglePanel('date')}>
             <Icon name="calendar" size={15} /> {dateLabel}
-          </button>
-          <button type="button" className="chip shrink-0" aria-expanded={panel === 'account'} onClick={() => togglePanel('account')}>
-            <Icon name={state.cards.some((c) => c.id === account) ? 'card' : 'wallet'} size={15} /> {account === defaultAccount(state) ? 'Personal' : accountName(account)}
           </button>
           {effType === 'expense' && (
             <>
@@ -365,21 +426,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             Pick a date
           </label>
           <input id="composer-date" type="date" className="field w-auto py-2" value={effDate} max={state.today} onChange={(e) => e.target.value && setDate(e.target.value)} />
-        </div>
-      )}
-      {panel === 'account' && (
-        <div className="mt-4 flex animate-rise flex-wrap justify-center gap-2">
-          {state.accounts.filter((a) => a.type === 'bank' || a.type === 'cash').map((a) => (
-            <button key={a.id} type="button" className="chip" aria-pressed={account === a.id} onClick={() => { setAccount(a.id); setPanel(null); }}>
-              {a.id === defaultAccount(state) ? `Personal · ${a.name}` : a.name}
-            </button>
-          ))}
-          {effType === 'expense' &&
-            state.cards.map((c) => (
-              <button key={c.id} type="button" className="chip" aria-pressed={account === c.id} onClick={() => { setAccount(c.id); setPanel(null); }}>
-                <Icon name="card" size={14} /> {c.name} ··{c.last4}
-              </button>
-            ))}
         </div>
       )}
       {panel === 'plan' && (
