@@ -8,7 +8,8 @@ import { buildReminders, disableReminders, enableReminders, markReminderAsked, p
 import { Toggle, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
-const ROWS: { key: keyof Pick<ReminderPrefs, 'daily' | 'payday' | 'bills' | 'streak' | 'weekly'>; label: string; sub: string }[] = [
+const ROWS: { key: keyof Pick<ReminderPrefs, 'message' | 'daily' | 'payday' | 'bills' | 'streak' | 'weekly'>; label: string; sub: string }[] = [
+  { key: 'message', label: 'Daily message', sub: 'One short note around 10 am: a festival wish, a money tip, or what’s new in PULSE' },
   { key: 'daily', label: 'Log your day', sub: 'A nudge in the evening, only on days you haven’t logged anything' },
   { key: 'payday', label: 'Payday', sub: 'On salary day, so your month starts right' },
   { key: 'bills', label: 'Due tomorrow', sub: 'Bills, subscriptions, card bills, EMIs and SIPs, the evening before' },
@@ -94,7 +95,7 @@ export function RemindersScreen() {
             </span>
             <div className="min-w-0 flex-1">
               <h2 className="display text-[18px] leading-tight">{on ? 'On for this device' : 'Reminders are off'}</h2>
-              <p className="text-[13.5px] text-ink3">{on ? `${coming.length} coming up in the next few weeks` : 'Each phone or laptop is switched on separately.'}</p>
+              <p className="text-[13.5px] text-ink3">{on ? `${coming.length} coming up in the next few weeks${prefs.message ? ', plus the daily message' : ''}` : 'Each phone or laptop is switched on separately.'}</p>
             </div>
           </div>
           {blocked ? (
@@ -149,7 +150,7 @@ export function RemindersScreen() {
         />
         <p className="mt-3 flex items-start gap-2 px-1 text-[12.5px] text-ink3">
           <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
-          <span>To deliver a reminder, PULSE’s server keeps its time and its text for this device, and nothing more. With names and amounts off, the text never mentions them.</span>
+          <span>To deliver a reminder, PULSE’s server keeps its time and its text for this device, and nothing more. With names and amounts off, the text never mentions them. The daily message is the same for everyone and uses none of your data.</span>
         </p>
       </section>
     </div>

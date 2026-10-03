@@ -3,12 +3,15 @@
 // The app works out which reminders this person should get from their own data, then gives the
 // server only what it needs to deliver them: a time and the text to show. With "details" off,
 // that text has no names or amounts. The server part is netlify/lib/push.ts.
+//
+// One reminder is different: the daily message (netlify/lib/daily.ts). The server picks it and
+// sends the same one to everybody at 10 am India time, so it uses nothing from this person's data.
 import type { ReminderPrefs, State } from '../types';
 import { mainIncome, upcoming } from './finance';
 import { addDays, rupees } from './format';
 import { streak } from './streak';
 
-export const DEFAULT_REMINDERS: ReminderPrefs = { daily: true, dailyAt: '21:00', payday: true, bills: true, streak: true, weekly: true, details: false };
+export const DEFAULT_REMINDERS: ReminderPrefs = { daily: true, dailyAt: '21:00', payday: true, bills: true, streak: true, weekly: true, details: false, message: true };
 export const prefsOf = (s: State): ReminderPrefs => ({ ...DEFAULT_REMINDERS, ...(s.settings.reminders ?? {}) });
 
 export interface Reminder {
@@ -214,11 +217,13 @@ export async function syncReminders(s: State, force = false): Promise<boolean> {
   if (s.mode !== 'personal') return false; // the demo never changes anyone's reminders
   try {
     const reminders = buildReminders(s);
-    const hash = JSON.stringify(reminders);
+    // The daily message is sent by the server to everyone who hasn't switched it off; this device only says yes or no.
+    const daily = prefsOf(s).message;
+    const hash = JSON.stringify([reminders, daily]);
     if (!force && hash === l.hash && Date.now() - (l.syncedAt ?? 0) < 12 * 3600_000) return true;
     const sub = await subscription(true); // re-subscribes quietly if the browser dropped it
     if (!sub) return false;
-    const res = await post({ action: 'sync', id: l.id, sub: sub.toJSON(), reminders });
+    const res = await post({ action: 'sync', id: l.id, sub: sub.toJSON(), reminders, daily });
     if (!res.ok) return false;
     save({ ...load(), hash, syncedAt: Date.now() });
     return true;

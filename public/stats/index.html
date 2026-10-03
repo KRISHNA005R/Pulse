@@ -63,6 +63,23 @@
     .fbh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .tag { background: var(--sunk); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; }
     .fbm { margin: 8px 0 6px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .dm { display: flex; gap: 12px; align-items: flex-start; border-top: 1px solid var(--line); padding: 11px 0; }
+    .dm:first-child { border-top: 0; }
+    .dm .when { flex: 0 0 74px; font-size: 13px; font-weight: 700; line-height: 1.35; }
+    .dm .when span { display: block; font-weight: 500; color: var(--ink3); }
+    .dm .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .dm .what b { display: block; font-size: 14.5px; }
+    .dm .what p { margin: 2px 0 6px; font-size: 13.5px; color: var(--ink2); }
+    .tag.mine { background: var(--accent-soft); color: var(--accent); }
+    .now { background: var(--sunk); border-radius: 14px; padding: 12px 14px; margin-top: 12px; overflow-wrap: anywhere; }
+    .write { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-width: 520px; }
+    .write label { font-size: 13px; font-weight: 600; color: var(--ink2); display: flex; flex-direction: column; gap: 5px; }
+    .write label span { font-weight: 500; color: var(--ink3); }
+    .write .lr { display: flex; justify-content: space-between; gap: 10px; }
+    .write input, .write textarea { font: inherit; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .write textarea { resize: vertical; min-height: 76px; }
+    .write .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .write .ghost { padding: 13px 18px; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -110,7 +127,10 @@
             return fetch('/api/push?status=1', { headers: { 'x-stats-key': key }, cache: 'no-store' })
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; })
-              .then(function (push) { render(d, fb, push); });
+              .then(function (push) {
+                render(d, fb, push);
+                loadDaily();
+              });
           });
       })
       .catch(function (e) { app.innerHTML = '<p class="err">Could not load stats (' + esc(e.message) + '). Try again in a minute.</p>'; });
@@ -151,6 +171,80 @@
       '<div><div class="muted">Sender last ran</div><div class="n" style="font-size:16px' + (late ? ';color:#C2412D' : '') + '">' + (mins == null ? 'Never' : mins < 2 ? 'Just now' : mins < 120 ? mins + ' min ago' : Math.round(mins / 60) + ' h ago') + '</div></div></div>' +
       (mins == null ? '<p class="note">The sender runs every 15 minutes. If this still says “Never” an hour after the deploy, the schedule did not start: tell Claude.</p>'
         : late ? '<p class="note err">The sender should run every 15 minutes. It looks stuck.</p>' : '') + '</div>';
+  }
+
+  // ---- Daily message: what goes out each morning, and a box to write your own ----
+  var SRC = { custom: 'Your message', occasion: 'Festival / occasion', month: 'Time of the month', line: 'Money line' };
+  var wday = function (d) { return new Date(d + 'T00:00:00').toLocaleString('en-IN', { weekday: 'short' }); };
+  var draft = { date: '', title: '', body: '' };
+  // If reminders are on in PULSE on this same phone, a message can be tried here first.
+  function myDevice() { try { var l = JSON.parse(localStorage.getItem('pulse-push-v1') || 'null'); return l && l.on && /^[0-9a-f]{32}$/.test(l.id) ? l.id : ''; } catch (e) { return ''; } }
+  function pushApi(body) {
+    return fetch('/api/push', { method: 'POST', headers: { 'content-type': 'application/json', 'x-stats-key': getKey() }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.ok = r.ok && j.ok !== false; return j; }); })
+      .catch(function () { return { ok: false, error: 'No connection. Try again.' }; });
+  }
+  function loadDaily(msg, good) {
+    var box = document.getElementById('daily');
+    if (!box) return;
+    fetch('/api/push?daily=1', { headers: { 'x-stats-key': getKey() }, cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (dl) { box.innerHTML = dailyCard(dl, msg, good); if (dl) wireDaily(dl); });
+  }
+  function dailyCard(dl, msg, good) {
+    if (!dl) return '';
+    var s = dl.sentToday;
+    var first = dl.days[0];
+    var now = s
+      ? '<div class="now"><div class="muted">Today · ' + (s.done ? 'sent to ' : 'sending, so far ') + fmt(s.sent) + ' phone' + (s.sent === 1 ? '' : 's') + (s.failed ? ' · ' + fmt(s.failed) + ' will be tried again' : '') + '</div><b>' + esc(s.title) + '</b><div>' + esc(s.body) + '</div></div>'
+      : '<div class="now"><div class="muted">Today · ' + (dl.phase === 'before' ? 'goes out at 10:00 am India time' : dl.phase === 'due' ? 'going out within 15 minutes' : '<span class="err">not sent: the sender did not run between 10 am and 4 pm</span>') + '</div><b>' + esc(first.title) + '</b><div>' + esc(first.body) + '</div></div>';
+    var rows = dl.days.slice(1).map(function (x) {
+      return '<div class="dm"><div class="when">' + esc(short(x.date)) + '<span>' + esc(wday(x.date)) + '</span></div><div class="what"><b>' + esc(x.title) + '</b><p>' + esc(x.body) + '</p>' +
+        '<span class="tag' + (x.source === 'custom' ? ' mine' : '') + '">' + SRC[x.source] + '</span>' +
+        (x.source === 'custom' ? ' <button class="ghost" data-del="' + esc(x.date) + '">Remove</button>' : '') + '</div></div>';
+    }).join('');
+    var later = (dl.customs || []).filter(function (c) { return c.date > dl.days[dl.days.length - 1].date; }).map(function (c) {
+      return '<div class="dm"><div class="when">' + esc(short(c.date)) + '<span>' + esc(wday(c.date)) + '</span></div><div class="what"><b>' + esc(c.title) + '</b><p>' + esc(c.body) + '</p><span class="tag mine">Your message</span> <button class="ghost" data-del="' + esc(c.date) + '">Remove</button></div></div>';
+    }).join('');
+    return '<div class="card" style="margin-top:12px"><h2>Daily message</h2>' +
+      '<div class="muted">One notification every morning to every phone with reminders on. People can switch it off in You → Reminders.</div>' + now +
+      '<h2 style="margin-top:18px">Write your own</h2><div class="muted">For a new feature, an offer, or a wish. It replaces that day’s usual message.</div>' +
+      '<div class="write">' +
+      '<label>Date<input type="date" id="dmd" min="' + esc(s || dl.phase === 'missed' ? dl.days[1].date : dl.today) + '" value="' + esc(draft.date || dl.days[1].date) + '"></label>' +
+      '<label><div class="lr">Title <span id="dmtc"></span></div><input id="dmt" maxlength="60" placeholder="New in PULSE ✨" value="' + esc(draft.title) + '"></label>' +
+      '<label><div class="lr">Message <span id="dmbc"></span></div><textarea id="dmb" maxlength="140" placeholder="Pick Bank or Cash when you log a spend.">' + esc(draft.body) + '</textarea></label>' +
+      '<div class="btns"><button id="dms">Save for this date</button>' + (myDevice() ? '<button class="ghost" id="dmp">Send to this phone first</button>' : '') + '</div>' +
+      '<div id="dmm" role="status" class="' + (good ? 'muted' : 'err') + '" style="min-height:20px">' + esc(msg || '') + '</div></div>' +
+      '<h2 style="margin-top:10px">Coming up</h2><div style="margin-top:6px">' + rows + later + '</div>' +
+      '<p class="note">Festival dates are loaded until ' + esc(short(dl.lastOccasion)) + ' ' + esc(dl.lastOccasion.slice(0, 4)) + '. After that only fixed days (New Year, 15 August, Christmas…) and money lines go out, until the list is refreshed.' +
+      (myDevice() ? '' : ' To try a message on your own phone first, open this page on a phone where PULSE reminders are on.') + '</p></div>';
+  }
+  function wireDaily(dl) {
+    var d = document.getElementById('dmd'), t = document.getElementById('dmt'), b = document.getElementById('dmb'), m = document.getElementById('dmm');
+    var count = function () { document.getElementById('dmtc').textContent = t.value.length + '/60'; document.getElementById('dmbc').textContent = b.value.length + '/140'; draft = { date: d.value, title: t.value, body: b.value }; };
+    t.oninput = b.oninput = d.onchange = count; count();
+    var say = function (text, good) { m.textContent = text; m.className = good ? 'muted' : 'err'; };
+    document.getElementById('dms').onclick = function () {
+      if (!t.value.trim()) return say('Write a title first.');
+      var taken = dl.days.concat(dl.customs || []).filter(function (x) { return x.date === d.value && x.source !== 'line' && x.source !== 'month'; })[0];
+      var date = d.value;
+      say('Saving…', true);
+      pushApi({ action: 'daily-set', date: date, title: t.value, body: b.value }).then(function (r) {
+        if (!r.ok) return say(r.error || 'Could not save. Try again.');
+        draft = { date: '', title: '', body: '' };
+        loadDaily('Saved. It goes out on ' + short(date) + ' at 10:00 am.' + (taken && taken.source === 'occasion' ? ' It replaces “' + taken.title + '”.' : ''), true);
+      });
+    };
+    var p = document.getElementById('dmp');
+    if (p) p.onclick = function () {
+      if (!t.value.trim()) return say('Write a title first.');
+      say('Sending to this phone…', true);
+      pushApi({ action: 'daily-try', id: myDevice(), title: t.value, body: b.value }).then(function (r) { say(r.ok ? 'Sent to this phone only. It should pop up in a few seconds.' : (r.error || 'Could not send.'), r.ok); });
+    };
+    [].forEach.call(document.querySelectorAll('[data-del]'), function (btn) {
+      btn.onclick = function () { pushApi({ action: 'daily-del', date: btn.getAttribute('data-del') }).then(function () { loadDaily('Removed. The usual message goes out that day.', true); }); };
+    });
   }
 
   function render(d, fb, push) {
@@ -209,6 +303,7 @@
       '</div>' +
       feedback(fb) +
       reminders(push) +
+      '<div id="daily"></div>' +
       '<p class="note">One person on two devices counts twice. Nothing here can identify anyone or show amounts.</p>';
 
     document.getElementById('days').onchange = function (e) { days = Number(e.target.value); load(); };

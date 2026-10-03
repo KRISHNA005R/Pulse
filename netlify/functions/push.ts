@@ -6,11 +6,18 @@
 //   POST /api/push  { action: 'test', id }           -> sends one notification now
 //   POST /api/push  { action: 'off',  id }           -> forgets the device and its reminders
 //
+// The daily message, for the private stats page (all need the x-stats-key header):
+//   GET  /api/push?daily=1                                         -> today's message, the next two weeks, written messages
+//   POST /api/push  { action: 'daily-set', date, title, body }     -> write the message for a date
+//   POST /api/push  { action: 'daily-del', date }                  -> remove it
+//   POST /api/push  { action: 'daily-try', id, title, body }       -> send it to one device now, to see how it looks
+//
 // See netlify/lib/push.ts for what is stored. The sender runs from netlify/functions/push-cron.ts.
 import { getStore } from '@netlify/blobs';
 import webpush from 'web-push';
 import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
 import { getVapid, removeDevice, sendTest, status, syncDevice, type Sender, type StoreLike, type Vapid } from '../lib/push';
+import { dailyOverview, deleteCustom, sendPreview, setCustom } from '../lib/daily';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -35,12 +42,16 @@ export const pushStore = () => getStore({ name: 'pulse-push', consistency: 'stro
 
 export async function handle(req: Request, store: StoreLike, sender: Sender, keyHash: string, make = makeVapid): Promise<Response> {
   try {
+    // The stats page proves who it is with the stats password.
+    const owner = async () => {
+      const key = req.headers.get('x-stats-key') ?? '';
+      return !!key && (await sha256(key)) === keyHash;
+    };
     if (req.method === 'GET') {
       const url = new URL(req.url);
-      if (url.searchParams.has('status')) {
-        const key = req.headers.get('x-stats-key') ?? '';
-        if (!key || (await sha256(key)) !== keyHash) return json({ error: 'wrong key' }, 401);
-        return json(await status(store));
+      if (url.searchParams.has('status') || url.searchParams.has('daily')) {
+        if (!(await owner())) return json({ error: 'wrong key' }, 401);
+        return json(url.searchParams.has('daily') ? await dailyOverview(store) : await status(store));
       }
       return json({ publicKey: (await getVapid(store, make)).publicKey });
     }
@@ -55,7 +66,7 @@ export async function handle(req: Request, store: StoreLike, sender: Sender, key
       }
       const id = String(body.id ?? '');
       if (body.action === 'sync') {
-        const res = await syncDevice(store, id, body.sub, body.reminders);
+        const res = await syncDevice(store, id, body.sub, body.reminders, new Date(), body.daily);
         return json(res, res.ok ? 200 : 400);
       }
       if (body.action === 'test') {
@@ -65,6 +76,18 @@ export async function handle(req: Request, store: StoreLike, sender: Sender, key
       if (body.action === 'off') {
         await removeDevice(store, id);
         return json({ ok: true });
+      }
+      if (typeof body.action === 'string' && body.action.startsWith('daily-')) {
+        if (!(await owner())) return json({ error: 'wrong key' }, 401);
+        if (body.action === 'daily-set') {
+          const res = await setCustom(store, body);
+          return json(res, res.ok ? 200 : 400);
+        }
+        if (body.action === 'daily-del') return json(await deleteCustom(store, body.date));
+        if (body.action === 'daily-try') {
+          const res = await sendPreview(store, id, body, sender, await getVapid(store, make));
+          return json(res, res.ok ? 200 : 400);
+        }
       }
       return json({ error: 'unknown action' }, 400);
     }

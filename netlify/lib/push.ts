@@ -10,6 +10,7 @@
 //   dev/<id>                      one device: its push address and the reminders it has queued
 //   due/<slot>/<id>/<tag>         one queued reminder; <slot> is its time rounded down to 15 minutes (UTC)
 //   cron                          when the sender last ran, for the stats page
+//   daily/...                     the daily message (netlify/lib/daily.ts)
 
 export interface StoreLike {
   get(key: string, opts: { type: 'json' }): Promise<unknown>;
@@ -40,6 +41,8 @@ interface Device {
   sub: Sub;
   keys: Record<string, string>;
   at: string;
+  /** false = this person switched the daily message off (see netlify/lib/daily.ts). */
+  daily?: boolean;
 }
 
 /** Sends one push. Returns the push service's HTTP status (201 = accepted, 404/410 = this device is gone). */
@@ -111,7 +114,7 @@ export async function getVapid(store: StoreLike, make: () => Vapid): Promise<Vap
 }
 
 /** Replace this device's queued reminders with a new set, writing only what changed. */
-export async function syncDevice(store: StoreLike, id: string, subIn: unknown, remindersIn: unknown, now = new Date()) {
+export async function syncDevice(store: StoreLike, id: string, subIn: unknown, remindersIn: unknown, now = new Date(), daily: unknown = undefined) {
   if (!ID.test(id)) return { ok: false as const, error: 'bad id' };
   const sub = cleanSub(subIn);
   if (!sub) return { ok: false as const, error: 'bad subscription' };
@@ -128,7 +131,8 @@ export async function syncDevice(store: StoreLike, id: string, subIn: unknown, r
   }
   for (const key of Object.keys(old?.keys ?? {})) if (!(key in next)) writes.push(store.delete(key));
   await Promise.all(writes);
-  await store.setJSON(`dev/${id}`, { sub, keys: next, at: now.toISOString() } satisfies Device);
+  // Older versions of the app don't say either way: they keep getting the daily message.
+  await store.setJSON(`dev/${id}`, { sub, keys: next, at: now.toISOString(), ...(daily === false ? { daily: false } : {}) } satisfies Device);
   return { ok: true as const, scheduled: reminders.length, changed: writes.length };
 }
 

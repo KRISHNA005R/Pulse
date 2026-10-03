@@ -297,6 +297,8 @@ export interface ReminderPrefs {
   weekly: boolean;
   /** Put names and amounts in the reminder text. Off keeps the text generic. */
   details: boolean;
+  /** The daily message: one short note each morning, the same for everyone (a festival wish, a money line, what's new). */
+  message: boolean;
 }
 
 export interface Onboarding {
