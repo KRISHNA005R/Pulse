@@ -204,6 +204,21 @@ export interface Person {
   name: string;
   short: string;
   hue: number;
+  /** Set when this friend is connected on PULSE: the two apps share their splits with each other. */
+  link?: FriendLink;
+}
+
+/** The private channel shared with one friend. The key only ever travels inside the invite link. */
+export interface FriendLink {
+  chan: string;
+  key: string;
+  /** This side's secret for writing to the channel. */
+  token: string;
+  /** 'invited' until the friend opens the invite. */
+  status: 'invited' | 'linked';
+  since: ISODate;
+  /** What the friend calls themselves in their PULSE. */
+  theirName?: string;
 }
 
 export interface Group {
@@ -230,6 +245,8 @@ export interface SplitExpense {
   category: CategoryId;
   plan?: ID;
   transactionId?: ID;
+  /** Recorded by a connected friend in their PULSE (the channel it came through). Only they can change it. */
+  remote?: string;
 }
 
 export interface Settlement {
@@ -239,6 +256,10 @@ export interface Settlement {
   to: ID;
   amount: number;
   date: ISODate;
+  /** Recorded by a connected friend in their PULSE. */
+  remote?: string;
+  /** A friend's settle-up has been added to (or taken from) one of this person's accounts. */
+  banked?: boolean;
 }
 
 export interface Debt {

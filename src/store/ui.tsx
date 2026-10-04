@@ -39,6 +39,8 @@ export type SheetSpec =
   | { type: 'group-form' }
   | { type: 'group-expense'; groupId?: string; personId?: string }
   | { type: 'settle'; personId: string; groupId?: string }
+  | { type: 'friend-invite' }
+  | { type: 'friend-join'; code?: string }
   | { type: 'share-card'; preset?: 'weekend' | 'plan' }
   | { type: 'receipt' }
   | { type: 'command'; query?: string }

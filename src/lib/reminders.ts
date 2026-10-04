@@ -143,6 +143,8 @@ export const pushSupported = () => typeof window !== 'undefined' && 'serviceWork
 export const pushPermission = (): NotificationPermission | 'unsupported' => (pushSupported() ? Notification.permission : 'unsupported');
 export const remindersOn = () => load().on && pushPermission() === 'granted';
 export const reminderAsked = () => !!load().asked;
+/** This device's id on the notification server, when reminders are on here. Lets a friend's split reach this phone. */
+export const reminderDeviceId = () => (remindersOn() ? load().id : undefined);
 export const markReminderAsked = () => save({ ...load(), asked: true });
 
 const post = (body: unknown) => fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });

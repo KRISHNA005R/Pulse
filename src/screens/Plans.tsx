@@ -6,6 +6,7 @@ import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
 import { EmptyState, MoneyStat, PersonAvatar, ProgressBar, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
+import { FriendConnect, FriendPayments } from '../components/Friends';
 
 export function PlansScreen() {
   const ui = useUI();
@@ -84,7 +85,11 @@ function SplitsView() {
   const { state } = useStore();
   const ui = useUI();
   const t = useMemo(() => socialTotals(state), [state]);
-  const people = [...t.balances.entries()].filter(([, v]) => v !== 0).sort((a, b) => a[1] - b[1]);
+  // Anyone with a balance, plus friends connected on PULSE even when you're square.
+  const people = state.people
+    .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number])
+    .filter(([id, v]) => v !== 0 || state.people.find((p) => p.id === id)?.link)
+    .sort((a, b) => a[1] - b[1]);
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -103,19 +108,34 @@ function SplitsView() {
                   <button type="button" className="row-btn flex-1" onClick={() => ui.push({ name: 'person', id })}>
                     <PersonAvatar person={p} size={40} />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-semibold">{v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</span>
-                      <span className="block text-[13px] text-ink3">{p.name}</span>
+                      <span className="block text-[15px] font-semibold">{v === 0 ? `You and ${p.short} are square` : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</span>
+                      <span className="block text-[13px] text-ink3">
+                        {p.name}
+                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : ' · invite sent') : ''}
+                      </span>
                     </span>
                   </button>
-                  <button type="button" className="btn-quiet min-h-[38px] shrink-0 px-4 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: id })}>
-                    {v < 0 ? 'Settle' : 'Record'}
-                  </button>
+                  {v !== 0 && (
+                    <button type="button" className="btn-quiet min-h-[38px] shrink-0 px-4 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: id })}>
+                      {v < 0 ? 'Settle' : 'Record'}
+                    </button>
+                  )}
                 </li>
               );
             })}
           </ul>
         ) : (
           <p className="px-1 text-[14.5px] text-ink3">Everyone's square. Nice.</p>
+        )}
+        {state.mode === 'personal' && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-invite' })}>
+              <Icon name="users" size={16} /> Invite a friend
+            </button>
+            <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-join' })}>
+              I have an invite
+            </button>
+          </div>
         )}
       </section>
 
@@ -423,6 +443,8 @@ export function PersonDetail({ id }: { id: string }) {
           </button>
         </div>
       </div>
+      <FriendPayments person={p} />
+      <FriendConnect person={p} />
       {groups.length > 0 && (
         <section className="mt-8" aria-labelledby="pp-g">
           <SectionHeader id="pp-g" title="Groups together" />
@@ -451,6 +473,7 @@ export function PersonDetail({ id }: { id: string }) {
                 <span className="block truncate font-medium">{s.description}</span>
                 <span className="block text-[13px] text-ink3">
                   {fmtDate(s.date)} · {s.paidBy === 'me' ? 'you paid' : s.paidBy === id ? `${p.short} paid` : 'someone else paid'}
+                  {s.remote ? ` · added by ${p.short}` : ''}
                 </span>
               </span>
               <span className="num shrink-0">{rupees(s.amount)}</span>

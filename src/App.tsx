@@ -19,6 +19,7 @@ import { MIGRATED_FLAG } from './lib/migrate';
 import { applyUpdate, onUpdateReady } from './lib/update';
 import { InsuranceScreen } from './screens/Insurance';
 import { useInstallNudge } from './components/InstallPrompt';
+import { useFriends } from './components/Friends';
 import { RemindersScreen } from './screens/Reminders';
 import { syncReminders } from './lib/reminders';
 import { FeedbackScreen } from './screens/Feedback';
@@ -145,6 +146,7 @@ function Shell() {
   );
   const ui = useUI();
   useInstallNudge();
+  useFriends();
   // Keep this device's queued reminders in step with the data (a few seconds after things settle).
   useEffect(() => {
     const t = window.setTimeout(() => void syncReminders(state), 6000);
@@ -195,7 +197,7 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.onboarding.done, store.sync.enabled]);
 
-  // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback, /?tab=plans|activity|you
+  // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback, /?tab=plans|splits|activity|you
   useEffect(() => {
     if (!state.onboarding.done) return;
     const q = new URLSearchParams(location.search);
@@ -203,6 +205,11 @@ function Shell() {
     const tab = q.get('tab');
     if (!action && !tab) return;
     if (tab === 'plans' || tab === 'activity' || tab === 'you' || tab === 'home') ui.resetTo(tab);
+    // A friend's notification opens straight on the splits.
+    if (tab === 'splits') {
+      ui.resetTo('plans');
+      ui.setPlansSegment('splits');
+    }
     if (action === 'add') ui.openSheet({ type: 'composer' });
     if (action === 'afford') ui.openSheet({ type: 'afford' });
     if (action === 'ai') ui.openSheet({ type: 'ai' });

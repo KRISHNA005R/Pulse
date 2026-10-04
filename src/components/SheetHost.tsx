@@ -8,6 +8,7 @@ import { ReceiptScanner } from './ReceiptScanner';
 import { TransactionDetail } from './TransactionDetail';
 import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
+import { FriendInvite, FriendJoin } from './Friends';
 import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, DebtForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
 import { ShareCard } from './ShareCard';
 import { CommandBar } from './CommandBar';
@@ -96,6 +97,18 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Settle up" onClose={close} size="sm" z={z}>
           <SettleForm personId={spec.personId} groupId={spec.groupId} onDone={close} />
+        </Sheet>
+      );
+    case 'friend-invite':
+      return (
+        <Sheet title="Invite a friend" onClose={close} size="sm" z={z}>
+          <FriendInvite onDone={close} />
+        </Sheet>
+      );
+    case 'friend-join':
+      return (
+        <Sheet title="Connect on PULSE" onClose={close} size="sm" z={z}>
+          <FriendJoin code={spec.code} onDone={close} />
         </Sheet>
       );
     case 'income-form':

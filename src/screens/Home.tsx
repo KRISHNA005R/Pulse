@@ -5,6 +5,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { buildInsights } from '../lib/insights';
 import { detections, personBalances, socialTotals, upcoming } from '../lib/finance';
+import { FriendNewsCard } from '../components/Friends';
 import { addDays, daysBetween, fmtDate, greeting, relDay, rupees } from '../lib/format';
 import { firstSeen } from '../lib/stats';
 import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
@@ -81,6 +82,8 @@ export function HomeScreen() {
           )}
         </ul>
       </section>
+
+      <FriendNewsCard />
 
       {askFeedback && (
         <section aria-label="Feedback" className="-mt-2 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">

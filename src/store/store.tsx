@@ -5,6 +5,7 @@ import type {
   Category,
   CreditCard,
   Debt,
+  FriendLink,
   Group,
   Person,
   Plan,
@@ -27,6 +28,7 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
+import { applyBox, leaveChannel, type Box, type BoxItem } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { applyMoney, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
@@ -656,6 +658,74 @@ function useStoreImpl() {
     [commit],
   );
 
+  // ---------- friends on PULSE (lib/friends.ts) ----------
+  /** Connect a person to a shared channel. With no id, a new person is made with that name. */
+  const linkPerson = useCallback(
+    (personId: string | null, name: string, link: FriendLink): string => {
+      let id = personId ?? '';
+      commit((s) => {
+        let p = s.people.find((x) => x.id === personId);
+        if (!p) {
+          const clean = name.trim() || 'Friend';
+          p = { id: uid('p'), name: clean, short: clean.split(' ')[0], hue: Math.floor(Math.random() * 360) };
+          s.people.push(p);
+        }
+        p.link = link;
+        id = p.id;
+      });
+      return id;
+    },
+    [commit],
+  );
+  /** Make the data match what a connected friend has published. Returns what was new. */
+  const applyFriendBox = useCallback(
+    (personId: string, box: Box): BoxItem[] => {
+      let fresh: BoxItem[] = [];
+      commit((s) => void (fresh = applyBox(s, personId, box)));
+      return fresh;
+    },
+    [commit],
+  );
+  const markFriendJoined = useCallback(
+    (personId: string) =>
+      commit((s) => {
+        const p = s.people.find((x) => x.id === personId);
+        if (p?.link) p.link.status = 'linked';
+      }),
+    [commit],
+  );
+  /** Disconnect: what the friend shared stays here as ordinary history, and nothing more is exchanged. */
+  const unlinkPerson = useCallback(
+    (personId: string) =>
+      commit((s) => {
+        const p = s.people.find((x) => x.id === personId);
+        const chan = p?.link?.chan;
+        if (!p || !chan) return;
+        delete p.link;
+        for (const x of s.splits) if (x.remote === chan) delete x.remote;
+        for (const x of s.settlements) if (x.remote === chan) delete x.remote;
+      }),
+    [commit],
+  );
+  /** A friend marked a payment between us: move the money in or out of one of my accounts too. */
+  const bankSettlement = useCallback(
+    (id: string, accountId?: string) => {
+      commit((s) => {
+        const st = s.settlements.find((x) => x.id === id);
+        if (!st || st.banked) return;
+        const other = st.from === 'me' ? st.to : st.from;
+        const person = s.people.find((p) => p.id === other);
+        const tx: Transaction = { id: uid('t'), merchant: person?.name ?? 'Settle up', amount: st.amount, type: 'transfer', direction: st.from === 'me' ? 'out' : 'in', category: 'transfer', date: s.today, account: accountId ?? defaultAccount(s), people: [other], notes: 'Settled up', recurring: false, status: 'completed' };
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+        st.banked = true;
+      });
+      haptic(12);
+      toast({ text: 'Balance updated.', tone: 'good' });
+    },
+    [commit, toast],
+  );
+
   const addGroup = useCallback(
     (g: Omit<Group, 'id' | 'createdAt'>) => {
       const id = uid('g');
@@ -855,6 +925,14 @@ function useStoreImpl() {
   const replayOnboarding = useCallback(() => commit((s) => void (s.onboarding.done = false)), [commit]);
   /** Wipe everything this device has stored and return to the welcome screen. */
   const eraseAll = useCallback(() => {
+    // Friends stop seeing this person's splits: leave every shared channel (this device only if it's the last one syncing).
+    const mine = ref.current.mode === 'personal' ? ref.current : readStash();
+    if (!loadSync()) for (const p of mine?.people ?? []) if (p.link) void leaveChannel(p.link);
+    try {
+      localStorage.removeItem('pulse-friends-v1');
+    } catch {
+      /* ignore */
+    }
     writeStash(null);
     setHasStash(false);
     saveSync(null);
@@ -1305,6 +1383,11 @@ function useStoreImpl() {
     setSubStatus,
     deleteSubscription,
     addPerson,
+    linkPerson,
+    applyFriendBox,
+    markFriendJoined,
+    unlinkPerson,
+    bankSettlement,
     addGroup,
     addSplit,
     recordSettlement,
