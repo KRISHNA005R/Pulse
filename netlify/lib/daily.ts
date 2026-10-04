@@ -15,6 +15,7 @@
 // Stored in the 'pulse-push' blob store:
 //   daily/custom/<YYYY-MM-DD>     a message written on the stats page
 //   daily/run                     today's send: the message, who already got it, and whether it's finished
+//   daily/now/<date>/<n>          a message sent by hand from the stats page (see "Send now" at the end)
 import { removeDevice, type Payload, type Sender, type StoreLike, type Sub, type Vapid } from './push';
 
 export interface Line {
@@ -289,7 +290,8 @@ export async function dailyOverview(store: StoreLike, now = new Date()) {
   // phase: has today's 10 am send not started yet, is it due now, or was it missed (the sender didn't run by 4 pm)?
   const mins = istMinutes(now);
   const phase = mins < DAILY_FROM ? 'before' : mins < DAILY_UNTIL ? 'due' : 'missed';
-  return { today, phase, sentToday, days, customs, lastOccasion: Object.keys(DATED).sort().pop() };
+  const now_ = (await todaysBlasts(store, today)).map((x) => ({ n: x.n, at: x.at, title: x.title, body: x.body, sent: x.sent, failed: x.failed, done: x.done }));
+  return { today, phase, sentToday, days, customs, lastOccasion: Object.keys(DATED).sort().pop(), now: { max: MAX_NOW, used: now_.length, list: now_.reverse() }, hour: Math.floor(mins / 60) };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -303,6 +305,44 @@ interface DeviceLite {
   sub: Sub;
   /** false = this person switched the daily message off. */
   daily?: boolean;
+}
+
+/**
+ * Send one notification to every device that isn't in `had` yet, and add each one that got it (or
+ * has the daily message switched off) to `had`. Stops when the time budget runs out, so a big send
+ * carries on in the next run.
+ */
+async function deliver(store: StoreLike, send: Sender, vapid: Vapid, payload: Payload, had: Set<string>, budgetMs: number) {
+  const { blobs } = await store.list({ prefix: 'dev/' });
+  const todo = blobs.map((b) => b.key.slice(4)).filter((id) => !had.has(id));
+  const started = Date.now();
+  let sent = 0;
+  let failed = 0;
+  let i = 0;
+  let outOfTime = false;
+  const worker = async () => {
+    while (i < todo.length) {
+      if (Date.now() - started > budgetMs) {
+        outOfTime = true;
+        return;
+      }
+      const id = todo[i++];
+      const dev = (await store.get(`dev/${id}`, { type: 'json' })) as DeviceLite | null;
+      if (!dev) continue;
+      if (dev.daily === false) {
+        had.add(id); // switched off: nothing to send, and no need to look again
+        continue;
+      }
+      const status = await send(dev.sub, payload, vapid).catch(() => 0);
+      if (status === 404 || status === 410) await removeDevice(store, id);
+      else if (status >= 200 && status < 300) {
+        had.add(id);
+        sent++;
+      } else failed++; // tried again in the next run
+    }
+  };
+  await Promise.all(Array.from({ length: PARALLEL }, worker));
+  return { sent, failed, outOfTime };
 }
 
 /**
@@ -328,34 +368,8 @@ export async function runDaily(store: StoreLike, send: Sender, vapid: Vapid, now
   const payload: Payload = { title: run.title, body: run.body, url: run.url || '/', tag: `msg-${day}` };
 
   const had = new Set(run.ids);
-  const { blobs } = await store.list({ prefix: 'dev/' });
-  const todo = blobs.map((b) => b.key.slice(4)).filter((id) => !had.has(id));
-  const started = Date.now();
-  let failed = 0;
-  let i = 0;
-  let outOfTime = false;
-  const worker = async () => {
-    while (i < todo.length) {
-      if (Date.now() - started > budgetMs) {
-        outOfTime = true;
-        return;
-      }
-      const id = todo[i++];
-      const dev = (await store.get(`dev/${id}`, { type: 'json' })) as DeviceLite | null;
-      if (!dev) continue;
-      if (dev.daily === false) {
-        had.add(id); // switched off: nothing to send, and no need to look again today
-        continue;
-      }
-      const status = await send(dev.sub, payload, vapid).catch(() => 0);
-      if (status === 404 || status === 410) await removeDevice(store, id);
-      else if (status >= 200 && status < 300) {
-        had.add(id);
-        run.sent++;
-      } else failed++; // tried again in the next run
-    }
-  };
-  await Promise.all(Array.from({ length: PARALLEL }, worker));
+  const { sent, failed, outOfTime } = await deliver(store, send, vapid, payload, had, budgetMs);
+  run.sent += sent;
 
   run.ids = [...had];
   run.failed = failed;
@@ -373,4 +387,74 @@ export async function sendPreview(store: StoreLike, id: string, b: Record<string
   if (!dev) return { ok: false, error: 'This phone does not have reminders on. Turn them on in PULSE → You → Reminders.' };
   const status = await send(dev.sub, { title: line.title, body: line.body, url: line.url ?? '/', tag: 'msg-preview' }, vapid).catch(() => 0);
   return status >= 200 && status < 300 ? { ok: true } : { ok: false, error: `The phone’s push service said ${status}.` };
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Send now": a message written on the stats page that goes to everyone straight away, on top of
+// the 10 am one. At most MAX_NOW a day (India time), because every extra notification makes more
+// people switch them off. People who switched the daily message off don't get these either.
+//
+//   daily/now/<YYYY-MM-DD>/<01..10>     one send: the message, who has it, and whether it's finished
+// ---------------------------------------------------------------------------------------------
+export const MAX_NOW = 10;
+
+interface Blast extends Required<Line> {
+  day: string;
+  n: number;
+  at: string;
+  ids: string[];
+  sent: number;
+  failed: number;
+  done: boolean;
+}
+
+const blastKey = (day: string, n: number) => `daily/now/${day}/${String(n).padStart(2, '0')}`;
+
+async function todaysBlasts(store: StoreLike, day: string): Promise<Blast[]> {
+  const { blobs } = await store.list({ prefix: `daily/now/${day}/` });
+  return ((await Promise.all(blobs.map((b) => store.get(b.key, { type: 'json' })))).filter(Boolean) as Blast[]).sort((a, b) => a.n - b.n);
+}
+
+/** Queue a message to go out now. Refused once the day's limit is used. */
+export async function createBlast(store: StoreLike, b: Record<string, unknown>, now = new Date()) {
+  const line = cleanCustom(b);
+  if (!line) return { ok: false as const, error: 'Write a title first.' };
+  const day = istDate(now);
+  const used = (await todaysBlasts(store, day)).length;
+  if (used >= MAX_NOW) return { ok: false as const, error: `You have sent ${MAX_NOW} today, which is the limit. The next one can go tomorrow.` };
+  const blast: Blast = { title: line.title, body: line.body, url: line.url ?? '/', day, n: used + 1, at: now.toISOString(), ids: [], sent: 0, failed: 0, done: false };
+  await store.setJSON(blastKey(day, blast.n), blast);
+  return { ok: true as const, n: blast.n };
+}
+
+/**
+ * Deliver today's unfinished send-now messages. Called right after one is created (so it goes out
+ * at once) and by the 15-minute sender (to finish a big send, or retry phones that failed).
+ * A send that is still not finished two hours later is left as it is.
+ */
+export async function runBlasts(store: StoreLike, send: Sender, vapid: Vapid, now = new Date(), budgetMs = 8_000) {
+  const day = istDate(now);
+  // Yesterday's records are no use to anyone.
+  const { blobs } = await store.list({ prefix: 'daily/now/' });
+  await Promise.all(blobs.filter((b) => !b.key.startsWith(`daily/now/${day}/`)).map((b) => store.delete(b.key)));
+  const started = Date.now();
+  const out: { n: number; sent: number; failed: number; done: boolean }[] = [];
+  for (const blast of await todaysBlasts(store, day)) {
+    if (blast.done) continue;
+    if (now.getTime() - Date.parse(blast.at) > 2 * 3600_000) {
+      await store.setJSON(blastKey(day, blast.n), { ...blast, done: true });
+      continue;
+    }
+    const left = budgetMs - (Date.now() - started);
+    if (left <= 0) break;
+    const had = new Set(blast.ids);
+    const res = await deliver(store, send, vapid, { title: blast.title, body: blast.body, url: blast.url, tag: `now-${day}-${blast.n}` }, had, left);
+    blast.ids = [...had];
+    blast.sent += res.sent;
+    blast.failed = res.failed;
+    blast.done = !res.outOfTime && res.failed === 0;
+    await store.setJSON(blastKey(day, blast.n), blast);
+    out.push({ n: blast.n, sent: blast.sent, failed: blast.failed, done: blast.done });
+  }
+  return out;
 }

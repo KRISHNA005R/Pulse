@@ -11,13 +11,14 @@
 //   POST /api/push  { action: 'daily-set', date, title, body }     -> write the message for a date
 //   POST /api/push  { action: 'daily-del', date }                  -> remove it
 //   POST /api/push  { action: 'daily-try', id, title, body }       -> send it to one device now, to see how it looks
+//   POST /api/push  { action: 'daily-now', title, body }           -> send it to everyone now (at most 10 a day)
 //
 // See netlify/lib/push.ts for what is stored. The sender runs from netlify/functions/push-cron.ts.
 import { getStore } from '@netlify/blobs';
 import webpush from 'web-push';
 import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
 import { getVapid, removeDevice, sendTest, status, syncDevice, type Sender, type StoreLike, type Vapid } from '../lib/push';
-import { dailyOverview, deleteCustom, sendPreview, setCustom } from '../lib/daily';
+import { createBlast, dailyOverview, deleteCustom, runBlasts, sendPreview, setCustom } from '../lib/daily';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -87,6 +88,13 @@ export async function handle(req: Request, store: StoreLike, sender: Sender, key
           return json(res, res.ok ? 200 : 400);
         }
         if (body.action === 'daily-del') return json(await deleteCustom(store, body.date));
+        if (body.action === 'daily-now') {
+          const made = await createBlast(store, body);
+          if (!made.ok) return json(made, 400);
+          // Send straight away. Anything this call doesn't reach in time is finished by the 15-minute sender.
+          const res = (await runBlasts(store, sender, await getVapid(store, make), new Date(), 6_000)).find((x) => x.n === made.n);
+          return json({ ok: true, n: made.n, sent: res?.sent ?? 0, failed: res?.failed ?? 0, done: res?.done ?? false });
+        }
         if (body.action === 'daily-try') {
           const res = await sendPreview(store, id, body, sender, await getVapid(store, make));
           return json(res, res.ok ? 200 : 400);

@@ -196,6 +196,8 @@
     if (!dl) return '';
     var s = dl.sentToday;
     var first = dl.days[0];
+    var nw = dl.now || { max: 10, used: 0, list: [] };
+    var left = Math.max(0, nw.max - nw.used);
     var now = s
       ? '<div class="now"><div class="muted">Today · ' + (s.done ? 'sent to ' : 'sending, so far ') + fmt(s.sent) + ' phone' + (s.sent === 1 ? '' : 's') + (s.failed ? ' · ' + fmt(s.failed) + ' will be tried again' : '') + '</div><b>' + esc(s.title) + '</b><div>' + esc(s.body) + '</div></div>'
       : '<div class="now"><div class="muted">Today · ' + (dl.phase === 'before' ? 'goes out at 10:00 am India time' : dl.phase === 'due' ? 'going out within 15 minutes' : '<span class="err">not sent: the sender did not run between 10 am and 4 pm</span>') + '</div><b>' + esc(first.title) + '</b><div>' + esc(first.body) + '</div></div>';
@@ -214,8 +216,13 @@
       '<label>Date<input type="date" id="dmd" min="' + esc(s || dl.phase === 'missed' ? dl.days[1].date : dl.today) + '" value="' + esc(draft.date || dl.days[1].date) + '"></label>' +
       '<label><div class="lr">Title <span id="dmtc"></span></div><input id="dmt" maxlength="60" placeholder="New in PULSE ✨" value="' + esc(draft.title) + '"></label>' +
       '<label><div class="lr">Message <span id="dmbc"></span></div><textarea id="dmb" maxlength="140" placeholder="Pick Bank or Cash when you log a spend.">' + esc(draft.body) + '</textarea></label>' +
-      '<div class="btns"><button id="dms">Save for this date</button>' + (myDevice() ? '<button class="ghost" id="dmp">Send to this phone first</button>' : '') + '</div>' +
+      '<div class="btns"><button id="dmn"' + (left ? '' : ' disabled style="opacity:.45"') + '>Send now to everyone</button><button class="ghost" id="dms">Save for the date above</button>' + (myDevice() ? '<button class="ghost" id="dmp">Send to this phone first</button>' : '') + '</div>' +
+      '<div class="muted">Send now: ' + (left ? left + ' of ' + nw.max + ' left today. ' : 'all ' + nw.max + ' used today, the next one can go tomorrow. ') + 'It goes to every phone straight away, on top of the 10 am message. Use it rarely: too many notifications and people switch them off.</div>' +
       '<div id="dmm" role="status" class="' + (good ? 'muted' : 'err') + '" style="min-height:20px">' + esc(msg || '') + '</div></div>' +
+      (nw.list.length ? '<h2 style="margin-top:10px">Sent by you today</h2><div style="margin-top:6px">' + nw.list.map(function (x) {
+        var t = new Date(x.at).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+        return '<div class="dm"><div class="when">' + esc(t) + '<span>#' + x.n + '</span></div><div class="what"><b>' + esc(x.title) + '</b><p>' + esc(x.body) + '</p><span class="tag mine">' + (x.done ? 'Sent to ' : 'Sending, so far ') + fmt(x.sent) + ' phone' + (x.sent === 1 ? '' : 's') + (x.failed ? ' · ' + fmt(x.failed) + ' being retried' : '') + '</span></div></div>';
+      }).join('') + '</div>' : '') +
       '<h2 style="margin-top:10px">Coming up</h2><div style="margin-top:6px">' + rows + later + '</div>' +
       '<p class="note">Festival dates are loaded until ' + esc(short(dl.lastOccasion)) + ' ' + esc(dl.lastOccasion.slice(0, 4)) + '. After that only fixed days (New Year, 15 August, Christmas…) and money lines go out, until the list is refreshed.' +
       (myDevice() ? '' : ' To try a message on your own phone first, open this page on a phone where PULSE reminders are on.') + '</p></div>';
@@ -234,6 +241,24 @@
         if (!r.ok) return say(r.error || 'Could not save. Try again.');
         draft = { date: '', title: '', body: '' };
         loadDaily('Saved. It goes out on ' + short(date) + ' at 10:00 am.' + (taken && taken.source === 'occasion' ? ' It replaces “' + taken.title + '”.' : ''), true);
+      });
+    };
+    // Send now: the first tap asks, the second tap sends.
+    var nowBtn = document.getElementById('dmn'), armed = 0;
+    nowBtn.onclick = function () {
+      if (!t.value.trim()) return say('Write a title first.');
+      if (Date.now() - armed > 6000) {
+        armed = Date.now();
+        var night = dl.hour >= 22 || dl.hour < 8;
+        nowBtn.textContent = night ? 'It is night in India. Tap again to send anyway' : 'Tap again to send to everyone';
+        setTimeout(function () { if (Date.now() - armed >= 6000) nowBtn.textContent = 'Send now to everyone'; }, 6100);
+        return;
+      }
+      armed = 0; nowBtn.disabled = true; nowBtn.textContent = 'Sending…';
+      pushApi({ action: 'daily-now', title: t.value, body: b.value }).then(function (r) {
+        if (!r.ok) { nowBtn.disabled = false; nowBtn.textContent = 'Send now to everyone'; return say(r.error || 'Could not send. Try again.'); }
+        draft = { date: d.value, title: '', body: '' };
+        loadDaily('Sent to ' + fmt(r.sent) + ' phone' + (r.sent === 1 ? '' : 's') + (r.done ? '.' : '. The rest will get it within 15 minutes.'), true);
       });
     };
     var p = document.getElementById('dmp');
