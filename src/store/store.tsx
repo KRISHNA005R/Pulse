@@ -5,8 +5,10 @@ import type {
   Category,
   CreditCard,
   Debt,
+  Door,
   FriendLink,
   Group,
+  GroupShare,
   Person,
   Plan,
   Settings,
@@ -28,7 +30,7 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
-import { applyBox, leaveChannel, type Box, type BoxItem } from '../lib/friends';
+import { acceptKnock, applyBox, applyGroup, closeDoor, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { applyMoney, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
@@ -707,6 +709,103 @@ function useStoreImpl() {
       }),
     [commit],
   );
+  /** My own PULSE link: one link for everybody. Made the first time it's asked for. */
+  const ensureDoor = useCallback((): Door => {
+    let d = ref.current.user.door;
+    if (!d) {
+      const fresh = newDoor();
+      d = fresh;
+      commit((s) => void (s.user.door = fresh));
+    }
+    return d;
+  }, [commit]);
+  /** A new link. The old one stops working; people already connected stay connected. */
+  const resetDoor = useCallback((): Door => {
+    const old = ref.current.user.door;
+    if (old) void closeDoor(old);
+    const fresh = newDoor();
+    commit((s) => void (s.user.door = fresh));
+    return fresh;
+  }, [commit]);
+  /** Someone opened my link. They become a new person here, or take their old place if they were here before. */
+  const friendKnocked = useCallback(
+    (name: string, link: FriendLink, theirUid?: string): string => {
+      let id = '';
+      commit((s) => void (id = acceptKnock(s, name, link, theirUid, uid('p'))));
+      return id;
+    },
+    [commit],
+  );
+  /** Two names are the same person: fold `fromId` into `intoId`. */
+  const mergePeople = useCallback(
+    (fromId: string, intoId: string) => {
+      const into = ref.current.people.find((p) => p.id === intoId);
+      commit((s) => mergePeopleIn(s, fromId, intoId));
+      toast({ text: `Merged. Everything is under ${into?.short ?? 'one name'} now.`, tone: 'good' });
+    },
+    [commit, toast],
+  );
+
+  // ---------- shared groups (lib/friends.ts) ----------
+  /** Start sharing a group with a link. Returns its keys (the ones it already has, if it's shared). */
+  const shareGroup = useCallback(
+    (groupId: string): GroupShare | null => {
+      let share: GroupShare | null = null;
+      commit((s) => {
+        const g = s.groups.find((x) => x.id === groupId);
+        if (!g) return;
+        if (!g.shared) g.shared = newShare(s.today);
+        share = structuredClone(g.shared);
+      });
+      return share;
+    },
+    [commit],
+  );
+  /** I opened a group's link: the group appears here, and the next sync fills it in. */
+  const joinGroup = useCallback(
+    (name: string, emoji: string, share: GroupShare): string => {
+      const id = uid('g');
+      commit((s) => void s.groups.unshift({ id, name: name.trim() || 'Group', emoji, members: ['me'], createdAt: s.today, shared: share }));
+      return id;
+    },
+    [commit],
+  );
+  const applyGroupView = useCallback(
+    (groupId: string, view: GroupView): GroupNews[] => {
+      let news: GroupNews[] = [];
+      commit((s) => void (news = applyGroup(s, groupId, view)));
+      return news;
+    },
+    [commit],
+  );
+  /** Stop sharing on this phone. The group and its history stay as an ordinary group. */
+  const unshareGroup = useCallback((groupId: string) => commit((s) => unshareGroupIn(s, groupId)), [commit]);
+  const setGroupClosed = useCallback(
+    (groupId: string, closed: boolean) =>
+      commit((s) => {
+        const sh = s.groups.find((x) => x.id === groupId)?.shared;
+        if (!sh) return;
+        if (closed) sh.closed = true;
+        else delete sh.closed;
+      }),
+    [commit],
+  );
+  /** Add someone to a group by name (someone who isn't on PULSE). */
+  const addGroupMember = useCallback(
+    (groupId: string, name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
+      commit((s) => {
+        const g = s.groups.find((x) => x.id === groupId);
+        if (!g) return;
+        const p: Person = { id: uid('p'), name: clean, short: clean.split(' ')[0], hue: Math.floor(Math.random() * 360) };
+        s.people.push(p);
+        g.members.push(p.id);
+      });
+    },
+    [commit],
+  );
+
   /** A friend marked a payment between us: move the money in or out of one of my accounts too. */
   const bankSettlement = useCallback(
     (id: string, accountId?: string) => {
@@ -927,7 +1026,11 @@ function useStoreImpl() {
   const eraseAll = useCallback(() => {
     // Friends stop seeing this person's splits: leave every shared channel (this device only if it's the last one syncing).
     const mine = ref.current.mode === 'personal' ? ref.current : readStash();
-    if (!loadSync()) for (const p of mine?.people ?? []) if (p.link) void leaveChannel(p.link);
+    if (!loadSync()) {
+      for (const p of mine?.people ?? []) if (p.link) void leaveChannel(p.link);
+      for (const g of mine?.groups ?? []) if (g.shared) void leaveGroupChannel(g.shared);
+      if (mine?.user.door) void closeDoor(mine.user.door);
+    }
     try {
       localStorage.removeItem('pulse-friends-v1');
     } catch {
@@ -1387,6 +1490,16 @@ function useStoreImpl() {
     applyFriendBox,
     markFriendJoined,
     unlinkPerson,
+    ensureDoor,
+    resetDoor,
+    friendKnocked,
+    mergePeople,
+    shareGroup,
+    joinGroup,
+    applyGroupView,
+    unshareGroup,
+    setGroupClosed,
+    addGroupMember,
     bankSettlement,
     addGroup,
     addSplit,

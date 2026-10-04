@@ -41,6 +41,7 @@ export type SheetSpec =
   | { type: 'settle'; personId: string; groupId?: string }
   | { type: 'friend-invite' }
   | { type: 'friend-join'; code?: string }
+  | { type: 'person-merge'; personId: string }
   | { type: 'share-card'; preset?: 'weekend' | 'plan' }
   | { type: 'receipt' }
   | { type: 'command'; query?: string }

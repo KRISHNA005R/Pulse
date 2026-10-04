@@ -1,10 +1,26 @@
-// Friends on PULSE: the shared, encrypted channel two people use to see each other's splits.
+// Friends on PULSE: the shared, encrypted channels people use to see each other's splits.
 //
+// Two people:
 //   POST /api/friends  { action: 'create', chan, token, dev? }                      the inviter opens a channel
 //   POST /api/friends  { action: 'join',   chan, token, dev? }                      the friend accepts the invite
 //   POST /api/friends  { action: 'get',    chan, token, dev? }                      -> both sealed boxes
 //   POST /api/friends  { action: 'put',    chan, token, box, dev?, notify? }        publish my box, notify the friend
 //   POST /api/friends  { action: 'leave',  chan, token }                            disconnect
+//
+// A shared group (gid = the group, mid = this member):
+//   POST /api/friends  { action: 'g-create' | 'g-join', gid, mid, token, dev? }     start a group / join with its link
+//   POST /api/friends  { action: 'g-get',   gid, mid, token, dev? }                 -> every member's sealed box
+//   POST /api/friends  { action: 'g-put',   gid, mid, token, box, notify? }         publish my box, notify the others
+//   POST /api/friends  { action: 'g-leave', gid, mid, token }
+//   POST /api/friends  { action: 'g-close', gid, mid, token, closed }               owner: stop or allow new people
+//   POST /api/friends  { action: 'g-remove', gid, mid, token, target }              owner: take a member out
+//
+// A personal link (one link for everybody):
+//   POST /api/friends  { action: 'door-open',  door, token, dev? }                  the owner makes the link
+//   POST /api/friends  { action: 'door-knock', door, box, notify? }                 someone opened it
+//   POST /api/friends  { action: 'door-read',  door, token, dev? }                  -> who is waiting
+//   POST /api/friends  { action: 'door-clear', door, token, ns }
+//   POST /api/friends  { action: 'door-close', door, token }                        the link stops working
 //
 // What is stored and why it can't be read here: netlify/lib/friends.ts.
 import { getStore } from '@netlify/blobs';

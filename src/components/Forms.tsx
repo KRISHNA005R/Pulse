@@ -395,7 +395,8 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
         <input id="group-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Lonavala weekend" />
       </Field>
       <div>
-        <p className="mb-2 text-[13px] font-semibold text-ink2">Who's in?</p>
+        <p className="mb-1 text-[13px] font-semibold text-ink2">Who's in?</p>
+        <p className="mb-2 text-[12.5px] text-ink3">Pick or add names now, or skip this: after creating the group you can share one link and everyone who opens it joins by themselves.</p>
         <div className="flex flex-wrap gap-2">
           {state.people.map((p) => (
             <button key={p.id} type="button" className="chip pl-1" aria-pressed={members.includes(p.id)} onClick={() => setMembers(members.includes(p.id) ? members.filter((x) => x !== p.id) : [...members, p.id])}>
@@ -434,7 +435,7 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
       </Field>
       <button
         type="button"
-        disabled={!name.trim() || !members.length}
+        disabled={!name.trim()}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
           const id = store.addGroup({ name: name.trim(), emoji, members: ['me', ...members], plan: plan || undefined });

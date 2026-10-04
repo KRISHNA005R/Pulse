@@ -34,6 +34,18 @@ export interface User {
   name: string;
   fullName: string;
   handle: string;
+  /** A random id other people's apps know this person by, so the same friend isn't listed twice. Never shown. */
+  uid?: string;
+  /** This person's own PULSE link: one link for everybody (lib/friends.ts). */
+  door?: Door;
+}
+
+/** A personal link. The key only ever travels inside the link itself. */
+export interface Door {
+  id: string;
+  key: string;
+  /** The owner's secret for reading who opened the link. */
+  token: string;
 }
 
 export type AccountType = 'bank' | 'cash' | 'wallet' | 'savings' | 'investment';
@@ -206,6 +218,8 @@ export interface Person {
   hue: number;
   /** Set when this friend is connected on PULSE: the two apps share their splits with each other. */
   link?: FriendLink;
+  /** Their PULSE id (User.uid), once known from a link or a shared group. */
+  uid?: string;
 }
 
 /** The private channel shared with one friend. The key only ever travels inside the invite link. */
@@ -219,6 +233,32 @@ export interface FriendLink {
   since: ISODate;
   /** What the friend calls themselves in their PULSE. */
   theirName?: string;
+  /** Started by opening the friend's personal link (its id): connected once their phone picks it up. */
+  door?: string;
+}
+
+/** A group that several people keep together, each in their own PULSE (lib/friends.ts). */
+export interface GroupShare {
+  gid: string;
+  /** Seals what members publish. Only ever travels inside the group's link. */
+  key: string;
+  /** Who I am in this group, and my secret for publishing as that member. */
+  mid: string;
+  token: string;
+  /** I made the group: I can stop new people joining and take a member out. */
+  owner?: boolean;
+  /** Nobody new can join with the link. */
+  closed?: boolean;
+  /**
+   * How the names inside members' boxes map to people here. A key is either a member id (someone who
+   * joined) or "<member id>.<their person id>" (a name a member typed by hand).
+   */
+  refs: Record<string, ID>;
+  /** Members who have joined and not left, apart from me. */
+  on: string[];
+  /** A name someone else typed by hand that turned out to be me. */
+  claim?: string;
+  since: ISODate;
 }
 
 export interface Group {
@@ -228,6 +268,8 @@ export interface Group {
   members: ID[]; // includes 'me'
   plan?: ID;
   createdAt: ISODate;
+  /** Set when the group is shared with a link. */
+  shared?: GroupShare;
 }
 
 export type SplitMode = 'equal' | 'exact' | 'percent' | 'shares';
@@ -245,7 +287,7 @@ export interface SplitExpense {
   category: CategoryId;
   plan?: ID;
   transactionId?: ID;
-  /** Recorded by a connected friend in their PULSE (the channel it came through). Only they can change it. */
+  /** Recorded by a connected friend or a group member in their PULSE (the channel or group it came through). Only they can change it. */
   remote?: string;
 }
 

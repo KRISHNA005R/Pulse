@@ -1,12 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { budgetState, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { authorOf, groupSeat } from '../lib/friends';
 import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
 import { EmptyState, MoneyStat, PersonAvatar, ProgressBar, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
-import { FriendConnect, FriendPayments } from '../components/Friends';
+import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Friends';
 
 export function PlansScreen() {
   const ui = useUI();
@@ -85,10 +86,10 @@ function SplitsView() {
   const { state } = useStore();
   const ui = useUI();
   const t = useMemo(() => socialTotals(state), [state]);
-  // Anyone with a balance, plus friends connected on PULSE even when you're square.
+  // Anyone with a balance, plus friends on PULSE (connected, or in a shared group with you) even when you're square.
   const people = state.people
+    .filter((p) => (t.balances.get(p.id) ?? 0) !== 0 || p.link || p.uid)
     .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number])
-    .filter(([id, v]) => v !== 0 || state.people.find((p) => p.id === id)?.link)
     .sort((a, b) => a[1] - b[1]);
   return (
     <div className="flex flex-col gap-8">
@@ -111,7 +112,7 @@ function SplitsView() {
                       <span className="block text-[15px] font-semibold">{v === 0 ? `You and ${p.short} are square` : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</span>
                       <span className="block text-[13px] text-ink3">
                         {p.name}
-                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : ' · invite sent') : ''}
+                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : p.link.door ? ' · connecting' : ' · invite sent') : p.uid ? ' · in a group with you' : ''}
                       </span>
                     </span>
                   </button>
@@ -130,10 +131,10 @@ function SplitsView() {
         {state.mode === 'personal' && (
           <div className="mt-3 grid grid-cols-2 gap-2">
             <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-invite' })}>
-              <Icon name="users" size={16} /> Invite a friend
+              <Icon name="users" size={16} /> Invite friends
             </button>
             <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-join' })}>
-              I have an invite
+              I have a link
             </button>
           </div>
         )}
@@ -307,48 +308,90 @@ export function PlanDetail({ id }: { id: string }) {
 // Group detail
 // ------------------------------------------------------------------
 export function GroupDetail({ id }: { id: string }) {
-  const { state } = useStore();
+  const store = useStore();
+  const { state } = store;
   const ui = useUI();
+  const [friend, setFriend] = useState('');
   const group = state.groups.find((g) => g.id === id);
   if (!group) return <TopNavigation title="Group" onBack={ui.pop} />;
   const g = groupSummary(state, id);
   const plan = group.plan ? state.plans.find((p) => p.id === group.plan) : undefined;
   const settlements = state.settlements.filter((s) => s.group === id);
   const name = (pid: string) => (pid === 'me' ? 'You' : state.people.find((p) => p.id === pid)?.short ?? '?');
+  const others = group.members.filter((m) => m !== 'me');
+  // With three or more people, "who owes me" isn't the whole picture: show where everyone stands.
+  const net = others.length > 1 ? [...groupNet(state, id)].filter(([, v]) => v !== 0).sort((a, b) => b[1] - a[1]) : [];
   return (
     <div>
-      <TopNavigation title={`${group.name} ${group.emoji}`} onBack={ui.pop} sub={`${group.members.length} people${plan ? ` · linked to ${plan.name}` : ''}`} />
+      <TopNavigation title={`${group.name} ${group.emoji}`} onBack={ui.pop} sub={`${group.members.length} ${group.members.length === 1 ? 'person' : 'people'}${group.shared ? ' · shared' : ''}${plan ? ` · linked to ${plan.name}` : ''}`} />
       <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-surface p-4">
         <MoneyStat label="Total spent" value={g.total} />
         <MoneyStat label="You owe" value={g.youOwe} />
         <MoneyStat label="You are owed" value={g.owedToYou} tone={g.owedToYou ? 'pos' : undefined} />
       </div>
-      <button type="button" className="btn-accent mt-4 w-full" onClick={() => ui.openSheet({ type: 'group-expense', groupId: id })}>
-        <Icon name="plus" size={17} /> Add expense
-      </button>
+      {others.length ? (
+        <button type="button" className="btn-accent mt-4 w-full" onClick={() => ui.openSheet({ type: 'group-expense', groupId: id })}>
+          <Icon name="plus" size={17} /> Add expense
+        </button>
+      ) : (
+        <p className="mt-4 rounded-2xl bg-sunk px-4 py-3 text-[14px] text-ink2">It's just you here so far. Share the group link below, or add someone by name, then add the first expense.</p>
+      )}
+      <GroupShareCard group={group} />
 
       <section className="mt-8" aria-labelledby="gb-h">
         <SectionHeader id="gb-h" title="Balances" />
         <ul className="flex flex-col">
-          {group.members
-            .filter((m) => m !== 'me')
-            .map((pid) => {
-              const v = g.balances.get(pid) ?? 0;
-              const p = state.people.find((x) => x.id === pid);
-              return (
-                <li key={pid} className="flex items-center gap-3 px-2 py-2">
-                  <PersonAvatar person={p} size={36} />
-                  <span className="flex-1 text-[15px]">{v === 0 ? `${p?.short} · settled` : v < 0 ? `You owe ${p?.short} ${rupees(-v)}` : `${p?.short} owes you ${rupees(v)}`}</span>
-                  {v !== 0 && (
-                    <button type="button" className="btn-quiet min-h-[36px] px-3.5 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: pid, groupId: id })}>
-                      Settle
-                    </button>
-                  )}
-                </li>
-              );
-            })}
+          {others.map((pid) => {
+            const v = g.balances.get(pid) ?? 0;
+            const p = state.people.find((x) => x.id === pid);
+            return (
+              <li key={pid} className="flex items-center gap-3 px-2 py-2">
+                <PersonAvatar person={p} size={36} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px]">{v === 0 ? `${p?.short} · settled` : v < 0 ? `You owe ${p?.short} ${rupees(-v)}` : `${p?.short} owes you ${rupees(v)}`}</span>
+                  {group.shared && <span className="block text-[12.5px] text-ink3">{{ on: 'Joined on PULSE', left: 'Left the group', name: 'Added by name · not joined yet' }[groupSeat(group, pid)]}</span>}
+                </span>
+                {v !== 0 && (
+                  <button type="button" className="btn-quiet min-h-[36px] px-3.5 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: pid, groupId: id })}>
+                    Settle
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
+        <form
+          className="mt-2 flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!friend.trim()) return;
+            store.addGroupMember(id, friend);
+            setFriend('');
+          }}
+        >
+          <label htmlFor="gm-name" className="sr-only">
+            Add someone by name
+          </label>
+          <input id="gm-name" className="field py-2" placeholder="Add someone by name" value={friend} onChange={(e) => setFriend(e.target.value)} autoComplete="off" />
+          <button type="submit" className="btn-quiet min-h-[42px] shrink-0 px-4">
+            <Icon name="user-plus" size={16} /> Add
+          </button>
+        </form>
       </section>
+
+      {net.length > 0 && (
+        <section className="mt-8" aria-labelledby="gn-h">
+          <SectionHeader id="gn-h" title="Whole group" />
+          <ul className="flex flex-col gap-1 px-2">
+            {net.map(([pid, v]) => (
+              <li key={pid} className="flex items-center justify-between py-1.5 text-[14px] text-ink2">
+                <span>{pid === 'me' ? (v > 0 ? 'You get back' : 'You owe in total') : `${name(pid)} ${v > 0 ? 'gets back' : 'owes'}`}</span>
+                <span className={`num font-semibold ${v > 0 ? 'text-pos' : 'text-ink'}`}>{rupees(Math.abs(v))}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-8" aria-labelledby="ge-h">
         <SectionHeader id="ge-h" title="Expenses" />
@@ -369,7 +412,7 @@ export function GroupDetail({ id }: { id: string }) {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold">{s.description}</span>
                       <span className="block text-[13px] text-ink3">
-                        {name(s.paidBy)} paid {rupees(s.amount)} · {s.mode === 'equal' ? 'split equally' : s.mode === 'exact' ? 'exact amounts' : s.mode === 'percent' ? 'by %' : 'by shares'}
+                        {name(s.paidBy)} paid {rupees(s.amount)} · {s.remote ? `added by ${authorOf(state, group, s.id)?.short ?? 'a member'}` : s.mode === 'equal' ? 'split equally' : s.mode === 'exact' ? 'exact amounts' : s.mode === 'percent' ? 'by %' : 'by shares'}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
@@ -426,6 +469,12 @@ export function PersonDetail({ id }: { id: string }) {
   const v = personBalances(state).get(id) ?? 0;
   const groups = state.groups.filter((g) => g.members.includes(id));
   const shared = state.splits.filter((s) => s.paidBy === id || s.shares.some((x) => x.person === id)).sort((a, b) => b.date.localeCompare(a.date));
+  /** Whose PULSE an entry came from: this friend's, or a member of a shared group. */
+  const addedBy = (s: (typeof shared)[number]) => {
+    if (s.remote === p.link?.chan) return p.short;
+    const g = state.groups.find((x) => x.id === s.group);
+    return (g && authorOf(state, g, s.id)?.short) || 'a friend';
+  };
   return (
     <div>
       <TopNavigation title={p.name} onBack={ui.pop} />
@@ -473,7 +522,7 @@ export function PersonDetail({ id }: { id: string }) {
                 <span className="block truncate font-medium">{s.description}</span>
                 <span className="block text-[13px] text-ink3">
                   {fmtDate(s.date)} · {s.paidBy === 'me' ? 'you paid' : s.paidBy === id ? `${p.short} paid` : 'someone else paid'}
-                  {s.remote ? ` · added by ${p.short}` : ''}
+                  {s.remote ? ` · added by ${addedBy(s)}` : ''}
                 </span>
               </span>
               <span className="num shrink-0">{rupees(s.amount)}</span>
@@ -481,6 +530,11 @@ export function PersonDetail({ id }: { id: string }) {
           ))}
         </ul>
       </section>
+      {state.mode === 'personal' && state.people.length > 1 && (
+        <button type="button" className="btn-ghost mt-6 min-h-[40px] px-1 text-[13.5px] text-ink3" onClick={() => ui.openSheet({ type: 'person-merge', personId: id })}>
+          Is {p.short} in your list twice? Merge the two names
+        </button>
+      )}
     </div>
   );
 }

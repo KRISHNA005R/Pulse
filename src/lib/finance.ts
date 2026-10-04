@@ -428,6 +428,30 @@ export function personBalances(s: State, groupId?: string): Map<string, number> 
   return net;
 }
 
+/**
+ * A group as a whole: what each person is up or down across everyone, not just against me.
+ * Positive = the group owes them. Negative = they owe the group. 'me' is included.
+ */
+export function groupNet(s: State, groupId: string): Map<string, number> {
+  const net = new Map<string, number>();
+  const add = (p: string, v: number) => net.set(p, (net.get(p) ?? 0) + v);
+  for (const sp of s.splits) {
+    if (sp.group !== groupId) continue;
+    for (const sh of sp.shares) {
+      if (sh.person === sp.paidBy) continue;
+      add(sp.paidBy, sh.amount);
+      add(sh.person, -sh.amount);
+    }
+  }
+  for (const st of s.settlements) {
+    if (st.group !== groupId) continue;
+    add(st.from, st.amount);
+    add(st.to, -st.amount);
+  }
+  for (const [k, v] of net) net.set(k, roundMoney(v));
+  return net;
+}
+
 export function groupSummary(s: State, groupId: string) {
   const bal = personBalances(s, groupId);
   let youOwe = 0;
