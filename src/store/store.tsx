@@ -27,35 +27,14 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
-import { addMonths, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, defaultAccount, incomeCategory, netWorth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
+import { applyMoney, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
-// ------------------------------------------------------------------
-// Pure state transitions. Every mutation that moves money goes through
-// applyMoney() so balances, cards and plan pots stay consistent.
-// ------------------------------------------------------------------
+// Pure state transitions. Every mutation that moves money goes through applyMoney()
+// (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
 
-function applyMoney(s: State, tx: Transaction, sign: 1 | -1) {
-  const acct = s.accounts.find((a) => a.id === tx.account);
-  const card = s.cards.find((c) => c.id === tx.account);
-  const amt = tx.amount * sign;
-  if (tx.type === 'expense') {
-    if (card) card.balance += amt;
-    else if (acct) acct.balance -= amt;
-  } else if (tx.type === 'income') {
-    if (acct) acct.balance += amt;
-  } else {
-    const out = tx.direction !== 'in';
-    if (acct) acct.balance += out ? -amt : amt;
-    if (tx.toAccount?.startsWith('pot:')) {
-      const plan = s.plans.find((p) => `pot:${p.id}` === tx.toAccount);
-      if (plan) plan.saved = Math.max(0, plan.saved + amt);
-    } else if (tx.toAccount) {
-      const to = s.accounts.find((a) => a.id === tx.toAccount);
-      if (to) to.balance += amt;
-    }
-  }
-}
+/** The demo month is frozen, so nothing is recorded by the calendar there. */
+const personal = (s: State) => s.mode === 'personal';
 
 type Draft = (s: State) => void;
 function produce(state: State, fn: Draft): State {
@@ -166,6 +145,124 @@ export function processDueInvestments(s: State): Transaction[] {
   return made;
 }
 
+/** One EMI as a transaction: the whole EMI leaves the account, and `principal` comes off the loan. */
+function emiTx(s: State, d: Debt, date: ISODate, how: string): Transaction {
+  const part = emiParts(d);
+  const account = d.account && (s.accounts.some((a) => a.id === d.account) || s.cards.some((c) => c.id === d.account)) ? d.account : defaultAccount(s);
+  return {
+    // Same id on every synced device, so an EMI is never recorded twice.
+    id: `emi-${d.id}-${debtDue(s, d)}`,
+    merchant: emiName(d),
+    amount: part.amount,
+    type: 'expense',
+    category: 'bills',
+    date,
+    account,
+    recurring: true,
+    status: 'completed',
+    debtId: d.id,
+    principal: part.principal,
+    notes: part.interest > 0 ? `${how} · ${rupees(part.principal)} off the loan, ${rupees(part.interest)} interest` : how,
+  };
+}
+
+/** Record one EMI and move the loan to its next date. Returns nothing if this EMI is already recorded. */
+function payEmi(s: State, d: Debt, date: ISODate, how: string): Transaction | null {
+  const tx = emiTx(s, d, date, how);
+  const fresh = !s.transactions.some((t) => t.id === tx.id);
+  if (fresh) {
+    s.transactions.unshift(tx);
+    applyMoney(s, tx, 1);
+  }
+  d.nextDate = addMonths(debtDue(s, d), 1);
+  return fresh ? tx : null;
+}
+
+/**
+ * Record every loan EMI that has fallen due: the EMI leaves the account it's paid from and the
+ * loan goes down by the EMI minus that month's interest. A loan from before this existed starts
+ * from its next EMI date, so nothing is back-dated. Loans paid by hand stay due until marked paid.
+ */
+export function processDueDebts(s: State): Transaction[] {
+  const made: Transaction[] = [];
+  for (const d of s.debts ?? []) {
+    if (!d.nextDate) d.nextDate = nextDayOfMonth(s.today, d.dueDay);
+    if (d.autoDebit === false) continue;
+    let guard = 0;
+    while (d.remaining > 0 && d.nextDate <= s.today && guard++ < 60) {
+      const tx = payEmi(s, d, d.nextDate, 'Auto-debit');
+      if (tx) made.push(tx);
+    }
+  }
+  return made;
+}
+
+/**
+ * Bills and subscriptions: on the due date, record the payment from its account and move to the
+ * next date. Skipped when the person already logged it themselves around that date, or switched
+ * auto-debit off for it (then the date just moves on, as it always did).
+ */
+export function processDueSubscriptions(s: State): Transaction[] {
+  const made: Transaction[] = [];
+  for (const sub of s.subscriptions) {
+    const next = (d: ISODate) => (sub.cycle === 'weekly' ? addDays(d, 7) : addMonths(d, sub.cycle === 'yearly' ? 12 : 1));
+    const live = sub.status === 'active' || sub.status === 'unknown';
+    const auto = live && sub.autoDebit !== false;
+    let guard = 0;
+    // Without auto-debit a payment due today stays on the list for the day; with it, it's recorded today.
+    while ((auto ? sub.nextDate <= s.today : sub.nextDate < s.today) && guard++ < 400) {
+      const due = sub.nextDate;
+      const id = `due-${sub.id}-${due}`;
+      const name = sub.name.trim().toLowerCase();
+      const logged = s.transactions.some(
+        (t) => t.id === id || (t.type === 'expense' && !t.subscriptionId && Math.abs(daysBetween(t.date, due)) <= 3 && t.merchant.toLowerCase().includes(name)),
+      );
+      if (auto && !logged && sub.amount > 0) {
+        const tx: Transaction = {
+          id,
+          merchant: sub.name,
+          amount: sub.amount,
+          type: 'expense',
+          category: sub.category,
+          date: due,
+          account: s.accounts.some((a) => a.id === sub.account) || s.cards.some((c) => c.id === sub.account) ? sub.account : defaultAccount(s),
+          recurring: true,
+          status: 'completed',
+          subscriptionId: sub.id,
+          notes: 'Recorded automatically on the due date',
+        };
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+        made.push(tx);
+      }
+      sub.nextDate = next(due);
+    }
+  }
+  return made;
+}
+
+/**
+ * A SIP must pay into a holding that exists. If its holding was removed, the instalments had
+ * nowhere to land and the Investments screen showed nothing held. Bring the holding back with
+ * everything put in through those SIPs.
+ */
+export function repairHoldings(s: State) {
+  for (const inv of s.investments ?? []) {
+    if (!inv.toAccount || inv.toAccount.startsWith('pot:') || inv.toAccount === '__new') continue;
+    if (s.accounts.some((a) => a.id === inv.toAccount)) continue;
+    const balance = (s.investments ?? []).filter((i) => i.toAccount === inv.toAccount).reduce((a, i) => a + investedTotal(s, i), 0);
+    s.accounts.push({ id: inv.toAccount, name: inv.platform?.trim() || 'Investments', institution: inv.platform?.trim() || 'Investments', type: 'investment', balance: roundMoney(balance), spendable: false });
+  }
+}
+
+/** What PULSE recorded by itself the last time it caught up with the calendar, for a note on screen. */
+let autoMade: Transaction[] = [];
+export function takeAutoMade(): Transaction[] {
+  const made = autoMade;
+  autoMade = [];
+  return made;
+}
+
 /**
  * Record every auto-debit insurance premium that has fallen due as an expense, then move the
  * policy to its next due date. Policies paid by hand stay due until the person marks them paid.
@@ -228,6 +325,7 @@ export function refresh(input: State): State {
   s.settings.currency = s.settings.currency ?? 'INR';
   for (const c of CATEGORIES) if (!s.categories.some((x) => x.id === c.id)) s.categories.push(structuredClone(c));
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
+  repairHoldings(s);
   if (s.mode !== 'personal') return s;
   const today = realToday();
   if (today <= s.today && s.today === today) return s;
@@ -253,17 +351,7 @@ export function refresh(input: State): State {
   }
   processDueInvestments(s);
   processDueInsurance(s);
-  for (const sub of s.subscriptions) {
-    const step = sub.cycle === 'yearly' ? 12 : 1;
-    let guard = 0;
-    if (sub.cycle === 'weekly') {
-      while (sub.nextDate < today && guard++ < 400) {
-        const d = new Date(sub.nextDate);
-        d.setDate(d.getDate() + 7);
-        sub.nextDate = d.toISOString().slice(0, 10);
-      }
-    } else while (sub.nextDate < today && guard++ < 60) sub.nextDate = addMonths(sub.nextDate, step);
-  }
+  autoMade = [...processDueDebts(s), ...processDueSubscriptions(s)];
   return s;
 }
 
@@ -315,6 +403,16 @@ function useStoreImpl() {
     window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), t.action ? 6000 : 4200);
   }, []);
   const dismissToast = useCallback((id: string) => setToasts((xs) => xs.filter((x) => x.id !== id)), []);
+
+  // Say what PULSE recorded while the person was away, so a changed balance is never a mystery.
+  useEffect(() => {
+    const made = takeAutoMade();
+    if (!made.length) return;
+    const total = made.reduce((a, t) => a + t.amount, 0);
+    const text = made.length === 1 ? `${made[0].merchant} was due: ${rupees(made[0].amount)} is recorded.` : `${made.length} payments were due: ${rupees(total)} is recorded. See Activity.`;
+    const t = window.setTimeout(() => toast({ text, emoji: '🧾' }), 3800);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
   // ---------- money moments ----------
   const momentAfterExpense = useCallback(
@@ -517,11 +615,22 @@ function useStoreImpl() {
   // ---------- subscriptions ----------
   const saveSubscription = useCallback(
     (sub: Omit<Subscription, 'id'> & { id?: string }) => {
+      let made: Transaction[] = [];
+      let id = sub.id;
       commit((s) => {
-        if (sub.id) Object.assign(s.subscriptions.find((x) => x.id === sub.id)!, sub);
-        else s.subscriptions.push({ ...sub, id: uid('sub') } as Subscription);
+        // A date in the past means "it was due then": start from the next time it comes round, never back-date.
+        const data = { ...sub };
+        let guard = 0;
+        while (data.nextDate < s.today && guard++ < 400) data.nextDate = data.cycle === 'weekly' ? addDays(data.nextDate, 7) : addMonths(data.nextDate, data.cycle === 'yearly' ? 12 : 1);
+        if (data.id) Object.assign(s.subscriptions.find((x) => x.id === data.id)!, data);
+        else {
+          id = uid('sub');
+          s.subscriptions.push({ ...data, id } as Subscription);
+        }
+        made = personal(s) ? processDueSubscriptions(s) : [];
       });
-      toast({ text: sub.id ? 'Saved.' : `${sub.name} added. It's now counted in safe-to-spend.` });
+      const paid = made.find((t) => t.subscriptionId === id);
+      toast({ text: paid ? `${sub.name} saved. Today's ${rupees(paid.amount)} is recorded.` : sub.id ? 'Saved.' : `${sub.name} added. It's now counted in safe-to-spend.` });
     },
     [commit, toast],
   );
@@ -958,11 +1067,47 @@ function useStoreImpl() {
   const deleteCard = useCallback((id: string) => commit((s) => void (s.cards = s.cards.filter((x) => x.id !== id))), [commit]);
   const saveDebt = useCallback(
     (d: Omit<Debt, 'id'> & { id?: string }) => {
-      commit((s) => {
-        if (d.id) Object.assign(s.debts.find((x) => x.id === d.id)!, d);
-        else s.debts.push({ ...d, id: uid('debt') } as Debt);
+      let made: Transaction[] = [];
+      let saved: Debt | undefined;
+      const next = commit((s) => {
+        const old = d.id ? s.debts.find((x) => x.id === d.id) : undefined;
+        // A new loan, or a changed due day, starts from the next time that day comes round.
+        const nextDate = old && old.dueDay === d.dueDay && old.nextDate ? old.nextDate : nextDayOfMonth(s.today, d.dueDay);
+        if (old) Object.assign(old, d, { nextDate });
+        else s.debts.push({ ...d, nextDate, id: uid('debt') } as Debt);
+        saved = old ?? s.debts[s.debts.length - 1];
+        made = personal(s) ? processDueDebts(s) : [];
       });
-      toast({ text: d.id ? 'Loan updated.' : `${d.name} added.` });
+      const emi = made.find((t) => t.debtId === saved?.id);
+      toast({
+        text: emi
+          ? `${d.name} saved. Today's EMI of ${rupees(emi.amount)} is recorded. Safe to spend: ${rupees(safeToSpend(next).safe)}.`
+          : d.id
+            ? 'Loan updated.'
+            : saved?.autoDebit === false
+              ? `${d.name} added. Mark each EMI paid on its date.`
+              : `${d.name} added. The EMI will be recorded on ${fmtDate(saved?.nextDate ?? next.today)}.`,
+      });
+    },
+    [commit, toast],
+  );
+  /** "Mark as paid" for a loan that isn't on auto-debit: record this EMI now. */
+  const payDebt = useCallback(
+    (id: string) => {
+      let tx: Transaction | null = null;
+      let left = 0;
+      const next = commit((s) => {
+        const d = s.debts.find((x) => x.id === id);
+        if (!d || d.remaining <= 0) return;
+        if (!d.nextDate) d.nextDate = nextDayOfMonth(s.today, d.dueDay);
+        tx = payEmi(s, d, s.today, 'Marked as paid');
+        left = d.remaining;
+      });
+      haptic(12);
+      const paid = tx as Transaction | null;
+      if (!paid) return void toast({ text: 'That EMI was already recorded.' });
+      if (left <= 0) burst({ kind: 'coins', power: 1.4 });
+      toast({ text: left <= 0 ? `${paid.merchant} recorded. This loan is paid off!` : `${paid.merchant} recorded. ${rupees(left)} left on the loan. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good', emoji: left <= 0 ? '🎉' : undefined });
     },
     [commit, toast],
   );
@@ -1202,6 +1347,7 @@ function useStoreImpl() {
     saveCard,
     deleteCard,
     saveDebt,
+    payDebt,
     deleteDebt,
   };
 }

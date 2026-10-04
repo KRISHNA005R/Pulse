@@ -7,7 +7,7 @@ import { remindersSummary } from './Reminders';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { detections, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { debtDue, defaultAccount, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, fmtMonthYear, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -547,7 +547,8 @@ export function CardsScreen() {
 // Debt
 // ------------------------------------------------------------------
 export function DebtScreen() {
-  const { state } = useStore();
+  const store = useStore();
+  const { state } = store;
   const ui = useUI();
   const [extra, setExtra] = useState(0);
   return (
@@ -569,6 +570,14 @@ export function DebtScreen() {
         const intBase = payoffInterest(d.remaining, d.rate, d.minPayment);
         const intFast = payoffInterest(d.remaining, d.rate, d.minPayment + extra);
         const done = faster ? addMonths(state.today, faster) : null;
+        const paidOff = d.remaining <= 0;
+        const due = debtDue(state, d);
+        const manual = d.autoDebit === false;
+        const dueNow = due <= state.today;
+        const overdue = manual && due < state.today;
+        const part = emiParts(d);
+        const paidFrom = state.accounts.find((a) => a.id === d.account)?.name ?? state.accounts.find((a) => a.id === defaultAccount(state))?.name ?? 'your account';
+        const paid = state.transactions.filter((t) => t.debtId === d.id);
         return (
           <article key={d.id} className="mb-4 rounded-3xl border border-line bg-surface p-5">
             <div className="flex items-start justify-between gap-2">
@@ -580,21 +589,46 @@ export function DebtScreen() {
               </button>
             </div>
             <p className="num-hero mt-3 text-[33px] leading-none">{rupees(d.remaining)}</p>
-            <p className="text-[13px] text-ink3">remaining</p>
+            <p className="text-[13px] text-ink3">{paidOff ? 'Paid off. Nothing left to pay.' : 'remaining'}</p>
             <dl className="mt-4 grid grid-cols-3 gap-3 text-[13px]">
               <div>
                 <dt className="text-ink3">EMI</dt>
                 <dd className="num text-[15px] font-semibold">{rupees(d.minPayment)}</dd>
               </div>
               <div>
-                <dt className="text-ink3">Due</dt>
-                <dd className="text-[15px] font-semibold">{ordinal(d.dueDay)} monthly</dd>
+                <dt className="text-ink3">{paidOff ? 'Due' : overdue ? 'Was due' : 'Next EMI'}</dt>
+                <dd className="text-[15px] font-semibold">{paidOff ? 'Done' : state.mode === 'personal' ? fmtDate(due) : `${ordinal(d.dueDay)} monthly`}</dd>
               </div>
               <div>
                 <dt className="text-ink3">Interest</dt>
                 <dd className="num text-[15px] font-semibold">{d.rate}% p.a.</dd>
               </div>
             </dl>
+            {!paidOff && state.mode === 'personal' && (
+              <div className="mt-4 rounded-2xl bg-sunk/70 p-4 text-[13.5px]">
+                {manual ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="min-w-0 flex-1 text-ink2">
+                      {dueNow ? `This EMI of ${rupees(part.amount)} is due. Mark it once you've paid.` : `You mark each EMI paid yourself. Next: ${rupees(part.amount)} on ${fmtDate(due)}.`}
+                    </p>
+                    <button type="button" className={`${dueNow ? 'btn-accent' : 'btn-quiet'} min-h-[40px] px-4 text-[14px]`} onClick={() => store.payDebt(d.id)}>
+                      Mark as paid
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-ink2">
+                    On {fmtDate(due)}, PULSE records {rupees(part.amount)} from {paidFrom}
+                    {part.interest > 0 ? `: ${rupees(part.principal)} comes off the loan and ${rupees(part.interest)} is interest.` : ' and takes it off the loan.'}
+                  </p>
+                )}
+                {paid.length > 0 && (
+                  <p className="mt-2 text-ink3">
+                    Last EMI {fmtDate(paid[0].date)}: {rupees(paid[0].amount)}. {paid.length} recorded in PULSE, {rupees(paid.reduce((a, t) => a + (t.principal ?? 0), 0))} off the loan so far.
+                  </p>
+                )}
+              </div>
+            )}
+            {!paidOff && (
             <div className="mt-5 rounded-2xl bg-sunk/70 p-4">
               <p className="text-[14px] font-semibold">Payoff projection</p>
               <label htmlFor={`extra-${d.id}`} className="mt-3 flex justify-between text-[13.5px] text-ink2">
@@ -617,6 +651,7 @@ export function DebtScreen() {
               )}
               <p className="mt-1 text-[12.5px] text-ink3">Estimate assumes a fixed rate and on-time payments.</p>
             </div>
+            )}
           </article>
         );
       })}
@@ -886,7 +921,7 @@ export function InvestmentsScreen() {
   const ui = useUI();
   const t = investmentTotals(state);
   const list = state.investments ?? [];
-  const holdings = state.accounts.filter((a) => a.type === 'investment');
+  const holdings = holdingAccounts(state);
   const weighted = t.monthly > 0 ? list.filter((i) => i.status === 'active').reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / t.monthly : 12;
   const [years, setYears] = useState(10);
   const [rate, setRate] = useState(Math.round(weighted * 10) / 10);

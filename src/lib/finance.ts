@@ -1,4 +1,4 @@
-import type { Budget, CategoryId, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
+import type { Account, Budget, CategoryId, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
 import { INSURANCE_ON } from './features';
 import {
@@ -89,7 +89,7 @@ export interface UpcomingItem {
   amount: number;
   date: ISODate;
   kind: 'subscription' | 'bill' | 'card' | 'loan' | 'income' | 'investment' | 'insurance';
-  /** Recorded by PULSE on the date (SIPs, auto-debit premiums). */
+  /** Recorded by PULSE on the date (SIPs, EMIs, bills, subscriptions, auto-debit premiums). */
   auto?: boolean;
   ref?: string;
 }
@@ -129,15 +129,17 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
   for (const sub of s.subscriptions) {
     if (sub.status === 'paused' || sub.status === 'cancelled') continue;
     if (sub.nextDate >= s.today && sub.nextDate < until)
-      out.push({ id: sub.id, name: sub.name, amount: sub.amount, date: sub.nextDate, kind: sub.kind, ref: sub.id });
+      out.push({ id: sub.id, name: sub.name, amount: sub.amount, date: sub.nextDate, kind: sub.kind, ref: sub.id, auto: sub.autoDebit !== false });
   }
   for (const c of s.cards) {
     if (c.status === 'due' && c.dueDate >= s.today && c.dueDate < until)
       out.push({ id: c.id, name: `${c.name} card bill`, amount: c.minDue, date: c.dueDate, kind: 'card', ref: c.id });
   }
   for (const d of s.debts) {
-    const due = nextDayOfMonth(s.today, d.dueDay);
-    if (due < until) out.push({ id: d.id, name: `${d.name} EMI`, amount: d.minPayment, date: due, kind: 'loan', ref: d.id });
+    if (d.remaining <= 0) continue; // paid off
+    // An EMI that's past due and not marked paid still has to be paid, so it stays on the list.
+    const due = debtDue(s, d);
+    if (due < until) out.push({ id: d.id, name: emiName(d), amount: emiParts(d).amount, date: due, kind: 'loan', ref: d.id, auto: d.autoDebit !== false });
   }
   for (const inv of s.investments ?? []) {
     if (inv.status !== 'active') continue;
@@ -157,7 +159,63 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
   return out.sort((a, b) => (a.date === b.date ? b.amount - a.amount : a.date.localeCompare(b.date)));
 }
 
-function nextDayOfMonth(today: ISODate, day: number): ISODate {
+/**
+ * Move money for one transaction (sign 1) or take it back (sign -1). Everything that changes a
+ * balance goes through here, so accounts, cards, plan pots and loans stay consistent.
+ */
+export function applyMoney(s: State, tx: Transaction, sign: 1 | -1) {
+  const acct = s.accounts.find((a) => a.id === tx.account);
+  const card = s.cards.find((c) => c.id === tx.account);
+  const amt = tx.amount * sign;
+  if (tx.type === 'expense') {
+    if (card) card.balance += amt;
+    else if (acct) acct.balance -= amt;
+    // A loan EMI also brings down what's left on the loan, by the part that isn't interest.
+    if (tx.debtId && tx.principal) {
+      const d = s.debts.find((x) => x.id === tx.debtId);
+      if (d) d.remaining = roundMoney(Math.max(0, d.remaining - tx.principal * sign));
+    }
+  } else if (tx.type === 'income') {
+    if (acct) acct.balance += amt;
+  } else {
+    const out = tx.direction !== 'in';
+    if (acct) acct.balance += out ? -amt : amt;
+    if (tx.toAccount?.startsWith('pot:')) {
+      const plan = s.plans.find((p) => `pot:${p.id}` === tx.toAccount);
+      if (plan) plan.saved = Math.max(0, plan.saved + amt);
+    } else if (tx.toAccount) {
+      const to = s.accounts.find((a) => a.id === tx.toAccount);
+      if (to) to.balance += amt;
+    }
+  }
+}
+
+/**
+ * One EMI, split the way a lender does: this month's interest first, the rest comes off the loan.
+ * With no interest rate, the whole EMI comes off. The last EMI is only what's still owed.
+ */
+export function emiParts(d: Debt): { amount: number; interest: number; principal: number } {
+  const interest = d.rate > 0 ? roundMoney((d.remaining * d.rate) / 1200) : 0;
+  const amount = roundMoney(Math.min(d.minPayment, d.remaining + interest));
+  const principal = roundMoney(Math.max(0, Math.min(d.remaining, amount - interest)));
+  return { amount, interest: roundMoney(amount - principal), principal };
+}
+
+/** "Bike loan EMI", without doubling the word when the loan is already called "Phone EMI". */
+export const emiName = (d: Debt) => (/\bemi\b/i.test(d.name) ? d.name : `${d.name} EMI`);
+
+/** When a loan's next EMI is due. */
+export function debtDue(s: State, d: Debt): ISODate {
+  return d.nextDate ?? nextDayOfMonth(s.today, d.dueDay);
+}
+
+/** Where invested money sits: investment accounts, plus any account a SIP pays into. */
+export function holdingAccounts(s: State): Account[] {
+  const targets = new Set((s.investments ?? []).map((i) => i.toAccount));
+  return s.accounts.filter((a) => a.type === 'investment' || targets.has(a.id));
+}
+
+export function nextDayOfMonth(today: ISODate, day: number): ISODate {
   const d = `${today.slice(0, 8)}${String(day).padStart(2, '0')}`;
   if (d >= today) return d;
   const nm = addDays(endOfMonth(today), 1);
@@ -525,7 +583,7 @@ export function investmentTotals(s: State) {
   const list = s.investments ?? [];
   const active = list.filter((i) => i.status === 'active');
   const monthly = Math.round(active.reduce((a, i) => a + investmentMonthly(i), 0));
-  const holdings = s.accounts.filter((a) => a.type === 'investment').reduce((a, x) => a + x.balance, 0);
+  const holdings = holdingAccounts(s).reduce((a, x) => a + x.balance, 0);
   const next = active.slice().sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0];
   return { monthly, yearly: monthly * 12, holdings, count: active.length, next };
 }

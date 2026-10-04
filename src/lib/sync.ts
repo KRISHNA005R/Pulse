@@ -1,4 +1,6 @@
-import type { State } from '../types';
+import type { State, Transaction } from '../types';
+import { isAuto } from './auto';
+import { applyMoney } from './finance';
 import { canCompress, deflate, fromB64Url, inflate, toB64Url, utf8 } from './codec';
 
 // ------------------------------------------------------------------
@@ -224,6 +226,32 @@ function combine<T extends WithId>(kind: string, b: T | undefined, l: T, r: T, p
   return win as T;
 }
 
+/** Records whose running totals were added up from both devices in the merge under way. */
+let addedUp = new Set<string>();
+
+/**
+ * Both devices recorded the same automatic entry (an EMI, a SIP, a bill, a payday) before they
+ * synced. The entry itself merges into one, but where the two devices' changes to a balance were
+ * added together it was counted twice. Take one copy back out of exactly those balances.
+ */
+function undoDouble(out: State, tx: Transaction) {
+  const probe = structuredClone({ accounts: out.accounts, cards: out.cards, plans: out.plans, debts: out.debts }) as State;
+  applyMoney(probe, tx, 1);
+  for (const [kind, fields] of Object.entries(COUNTERS)) {
+    const now = (out as unknown as Record<string, WithId[]>)[kind] ?? [];
+    const then = (probe as unknown as Record<string, WithId[]>)[kind] ?? [];
+    now.forEach((rec, i) => {
+      if (!addedUp.has(`${kind}:${rec.id}`)) return;
+      const a = rec as unknown as Record<string, number>;
+      const b = then[i] as unknown as Record<string, number>;
+      for (const f of fields) {
+        const moved = (b[f] ?? 0) - (a[f] ?? 0);
+        if (moved) a[f] = Math.round(((a[f] ?? 0) - moved) * 100) / 100;
+      }
+    });
+  }
+}
+
 function mergeList<T extends WithId>(kind: string, base: T[] | undefined, local: T[] | undefined, remote: T[] | undefined, preferLocal: boolean): T[] {
   const B = new Map((base ?? []).map((x) => [x.id, x]));
   const L = new Map((local ?? []).map((x) => [x.id, x]));
@@ -236,6 +264,7 @@ function mergeList<T extends WithId>(kind: string, base: T[] | undefined, local:
       if (same(l, r)) return l;
       if (b && same(l, b)) return r; // only the other device changed it
       if (b && same(r, b)) return l; // only this device changed it
+      if (b) addedUp.add(`${kind}:${id}`);
       return combine(kind, b, l, r, preferLocal); // both changed it: add up totals, newest wins the rest
     }
     if (l) return b && same(l, b) ? null : l; // deleted elsewhere (unless edited here)
@@ -279,8 +308,16 @@ const LISTS = ['accounts', 'cards', 'debts', 'categories', 'transactions', 'budg
  */
 export function merge3(base: State | null, local: State, remote: State, preferLocal = false): State {
   const out = { ...remote, ...local } as State;
+  addedUp = new Set();
   for (const k of LISTS) {
     (out as unknown as Record<string, unknown>)[k] = mergeList(k, base?.[k] as WithId[] | undefined, local[k] as WithId[], remote[k] as WithId[], preferLocal);
+  }
+  if (base) {
+    const ids = (s: State) => new Set(s.transactions.map((t) => t.id));
+    const B = ids(base);
+    const L = ids(local);
+    const R = ids(remote);
+    for (const tx of out.transactions) if (isAuto(tx) && !B.has(tx.id) && L.has(tx.id) && R.has(tx.id)) undoDouble(out, tx);
   }
   out.transactions = [...out.transactions].sort((a, b) => b.date.localeCompare(a.date));
   out.settings = mergeObject(base?.settings, local.settings, remote.settings, preferLocal);

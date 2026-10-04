@@ -74,6 +74,11 @@ export interface Transaction {
   insuranceId?: ID;
   /** Set when this is a payday from one of the person's income sources. */
   incomeId?: ID;
+  /** A loan EMI: the loan it pays, and how much of it came off the loan itself (the rest is interest). */
+  debtId?: ID;
+  principal?: number;
+  /** A bill or subscription recorded on its due date. */
+  subscriptionId?: ID;
 }
 
 export type BudgetPeriod = 'monthly' | 'weekly' | 'custom';
@@ -175,6 +180,8 @@ export interface Subscription {
   status: SubStatus;
   kind: 'subscription' | 'bill';
   account: ID;
+  /** Record the payment on its date and take it from `account`. On unless switched off. */
+  autoDebit?: boolean;
 }
 
 export type IncomeKind = 'salary' | 'freelance' | 'part-time' | 'business' | 'allowance' | 'other';
@@ -243,6 +250,12 @@ export interface Debt {
   minPayment: number;
   dueDay: number;
   rate: number; // annual %
+  /** Account the EMI is paid from (the main account when missing). */
+  account?: ID;
+  /** Record the EMI on its date: take it from the account and reduce what's left. On unless switched off. */
+  autoDebit?: boolean;
+  /** The next EMI date. Loans from before this existed get one the first time the app opens. */
+  nextDate?: ISODate;
 }
 
 export interface CreditCard {

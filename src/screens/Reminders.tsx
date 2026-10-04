@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReminderPrefs } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
+import { isAuto } from '../lib/auto';
 import { haptic } from '../lib/format';
 import { isIOS, isStandalone } from '../lib/pwa';
 import { buildReminders, disableReminders, enableReminders, markReminderAsked, prefsOf, pushPermission, pushSupported, reminderAsked, remindersOn, runReminderTest, syncReminders } from '../lib/reminders';
@@ -168,7 +169,7 @@ export function ReminderCard() {
   const { state } = store;
   const [gone, setGone] = useState(false);
   const [busy, setBusy] = useState(false);
-  const logged = state.transactions.filter((t) => !/^(sip|pay|ins)-/.test(t.id)).length;
+  const logged = state.transactions.filter((t) => !isAuto(t)).length;
   if (gone || state.mode !== 'personal' || !state.onboarding.done || logged < 3 || !pushSupported() || pushPermission() !== 'default' || remindersOn() || reminderAsked()) return null;
   const close = () => {
     markReminderAsked();

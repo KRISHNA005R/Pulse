@@ -48,7 +48,7 @@ export function HomeScreen() {
                 <CategoryMark state={state} category={u.kind === 'income' ? 'salary' : u.kind === 'investment' ? 'investments' : u.kind === 'insurance' ? 'insurance' : u.kind === 'subscription' ? 'subscriptions' : 'bills'} size={40} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{u.name}</span>
-                  <span className="block text-[13px] text-ink3">{u.kind === 'insurance' && u.date < state.today ? `Was due ${fmtDate(u.date)}` : relDay(u.date, state.today)}{u.kind === 'investment' || u.auto ? ' · auto-debit' : ''}</span>
+                  <span className="block text-[13px] text-ink3">{u.date < state.today ? `Was due ${fmtDate(u.date)}` : relDay(u.date, state.today)}{u.kind === 'investment' || u.auto ? ' · auto-debit' : ''}</span>
                 </span>
                 <span className={`num text-[15.5px] font-semibold ${u.kind === 'income' ? 'text-pos' : ''}`}>{u.kind === 'income' ? rupees(u.amount, { sign: true }) : rupees(u.amount)}</span>
               </button>

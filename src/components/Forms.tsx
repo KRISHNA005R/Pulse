@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
-import type { BudgetPeriod, CategoryId, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
+import type { BudgetPeriod, CategoryId, Debt, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
 import { decodeBackup, encodeBackup } from '../lib/backupCode';
 import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, defaultAccount, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { CYCLE_MONTHS, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
 
@@ -296,6 +296,8 @@ export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; pr
   const [next, setNext] = useState(ex?.nextDate ?? addMonths(state.today, 1));
   const [kind, setKind] = useState<Subscription['kind']>(ex?.kind ?? 'subscription');
   const [status, setStatus] = useState<Subscription['status']>(ex?.status ?? 'active');
+  const [account, setAccount] = useState(ex?.account ?? defaultAccount(state));
+  const [auto, setAuto] = useState(ex?.autoDebit !== false);
   const [confirm, setConfirm] = useState(false);
   const valid = name.trim() && parseFloat(amount) > 0;
   return (
@@ -319,6 +321,21 @@ export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; pr
       <Field label="Next payment" htmlFor="sub-next">
         <input id="sub-next" type="date" className="field" value={next} onChange={(e) => setNext(e.target.value)} />
       </Field>
+      <Field label="Paid from" htmlFor="sub-from">
+        <select id="sub-from" className="field" value={account} onChange={(e) => setAccount(e.target.value)}>
+          {state.accounts.filter((a) => a.type === 'bank' || a.type === 'cash' || a.id === account).map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+          {state.cards.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name} card ··{c.last4}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub={auto ? 'On the date PULSE records the payment and takes it from this account' : 'Off: PULSE only reminds you, and you log the payment yourself'} />
       {ex && (
         <div>
           <p className="mb-2 text-[13px] font-semibold text-ink2">Status</p>
@@ -330,7 +347,7 @@ export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; pr
         disabled={!valid}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
-          store.saveSubscription({ id: ex?.id, name: name.trim(), amount: roundMoney(parseFloat(amount)), cycle, nextDate: next, category: ex?.category ?? preset?.category ?? (kind === 'bill' ? 'bills' : 'subscriptions'), status, kind, account: ex?.account ?? defaultAccount(state) });
+          store.saveSubscription({ id: ex?.id, name: name.trim(), amount: roundMoney(parseFloat(amount)), cycle, nextDate: next, category: ex?.category ?? preset?.category ?? (kind === 'bill' ? 'bills' : 'subscriptions'), status, kind, account, autoDebit: auto });
           onDone();
         }}
       >
@@ -601,7 +618,15 @@ export function AccountForm({ accountId, onDone }: { accountId?: string; onDone:
   const [type, setType] = useState(ex?.type ?? 'bank');
   const [balance, setBalance] = useState(ex ? String(ex.balance) : '');
   const [spendable, setSpendable] = useState(ex?.spendable ?? true);
-  const used = ex ? store.state.transactions.some((t) => t.account === ex.id) : false;
+  // In use = money has moved through it, or something is set to pay from it or into it.
+  const st = store.state;
+  const used = ex
+    ? st.transactions.some((t) => t.account === ex.id || t.toAccount === ex.id) ||
+      (st.investments ?? []).some((i) => i.fromAccount === ex.id || i.toAccount === ex.id) ||
+      st.subscriptions.some((x) => x.account === ex.id) ||
+      st.debts.some((d) => d.account === ex.id) ||
+      (st.insurance ?? []).some((p) => p.account === ex.id)
+    : false;
   return (
     <div className="flex flex-col gap-4">
       <Field label="Name" htmlFor="acct-name">
@@ -657,7 +682,7 @@ export function AccountForm({ accountId, onDone }: { accountId?: string; onDone:
           }}
         />
       )}
-      {ex && used && <p className="text-[12.5px] text-ink3">This account has transactions, so it can't be removed. You can stop counting it toward safe-to-spend.</p>}
+      {ex && used && <p className="text-[12.5px] text-ink3">This account has transactions, or a SIP, bill or EMI uses it, so it can't be removed. You can stop counting it toward safe-to-spend.</p>}
     </div>
   );
 }
@@ -744,7 +769,13 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
   const [emi, setEmi] = useState(ex ? String(ex.minPayment) : '');
   const [dueDay, setDueDay] = useState(String(ex?.dueDay ?? 5));
   const [rate, setRate] = useState(ex ? String(ex.rate) : '');
+  const [account, setAccount] = useState(ex?.account ?? defaultAccount(store.state));
+  const [auto, setAuto] = useState(ex?.autoDebit !== false);
   const num = (v: string) => parseFloat(v) || 0;
+  const day = Math.min(28, Math.max(1, Math.round(num(dueDay)) || 1));
+  const part = emiParts({ remaining: num(remaining), minPayment: num(emi), rate: num(rate) } as Debt);
+  // Saving a new loan (or a changed due day) on its due day records today's EMI straight away.
+  const dueToday = store.state.mode === 'personal' && auto && num(emi) > 0 && num(remaining) > 0 && (!ex || ex.dueDay !== day || !ex.nextDate ? Number(store.state.today.slice(8)) === day : ex.nextDate <= store.state.today);
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3">
@@ -777,13 +808,33 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
           <input id="debt-rate" inputMode="decimal" className="field num" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))} placeholder="9.5" />
         </Field>
       </div>
-      <p className="text-[12.5px] text-ink3">An EMI due before payday is set aside in safe-to-spend.</p>
+      <Field label="EMI is paid from" htmlFor="debt-from">
+        <select id="debt-from" className="field" value={account} onChange={(e) => setAccount(e.target.value)}>
+          {store.state.accounts.filter((a) => a.type === 'bank' || a.type === 'cash' || a.id === account).map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} · {rupees(a.balance)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub={auto ? 'On the due day PULSE records the EMI, takes it from this account and reduces the loan' : 'Off: the EMI stays due until you tap “Mark as paid”'} />
+      {num(emi) > 0 && num(remaining) > 0 && (
+        <p className="rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">
+          {part.principal <= 0
+            ? `At ${num(rate)}% this EMI only covers interest, so the loan would not go down. Check the EMI or the rate.`
+            : part.interest > 0
+              ? `Each EMI: ${rupees(part.interest)} is this month's interest and ${rupees(part.principal)} comes off the loan. The interest part gets smaller every month.`
+              : 'No interest entered, so the full EMI comes off the loan each month.'}
+          {dueToday && <span className="mt-1 block font-semibold text-ink">The EMI is due today, so it will be recorded when you save.</span>}
+        </p>
+      )}
+      <p className="text-[12.5px] text-ink3">An EMI due before payday is set aside in safe-to-spend. Change “Amount left” here any time to match your lender's statement.</p>
       <button
         type="button"
         disabled={!name.trim() || !(num(remaining) > 0) || !(num(emi) > 0)}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
-          store.saveDebt({ id: ex?.id, name: name.trim(), lender: lender.trim() || 'Lender', kind, remaining: Math.round(num(remaining)), minPayment: Math.round(num(emi)), dueDay: Math.min(28, Math.max(1, Math.round(num(dueDay)) || 1)), rate: num(rate) });
+          store.saveDebt({ id: ex?.id, name: name.trim(), lender: lender.trim() || 'Lender', kind, remaining: Math.round(num(remaining)), minPayment: Math.round(num(emi)), dueDay: day, rate: num(rate), account, autoDebit: auto });
           onDone();
         }}
       >

@@ -7,6 +7,7 @@
 // One reminder is different: the daily message (netlify/lib/daily.ts). The server picks it and
 // sends the same one to everybody at 10 am India time, so it uses nothing from this person's data.
 import type { ReminderPrefs, State } from '../types';
+import { isAuto } from './auto';
 import { mainIncome, upcoming } from './finance';
 import { addDays, rupees } from './format';
 import { streak } from './streak';
@@ -24,7 +25,6 @@ export interface Reminder {
 
 /** A local date and clock time as a real moment. */
 const moment = (date: string, time: string) => new Date(`${date}T${time}:00`);
-const AUTO = /^(sip|pay|ins)-/; // recorded by PULSE itself, not something the person logged
 
 /** Every reminder for the next few weeks, worked out from the person's data. */
 export function buildReminders(s: State, p: ReminderPrefs = prefsOf(s), now = new Date()): Reminder[] {
@@ -36,7 +36,7 @@ export function buildReminders(s: State, p: ReminderPrefs = prefsOf(s), now = ne
     if (at.getTime() > now.getTime() + 60_000) out.push({ at: at.toISOString(), ...r });
   };
   const time = /^\d\d:\d\d$/.test(p.dailyAt) ? p.dailyAt : '21:00';
-  const loggedToday = s.transactions.some((t) => t.date === today && !AUTO.test(t.id));
+  const loggedToday = s.transactions.some((t) => t.date === today && !isAuto(t));
   const st = streak(s);
 
   // 1. Log your day (and 4. the streak warning, which replaces today's nudge when there's a streak to lose)
