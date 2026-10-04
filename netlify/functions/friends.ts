@@ -14,6 +14,7 @@
 //   POST /api/friends  { action: 'g-leave', gid, mid, token }
 //   POST /api/friends  { action: 'g-close', gid, mid, token, closed }               owner: stop or allow new people
 //   POST /api/friends  { action: 'g-remove', gid, mid, token, target }              owner: take a member out
+//   POST /api/friends  { action: 'g-delete', gid, mid, token }                      owner: delete the group for everyone
 //
 // A personal link (one link for everybody):
 //   POST /api/friends  { action: 'door-open',  door, token, dev? }                  the owner makes the link

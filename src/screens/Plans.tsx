@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { budgetState, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
-import { authorOf, groupSeat } from '../lib/friends';
+import { authorOf, groupSeat, inGroupOnPulse } from '../lib/friends';
 import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
 import { EmptyState, MoneyStat, PersonAvatar, ProgressBar, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
@@ -86,9 +86,10 @@ function SplitsView() {
   const { state } = useStore();
   const ui = useUI();
   const t = useMemo(() => socialTotals(state), [state]);
+  const together = (pid: string) => state.groups.some((g) => inGroupOnPulse(g, pid));
   // Anyone with a balance, plus friends on PULSE (connected, or in a shared group with you) even when you're square.
   const people = state.people
-    .filter((p) => (t.balances.get(p.id) ?? 0) !== 0 || p.link || p.uid)
+    .filter((p) => (t.balances.get(p.id) ?? 0) !== 0 || p.link || together(p.id))
     .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number])
     .sort((a, b) => a[1] - b[1]);
   return (
@@ -112,7 +113,7 @@ function SplitsView() {
                       <span className="block text-[15px] font-semibold">{v === 0 ? `You and ${p.short} are square` : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</span>
                       <span className="block text-[13px] text-ink3">
                         {p.name}
-                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : p.link.door ? ' · connecting' : ' · invite sent') : p.uid ? ' · in a group with you' : ''}
+                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : p.link.door ? ' · connecting' : ' · invite sent') : together(p.id) ? ' · in a group with you' : ''}
                       </span>
                     </span>
                   </button>
@@ -454,6 +455,28 @@ export function GroupDetail({ id }: { id: string }) {
           </ul>
         </section>
       )}
+
+      <button
+        type="button"
+        className="btn-quiet mt-10 w-full text-neg"
+        onClick={() => {
+          const n = g.expenses.length;
+          const open = g.owedToYou || g.youOwe ? ` Not settled yet: ${[g.owedToYou ? `you're owed ${rupees(g.owedToYou)}` : '', g.youOwe ? `you owe ${rupees(g.youOwe)}` : ''].filter(Boolean).join(' and ')}. That is removed too.` : '';
+          const shared = !group.shared || state.mode !== 'personal' ? '' : group.shared.owner ? ' Sharing stops for everyone; the others keep their own copy of the history.' : ' You leave the group; the others keep it, with what you added.';
+          ui.openSheet({
+            type: 'confirm',
+            title: `Delete ${group.name}?`,
+            body: `The group${n ? `, its ${n} ${n === 1 ? 'expense' : 'expenses'}` : ''} and who owes what in it are removed.${open}${shared} Money already recorded in your accounts stays in Activity. This can't be undone.`,
+            confirm: 'Delete group',
+            run: () => {
+              store.deleteGroup(id);
+              ui.pop();
+            },
+          });
+        }}
+      >
+        <Icon name="trash" size={16} /> Delete group
+      </button>
     </div>
   );
 }

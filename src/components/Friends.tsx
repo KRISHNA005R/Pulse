@@ -683,24 +683,6 @@ export function GroupShareCard({ group }: { group: Group }) {
         <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
         <span>Only this group is shared, locked so PULSE's server can't read it. Anyone with the link can join, so share it only with the group.</span>
       </p>
-      <button
-        type="button"
-        className="btn-ghost mt-1 min-h-[38px] px-0 text-[13.5px] text-neg"
-        onClick={() =>
-          ui.openSheet({
-            type: 'confirm',
-            title: `Leave ${group.name}?`,
-            body: 'The group stops updating on your phone. You keep the history, and the others keep what you added.',
-            confirm: 'Leave group',
-            run: () => {
-              void leaveGroupChannel(sh);
-              store.unshareGroup(group.id);
-            },
-          })
-        }
-      >
-        Leave group
-      </button>
     </section>
   );
 }

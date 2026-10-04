@@ -283,8 +283,13 @@ async function handleGroups(body: Record<string, unknown>, ctx: Ctx): Promise<Re
     return { status: 200, body: { ok: true } };
   }
 
-  if (action === 'g-close' || action === 'g-remove') {
+  if (action === 'g-close' || action === 'g-remove' || action === 'g-delete') {
     if (!mine.owner) return fail(403, 'Only the person who made the group can do this.');
+    // The group is deleted: nothing of it is kept here. Each member's phone keeps its own copy of the history.
+    if (action === 'g-delete') {
+      await Promise.all(all.map((x) => store.delete(gkey(gid, x.mid))));
+      return { status: 200, body: { ok: true } };
+    }
     if (action === 'g-close') {
       await store.setJSON(gkey(gid, mid), { ...mine, closed: body.closed === true });
       return { status: 200, body: { ok: true, closed: body.closed === true } };

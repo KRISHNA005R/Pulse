@@ -30,7 +30,7 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
-import { acceptKnock, applyBox, applyGroup, closeDoor, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
+import { acceptKnock, applyBox, applyGroup, closeDoor, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { applyMoney, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
@@ -780,6 +780,17 @@ function useStoreImpl() {
   );
   /** Stop sharing on this phone. The group and its history stay as an ordinary group. */
   const unshareGroup = useCallback((groupId: string) => commit((s) => unshareGroupIn(s, groupId)), [commit]);
+  /** Delete a group: its expenses and who-owes-what go with it. Shared groups also stop being shared. */
+  const deleteGroup = useCallback(
+    (groupId: string) => {
+      const g = ref.current.groups.find((x) => x.id === groupId);
+      if (!g) return;
+      if (g.shared && personal(ref.current)) void deleteGroupChannel(g.shared);
+      commit((s) => removeGroup(s, groupId));
+      toast({ text: `${g.name} deleted.` });
+    },
+    [commit, toast],
+  );
   const setGroupClosed = useCallback(
     (groupId: string, closed: boolean) =>
       commit((s) => {
@@ -1498,6 +1509,7 @@ function useStoreImpl() {
     joinGroup,
     applyGroupView,
     unshareGroup,
+    deleteGroup,
     setGroupClosed,
     addGroupMember,
     bankSettlement,

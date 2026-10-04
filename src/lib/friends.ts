@@ -945,6 +945,44 @@ export async function createGroupChannel(sh: GroupShare, dev?: string): Promise<
 export async function leaveGroupChannel(sh: GroupShare) {
   await api({ action: 'g-leave', ...gcred(sh) });
 }
+/**
+ * The group is being deleted on this phone. The person who made it takes it off the server for
+ * everyone (their phones keep their own copy, no longer shared); anyone else just leaves.
+ */
+export async function deleteGroupChannel(sh: GroupShare) {
+  await api({ action: sh.owner ? 'g-delete' : 'g-leave', ...gcred(sh) });
+}
+
+/**
+ * Delete a group here: the group, its expenses and its settle-ups, so nobody owes anything in it any
+ * more. Money already recorded in accounts is left alone: those entries stay in Activity as ordinary
+ * expenses and transfers.
+ */
+export function removeGroup(s: State, groupId: string) {
+  const g = s.groups.find((x) => x.id === groupId);
+  if (!g) return;
+  const gid = g.shared?.gid;
+  const gone = new Set(s.splits.filter((sp) => sp.group === groupId).map((sp) => sp.id));
+  s.splits = s.splits.filter((sp) => sp.group !== groupId);
+  for (const tx of s.transactions) if (tx.splitId && gone.has(tx.splitId)) delete tx.splitId;
+  s.settlements = s.settlements.filter((st) => st.group !== groupId);
+  // A payment made outside the group that only travelled through it stays, as ordinary history.
+  if (gid) for (const st of s.settlements) if (st.remote === gid) delete st.remote;
+  s.groups = s.groups.filter((x) => x.id !== groupId);
+  // People who were only ever here because of this group, and are now part of nothing, go with it.
+  const used = new Set<string>();
+  for (const sp of s.splits) {
+    used.add(sp.paidBy);
+    for (const x of sp.shares) used.add(x.person);
+  }
+  for (const st of s.settlements) {
+    used.add(st.from);
+    used.add(st.to);
+  }
+  for (const x of s.groups) for (const m of x.members) used.add(m);
+  for (const tx of s.transactions) for (const p of tx.people ?? []) used.add(p);
+  s.people = s.people.filter((p) => p.link || used.has(p.id) || !(g.members.includes(p.id) && /^p[ug]-/.test(p.id)));
+}
 /** Owner: stop (or allow again) new people joining with the link. */
 export async function lockGroup(sh: GroupShare, closed: boolean): Promise<boolean> {
   const r = await api({ action: 'g-close', ...gcred(sh), closed });
