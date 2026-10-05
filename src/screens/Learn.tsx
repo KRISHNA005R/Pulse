@@ -1,3 +1,4 @@
+import { useAuth } from '../store/auth';
 import { useState } from 'react';
 import { currentCurrency, ex } from '../lib/currency';
 import { useStore } from '../store/store';
@@ -170,13 +171,14 @@ export function InstallScreen() {
   const { toast } = useStore();
   const ui = useUI();
   const [p, setP] = useState<Platform>(isIOS() ? 'ios' : 'android');
+  const accounts = useAuth().on;
 
   const steps: Record<Platform, { title: string; body: React.ReactNode }[]> = {
     ios: [
       { title: 'Open PULSE in Safari', body: <>Go to <b>{SITE}</b> in Safari. Chrome and Edge work too on iOS 16.4 or later.</> },
       { title: 'Tap Share', body: <>Tap the Share button <Glyph><ShareIOS /></Glyph> in the toolbar at the bottom (at the top on iPad).</> },
       { title: 'Tap Add to Home Screen', body: <>Scroll the list and tap <b>Add to Home Screen</b>. If you see <b>Open as Web App</b>, leave it on.</> },
-      { title: 'Tap Add', body: <>PULSE lands on your home screen. Open it from there: it runs full screen and works offline.</> },
+      { title: 'Tap Add', body: <>PULSE lands on your home screen. Open it from there: it runs full screen and works offline.{accounts ? ' Sign in with the same account and your money is already there.' : ''}</> },
     ],
     android: [
       { title: 'Open PULSE in Chrome', body: <>Go to <b>{SITE}</b> in Chrome. Samsung Internet and Edge work too.</> },
@@ -252,7 +254,7 @@ export function InstallScreen() {
           <li className="flex gap-3"><span aria-hidden="true">📱</span> Opens full screen from your home screen, like any app</li>
           <li className="flex gap-3"><span aria-hidden="true">✈️</span> Works offline, and updates itself</li>
           <li className="flex gap-3"><span aria-hidden="true">⚡</span> Press and hold the icon for shortcuts: Add expense, Can I afford this?, Plans, Ask AI</li>
-          <li className="flex gap-3"><span aria-hidden="true">🔒</span> Your numbers stay on your phone. No bank login, ever</li>
+          <li className="flex gap-3"><span aria-hidden="true">🔒</span> {accounts ? 'Sign in and your money is there. No bank login, ever' : 'Your numbers stay on your phone. No bank login, ever'}</li>
         </ul>
       </section>
 

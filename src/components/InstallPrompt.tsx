@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/store';
+import { useAuth } from '../store/auth';
 import { useUI } from '../store/ui';
 import { inFrame, isIOS, isStandalone, useInstall } from '../lib/pwa';
 import { daysBetween, haptic } from '../lib/format';
@@ -90,6 +91,8 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [making, setMaking] = useState(false);
   const code = store.sync.enabled ? store.sync.code : null;
+  // With accounts, the data follows the person: they just sign in on the home-screen app. No code to carry.
+  const accounts = useAuth().on;
 
   const install = async () => {
     setBusy(true);
@@ -147,45 +150,47 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
               <b>2.</b> Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.
             </li>
             <li>
-              <b>3.</b> Open PULSE from your home screen and bring your data across with the code below.
+              <b>3.</b> {accounts ? 'Open PULSE from your home screen and sign in with the same account. Your money is already there.' : 'Open PULSE from your home screen and bring your data across with the code below.'}
             </li>
           </ol>
-          <div className="mt-3 rounded-xl border border-line bg-surface p-3">
-            <p className="text-[13px] leading-snug text-ink2">On iPhone the home-screen app starts empty. Your code moves everything you've entered here.</p>
-            {code ? (
-              <>
-                <p className="num mt-2 select-all break-all rounded-lg bg-sunk px-2 py-2 text-center font-mono text-[14px] font-semibold tracking-wide">{code}</p>
+          {!accounts && (
+            <div className="mt-3 rounded-xl border border-line bg-surface p-3">
+              <p className="text-[13px] leading-snug text-ink2">On iPhone the home-screen app starts empty. Your code moves everything you've entered here.</p>
+              {code ? (
+                <>
+                  <p className="num mt-2 select-all break-all rounded-lg bg-sunk px-2 py-2 text-center font-mono text-[14px] font-semibold tracking-wide">{code}</p>
+                  <button
+                    type="button"
+                    className="btn-quiet mt-2 min-h-[40px] w-full text-[14px]"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(code);
+                        store.toast({ text: 'Code copied. In the installed app, tap “I use PULSE on another device” and paste it.', emoji: '📋' });
+                      } catch {
+                        store.toast({ text: 'Copy is blocked here. Write the code down.' });
+                      }
+                    }}
+                  >
+                    <Icon name="copy" size={16} /> Copy my code
+                  </button>
+                  <p className="mt-2 text-[12.5px] text-ink3">In the installed app: tap <b>I use PULSE on another device</b>, then paste it.</p>
+                </>
+              ) : (
                 <button
                   type="button"
                   className="btn-quiet mt-2 min-h-[40px] w-full text-[14px]"
+                  disabled={making}
                   onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(code);
-                      store.toast({ text: 'Code copied. In the installed app, tap “I use PULSE on another device” and paste it.', emoji: '📋' });
-                    } catch {
-                      store.toast({ text: 'Copy is blocked here. Write the code down.' });
-                    }
+                    setMaking(true);
+                    await store.enableSync();
+                    setMaking(false);
                   }}
                 >
-                  <Icon name="copy" size={16} /> Copy my code
+                  {making ? 'Getting your code…' : 'Get my transfer code'}
                 </button>
-                <p className="mt-2 text-[12.5px] text-ink3">In the installed app: tap <b>I use PULSE on another device</b>, then paste it.</p>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="btn-quiet mt-2 min-h-[40px] w-full text-[14px]"
-                disabled={making}
-                onClick={async () => {
-                  setMaking(true);
-                  await store.enableSync();
-                  setMaking(false);
-                }}
-              >
-                {making ? 'Getting your code…' : 'Get my transfer code'}
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
           <button type="button" className="mt-3 text-[13.5px] font-semibold text-accent-ink underline-offset-2 hover:underline" onClick={guide}>
             Show me with more detail
           </button>
