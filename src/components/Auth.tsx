@@ -4,7 +4,8 @@ import { useStore } from '../store/store';
 import { useAuth } from '../store/auth';
 import { useUI } from '../store/ui';
 import { inAppBrowser, loadGoogle, markNudged, memberSince, memberTitle, nudgeInfo, type Account } from '../lib/auth';
-import { cardBlob, drawMemberCard, ensureFonts, type MemberSpec } from '../lib/cardArt';
+import { cardBlob, ensureFonts } from '../lib/cardArt';
+import { drawMemberCard, MEMBER_STYLES, type MemberSpec, type MemberStyle } from '../lib/memberArt';
 import { daysBetween, haptic, relDay, rupeesShort } from '../lib/format';
 import { isStandalone } from '../lib/pwa';
 import { Icon } from './ui/Icon';
@@ -378,23 +379,24 @@ export function MemberCardSheet({ onDone }: { onDone: () => void }) {
   const auth = useAuth();
   const canvas = useRef<HTMLCanvasElement>(null);
   const account = auth.session?.account;
+  const [style, setStyle] = useState<MemberStyle>('black');
   useEffect(() => {
     if (!account || !canvas.current) return;
     let live = true;
-    drawMemberCard(canvas.current, specOf(account));
-    void ensureFonts().then(() => live && canvas.current && drawMemberCard(canvas.current, specOf(account)));
+    drawMemberCard(canvas.current, specOf(account), style);
+    void ensureFonts().then(() => live && canvas.current && drawMemberCard(canvas.current, specOf(account), style));
     return () => {
       live = false;
     };
-  }, [account]);
+  }, [account, style]);
   if (!account) return null;
 
   const file = async () => {
     if (!canvas.current) return null;
     await ensureFonts();
-    drawMemberCard(canvas.current, specOf(account));
+    drawMemberCard(canvas.current, specOf(account), style);
     const b = await cardBlob(canvas.current);
-    return b ? new File([b], `pulse-member-${account.n}.png`, { type: 'image/png' }) : null;
+    return b ? new File([b], `pulse-member-${account.n}-${style}.png`, { type: 'image/png' }) : null;
   };
   const save = async () => {
     const f = await file();
@@ -423,8 +425,15 @@ export function MemberCardSheet({ onDone }: { onDone: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5" role="radiogroup" aria-label="Card design">
+        {MEMBER_STYLES.map((s) => (
+          <button key={s.value} type="button" role="radio" aria-checked={style === s.value} className="chip shrink-0" onClick={() => setStyle(s.value)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
       <div className="flex justify-center">
-        <canvas ref={canvas} role="img" aria-label={`PULSE member number ${account.n}, ${memberTitle(account.n)}`} className="h-auto rounded-2xl shadow-lift" style={{ width: 'min(100%, 250px)' }} />
+        <canvas ref={canvas} role="img" aria-label={`PULSE member number ${account.n}, ${memberTitle(account.n)}, ${MEMBER_STYLES.find((s) => s.value === style)?.label} design`} className="h-auto rounded-2xl shadow-lift" style={{ width: 'min(100%, 250px)' }} />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <button type="button" className="btn-accent" onClick={() => void share()}>

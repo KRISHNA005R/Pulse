@@ -146,8 +146,8 @@ export function Onboarding() {
                 <>
                   <LoginPanel />
                   {!auth.busy && (
-                    <button type="button" className="btn-ghost w-full" onClick={startDemo}>
-                      Just looking? Try the demo
+                    <button type="button" className="btn-quiet w-full" onClick={startDemo}>
+                      Explore a demo first
                     </button>
                   )}
                 </>

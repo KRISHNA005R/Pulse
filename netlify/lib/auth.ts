@@ -24,6 +24,7 @@ export interface AuthStore {
   get(key: string, opts: { type: 'json' }): Promise<unknown>;
   setJSON(key: string, value: unknown, opts?: { onlyIfNew?: boolean }): Promise<unknown>;
   delete(key: string): Promise<void>;
+  list(opts: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
 }
 
 export interface Account {
@@ -325,4 +326,65 @@ export async function googleKeys(fresh = false, fetcher: typeof fetch = fetch): 
   const keys = ((await res.json()) as { keys?: Jwk[] }).keys ?? [];
   cached = { at: Date.now(), keys };
   return keys;
+}
+
+// ---------------------------------------------------------------------------------------------
+// For the private stats page: how many people have an account, and the latest to join.
+// Email addresses are shown with the middle hidden: the page is behind one shared password, and a
+// list of everyone's full address is more than it needs.
+// ---------------------------------------------------------------------------------------------
+export function maskEmail(email: string): string {
+  const [name, domain = ''] = email.split('@');
+  const keep = name.length <= 2 ? 1 : 2;
+  return `${name.slice(0, keep)}${'•'.repeat(Math.max(3, Math.min(6, name.length - keep)))}@${domain}`;
+}
+
+export async function membersOverview(store: AuthStore, now = new Date()) {
+  const total = (await store.list({ prefix: 'acct/' })).blobs.length;
+  const highest = (await get<{ n: number }>(store, 'meta/count'))?.n ?? 0;
+  // India's day, since that is where the people are.
+  const ist = (d: Date | string) => new Date(new Date(d).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
+  const today = ist(now);
+  const days: Record<string, number> = {};
+  for (let i = 0; i < 14; i++) days[ist(new Date(now.getTime() - i * 86_400_000))] = 0;
+  const oldest = Object.keys(days).sort()[0];
+  const latest: { n: number; email: string; name: string; at: string; google: boolean }[] = [];
+  let google = 0;
+  let counted = 0;
+  // Walk back from the newest member number. Numbers of deleted accounts are skipped.
+  for (let from = highest; from > 0 && from > highest - 600; from -= 25) {
+    const ns = Array.from({ length: Math.min(25, from) }, (_, i) => from - i);
+    const batch = await Promise.all(
+      ns.map(async (n) => {
+        const claim = await get<{ uid: string }>(store, `n/${n}`);
+        const a = claim ? await get<Account>(store, `acct/${claim.uid}`) : null;
+        return a && a.n === n ? a : null;
+      }),
+    );
+    let stop = false;
+    for (const a of batch) {
+      if (!a) continue;
+      const day = ist(a.created);
+      if (day in days) days[day]++;
+      counted++;
+      if (a.google) google++;
+      if (latest.length < 12) latest.push({ n: a.n, email: maskEmail(a.email), name: a.name.split(' ')[0], at: a.created, google: !!a.google });
+      if (day < oldest && latest.length >= 12) stop = true;
+    }
+    if (stop) break;
+  }
+  const week = Object.entries(days).filter(([d]) => d > ist(new Date(now.getTime() - 7 * 86_400_000))).reduce((s, [, c]) => s + c, 0);
+  return {
+    ok: true,
+    total,
+    today: days[today] ?? 0,
+    week,
+    /** Member numbers given out so far; higher than `total` when accounts were deleted. */
+    highest,
+    /** Of the accounts looked at, how many have used Google (the rest signed in by email code only). */
+    google,
+    counted,
+    days: Object.entries(days).sort(([a], [b]) => (a < b ? -1 : 1)).map(([day, n]) => ({ day, n })),
+    latest,
+  };
 }

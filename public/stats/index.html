@@ -129,6 +129,7 @@
               .catch(function () { return null; })
               .then(function (push) {
                 render(d, fb, push);
+                loadMembers();
                 loadDaily();
               });
           });
@@ -171,6 +172,37 @@
       '<div><div class="muted">Sender last ran</div><div class="n" style="font-size:16px' + (late ? ';color:#C2412D' : '') + '">' + (mins == null ? 'Never' : mins < 2 ? 'Just now' : mins < 120 ? mins + ' min ago' : Math.round(mins / 60) + ' h ago') + '</div></div></div>' +
       (mins == null ? '<p class="note">The sender runs every 15 minutes. If this still says “Never” an hour after the deploy, the schedule did not start: tell Claude.</p>'
         : late ? '<p class="note err">The sender should run every 15 minutes. It looks stuck.</p>' : '') + '</div>';
+  }
+
+  // ---- Accounts: how many people have signed in, and the latest to join ----
+  function loadMembers() {
+    fetch('/api/auth?members=1', { headers: { 'x-stats-key': getKey() }, cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (m) { var el = document.getElementById('members'); if (el) el.innerHTML = members(m); });
+  }
+  function members(m) {
+    if (!m) return '';
+    var cell = function (label, n, sub) { return '<div><div class="muted">' + label + '</div><div class="n">' + fmt(n) + '</div>' + (sub ? '<div class="muted">' + sub + '</div>' : '') + '</div>'; };
+    var max = Math.max.apply(null, m.days.map(function (d) { return d.n; }).concat(1));
+    var chart = '<div style="display:flex;align-items:flex-end;gap:4px;height:64px;margin-top:14px" role="img" aria-label="New accounts per day, last 14 days">' +
+      m.days.map(function (d) {
+        return '<div title="' + esc(short(d.day)) + ': ' + d.n + '" style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;height:100%">' +
+          '<div style="height:' + Math.max(d.n ? 8 : 3, Math.round((d.n / max) * 100)) + '%;border-radius:5px 5px 2px 2px;background:' + (d.n ? 'var(--accent)' : 'var(--line)') + '"></div></div>';
+      }).join('') + '</div>' +
+      '<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>' + esc(short(m.days[0].day)) + '</span><span>New accounts per day</span><span>Today</span></div>';
+    var when = function (iso) { return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); };
+    var list = m.latest.map(function (a) {
+      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px">' +
+        '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>#' + a.n + '</b> ' + esc(a.name || '') + ' <span class="muted">' + esc(a.email) + '</span></span>' +
+        '<span class="muted" style="white-space:nowrap">' + (a.google ? 'Google' : 'Email') + ' · ' + esc(when(a.at)) + '</span></div>';
+    }).join('');
+    var gone = m.highest - m.total;
+    return '<div class="card" style="margin-bottom:12px"><h2>Accounts</h2><div class="muted">People who have signed in with Google or an email code</div><div class="ret">' +
+      cell('Registered', m.total, gone > 0 ? gone + ' deleted theirs' : '') + cell('New today', m.today) + cell('Last 7 days', m.week) + '</div>' +
+      (m.total ? chart + '<h2 style="margin-top:18px">Latest to join</h2>' + list +
+        '<p class="note">Email addresses are partly hidden on purpose: this page opens with one shared password, so it does not show anyone\'s full address.</p>'
+        : '<p class="muted" style="margin-top:10px">Nobody has signed in yet. Accounts show up here the moment someone does.</p>') + '</div>';
   }
 
   // ---- Daily message: what goes out each morning, and a box to write your own ----
@@ -299,6 +331,7 @@
       kpi('Active today', t.dau) + kpi('Active this week', t.wau) + kpi('Active this month', t.mau) +
       kpi('Daily habit', pct(t.stickiness), 'of monthly users open it on a given day') + kpi('Devices seen', t.people, 'including people who only looked') +
       '</div>' +
+      '<div id="members"></div>' +
 
       '<div class="card"><h2>Active users per day</h2><div class="muted">People using their own money (not the demo). Grey = started that day.</div>' +
       '<div class="chart" id="chart">' + cols + '</div><div class="axis"><span>' + short(d.from) + '</span><span>' + short(d.today) + '</span></div>' +

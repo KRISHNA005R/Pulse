@@ -1,6 +1,7 @@
 // PULSE accounts: sign in with Google or an emailed code. What an account is: netlify/lib/auth.ts.
 //
 //   GET  /api/auth                                         -> { google: <client id or ''>, email: true|false }
+//   GET  /api/auth?members=1   header x-stats-key          -> how many accounts, and the latest, for the stats page
 //   POST /api/auth  { action: 'google', credential }       -> { token, account, fresh }
 //   POST /api/auth  { action: 'email-start', email }       a 6-digit code is emailed
 //   POST /api/auth  { action: 'email-verify', email, code }-> { token, account, fresh }
@@ -15,9 +16,9 @@
 //   AUTH_FROM          e.g. "PULSE <login@pulsemoney.in>". Turns email codes on. The address must be
 //                      on a domain verified in Resend (FEEDBACK_FROM is used when this is missing).
 import { getStore } from '@netlify/blobs';
-import { authConfig, googleKeys, googleReturn, handleAuth, verifyGoogleJwt, type AuthCtx, type AuthStore } from '../lib/auth';
+import { authConfig, googleKeys, googleReturn, handleAuth, membersOverview, verifyGoogleJwt, type AuthCtx, type AuthStore } from '../lib/auth';
 import { codeEmail, type Mail } from '../lib/emails';
-import { json } from './stats';
+import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
 
 function context(req: Request): AuthCtx {
   const clientId = (process.env.GOOGLE_CLIENT_ID ?? '').trim();
@@ -55,7 +56,14 @@ const back = (hash: string) => new Response(null, { status: 303, headers: { loca
 export default async (req: Request) => {
   try {
     const ctx = context(req);
-    if (req.method === 'GET') return json(authConfig(ctx));
+    if (req.method === 'GET') {
+      if (new URL(req.url).searchParams.has('members')) {
+        const key = req.headers.get('x-stats-key') ?? '';
+        if (!key || (await sha256(key)) !== (process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH)) return json({ error: 'wrong key' }, 401);
+        return json(await membersOverview(ctx.store));
+      }
+      return json(authConfig(ctx));
+    }
     if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
     const type = req.headers.get('content-type') ?? '';
     const text = await req.text();

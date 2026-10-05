@@ -25,7 +25,7 @@ export const SIZES: Record<CardFormat, [number, number]> = { story: [1080, 1920]
 type Ctx = CanvasRenderingContext2D;
 
 // ---------- small helpers ----------
-function hash(str: string): number {
+export function hash(str: string): number {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
     h ^= str.charCodeAt(i);
@@ -33,7 +33,7 @@ function hash(str: string): number {
   }
   return h >>> 0;
 }
-function rng(seed: number) {
+export function rng(seed: number) {
   let s = seed || 1;
   return () => {
     s = (s + 0x6d2b79f5) | 0;
@@ -48,15 +48,15 @@ function hexRgb(h: string): [number, number, number] {
   const x = h.replace('#', '');
   return [0, 2, 4].map((i) => parseInt(x.slice(i, i + 2), 16)) as [number, number, number];
 }
-function mix(a: string, b: string, t: number): string {
+export function mix(a: string, b: string, t: number): string {
   const A = hexRgb(a);
   const B = hexRgb(b);
   return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
 }
-function font(ctx: Ctx, weight: number | string, size: number, fam: string) {
+export function font(ctx: Ctx, weight: number | string, size: number, fam: string) {
   ctx.font = `${weight} ${size}px ${fam}`;
 }
-function spacing(ctx: Ctx, px: number) {
+export function spacing(ctx: Ctx, px: number) {
   const c = ctx as Ctx & { letterSpacing?: string };
   if ('letterSpacing' in c) c.letterSpacing = `${px}px`;
 }
@@ -83,7 +83,7 @@ function wrap(ctx: Ctx, text: string, maxW: number, maxLines = 4): string[] {
   return lines;
 }
 /** Shrink the font until the text fits. Returns the size used. */
-function fit(ctx: Ctx, text: string, weight: number, start: number, fam: string, maxW: number, min = 36): number {
+export function fit(ctx: Ctx, text: string, weight: number, start: number, fam: string, maxW: number, min = 36): number {
   let s = start;
   font(ctx, weight, s, fam);
   while (ctx.measureText(text).width > maxW && s > min) {
@@ -92,7 +92,7 @@ function fit(ctx: Ctx, text: string, weight: number, start: number, fam: string,
   }
   return s;
 }
-function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
+export function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -101,14 +101,14 @@ function rr(ctx: Ctx, x: number, y: number, w: number, h: number, r: number) {
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
-function grain(ctx: Ctx, w: number, h: number, r: () => number, color: string, alpha: number, count: number) {
+export function grain(ctx: Ctx, w: number, h: number, r: () => number, color: string, alpha: number, count: number) {
   ctx.save();
   ctx.fillStyle = color;
   ctx.globalAlpha = alpha;
   for (let i = 0; i < count; i++) ctx.fillRect(r() * w, r() * h, 2, 2);
   ctx.restore();
 }
-function barcode(ctx: Ctx, x: number, y: number, w: number, h: number, r: () => number, color: string) {
+export function barcode(ctx: Ctx, x: number, y: number, w: number, h: number, r: () => number, color: string) {
   ctx.save();
   ctx.fillStyle = color;
   let cx = x;
@@ -119,7 +119,7 @@ function barcode(ctx: Ctx, x: number, y: number, w: number, h: number, r: () => 
   }
   ctx.restore();
 }
-function sparkle(ctx: Ctx, cx: number, cy: number, s: number, color: string) {
+export function sparkle(ctx: Ctx, cx: number, cy: number, s: number, color: string) {
   ctx.save();
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -131,7 +131,7 @@ function sparkle(ctx: Ctx, cx: number, cy: number, s: number, color: string) {
   ctx.fill();
   ctx.restore();
 }
-function circleText(ctx: Ctx, text: string, cx: number, cy: number, radius: number, fontStr: string, color: string, start = -Math.PI / 2) {
+export function circleText(ctx: Ctx, text: string, cx: number, cy: number, radius: number, fontStr: string, color: string, start = -Math.PI / 2) {
   ctx.save();
   ctx.font = fontStr;
   ctx.fillStyle = color;
@@ -151,7 +151,7 @@ function circleText(ctx: Ctx, text: string, cx: number, cy: number, radius: numb
   }
   ctx.restore();
 }
-function starPath(ctx: Ctx, cx: number, cy: number, spikes: number, outer: number, inner: number, rot = 0) {
+export function starPath(ctx: Ctx, cx: number, cy: number, spikes: number, outer: number, inner: number, rot = 0) {
   ctx.beginPath();
   for (let i = 0; i < spikes * 2; i++) {
     const r = i % 2 === 0 ? outer : inner;
@@ -163,7 +163,7 @@ function starPath(ctx: Ctx, cx: number, cy: number, spikes: number, outer: numbe
   }
   ctx.closePath();
 }
-function wordmark(ctx: Ctx, x: number, y: number, size: number, color: string, align: 'left' | 'right' | 'center' = 'left', dot: string = BRAND.accent) {
+export function wordmark(ctx: Ctx, x: number, y: number, size: number, color: string, align: 'left' | 'right' | 'center' = 'left', dot: string = BRAND.accent) {
   font(ctx, 800, size, BRAND.display);
   spacing(ctx, 0);
   const w1 = ctx.measureText('PULSE').width;
@@ -842,89 +842,3 @@ export function cardBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((res) => canvas.toBlob((b) => res(b), 'image/png'));
 }
 
-// ---------- the member card (shown after signing in, shareable as a story) ----------
-export interface MemberSpec {
-  n: number;
-  name: string;
-  /** "Day-one member" */
-  title: string;
-  /** "Oct 2026" */
-  since: string;
-}
-
-export function drawMemberCard(canvas: HTMLCanvasElement, m: MemberSpec) {
-  const [W, H] = SIZES.story;
-  if (canvas.width !== W) canvas.width = W;
-  if (canvas.height !== H) canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
-  ctx.textBaseline = 'alphabetic';
-  spacing(ctx, 0);
-  const r = rng(hash(`member|${m.n}`));
-
-  // Paper, with the card sitting on it.
-  ctx.fillStyle = BRAND.paper;
-  ctx.fillRect(0, 0, W, H);
-  grain(ctx, W, H, r, BRAND.ink, 0.05, 2600);
-  wordmark(ctx, 96, 190, 64, BRAND.ink);
-
-  ctx.fillStyle = BRAND.ink;
-  font(ctx, 800, 96, BRAND.display);
-  ctx.textAlign = 'left';
-  const first = (m.name.trim().split(' ')[0] || 'I').slice(0, 14);
-  ctx.fillText(m.name.trim() ? `${first} is in.` : 'I’m in.', 96, 470);
-  font(ctx, 500, 44, BRAND.body);
-  ctx.fillStyle = mix(BRAND.ink, BRAND.paper, 0.35);
-  ctx.fillText('Know what you can spend,', 96, 560);
-  ctx.fillText('without doing the math.', 96, 620);
-
-  // The card.
-  const x = 96;
-  const y = 760;
-  const w = W - 192;
-  const h = 760;
-  ctx.save();
-  ctx.shadowColor = 'rgba(23,20,15,0.35)';
-  ctx.shadowBlur = 80;
-  ctx.shadowOffsetY = 40;
-  rr(ctx, x, y, w, h, 64);
-  ctx.fillStyle = BRAND.ink;
-  ctx.fill();
-  ctx.restore();
-  ctx.save();
-  rr(ctx, x, y, w, h, 64);
-  ctx.clip();
-  // A soft glow in the corner, in the brand orange.
-  const glow = ctx.createRadialGradient(x + w, y, 0, x + w, y, w * 0.9);
-  glow.addColorStop(0, 'rgba(236,91,43,0.42)');
-  glow.addColorStop(1, 'rgba(236,91,43,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(x, y, w, h);
-  grain(ctx, W, H, r, '#FFFFFF', 0.05, 1800);
-  ctx.restore();
-
-  ctx.fillStyle = 'rgba(246,245,242,0.7)';
-  font(ctx, 700, 34, BRAND.body);
-  spacing(ctx, 8);
-  ctx.fillText('PULSE MEMBER', x + 72, y + 130);
-  spacing(ctx, 0);
-  ctx.fillStyle = BRAND.accent;
-  const label = `#${m.n}`;
-  font(ctx, 800, fit(ctx, label, 800, 300, BRAND.display, w - 144, 120), BRAND.display);
-  ctx.fillText(label, x + 64, y + 440);
-  ctx.fillStyle = '#F6F5F2';
-  font(ctx, 700, 46, BRAND.body);
-  ctx.fillText(m.title, x + 72, y + 570);
-  ctx.fillStyle = 'rgba(246,245,242,0.7)';
-  font(ctx, 500, 40, BRAND.body);
-  if (m.since) ctx.fillText(`Joined ${m.since}`, x + 72, y + 634);
-  wordmark(ctx, x + w - 72, y + h - 64, 40, '#F6F5F2', 'right');
-
-  ctx.fillStyle = BRAND.ink;
-  font(ctx, 700, 46, BRAND.body);
-  ctx.textAlign = 'center';
-  ctx.fillText('Get your number at pulsemoney.in', W / 2, H - 170);
-  ctx.textAlign = 'left';
-}
