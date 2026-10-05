@@ -803,10 +803,10 @@ function PhotoEditor() {
   const choose = async (file: File | undefined) => {
     if (!file) return;
     setBusy(true);
-    const photo = await squarePhoto(file);
+    const made = await squarePhoto(file);
     setBusy(false);
-    if (!photo) return store.toast({ text: "PULSE couldn't open that picture. Try another one, or a screenshot of it." });
-    store.updateUser({ photo });
+    if (!made) return store.toast({ text: "PULSE couldn't open that picture. Try another one, or a screenshot of it." });
+    store.updateUser(made);
     store.toast({ text: has ? 'Photo changed.' : 'Looking good. Photo added.', tone: 'good', emoji: '📸' });
   };
   return (
@@ -814,7 +814,7 @@ function PhotoEditor() {
       <PersonAvatar me size={76} />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold leading-tight">Your photo</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-ink3">Shown on your profile. Friends don't see it.</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-ink3">Shown on your profile, and to friends you split with on PULSE.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-primary min-h-[38px] px-4 text-[14px]" disabled={busy} onClick={() => input.current?.click()}>
             <Icon name="camera" size={15} /> {busy ? 'Adding…' : has ? 'Change photo' : 'Add photo'}
@@ -824,7 +824,7 @@ function PhotoEditor() {
               type="button"
               className="btn-quiet min-h-[38px] px-4 text-[14px]"
               onClick={() => {
-                store.updateUser({ photo: undefined });
+                store.updateUser({ photo: undefined, face: undefined });
                 store.toast({ text: 'Photo removed.' });
               }}
             >

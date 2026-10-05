@@ -4,6 +4,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { haptic, rupees } from '../lib/format';
 import { reminderDeviceId } from '../lib/reminders';
+import { faceOf, okPhoto } from '../lib/photo';
 import {
   clearFriendNews,
   clearJoinLink,
@@ -74,6 +75,18 @@ export function useFriends() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, state.user.uid]);
 
+  // A photo added before friends could see photos: make the small copy they get.
+  useEffect(() => {
+    const photo = state.user.photo;
+    if (!ready || !okPhoto(photo) || state.user.face) return;
+    let live = true;
+    void faceOf(photo).then((face) => live && face && store.updateUser({ face }));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, state.user.photo, state.user.face]);
+
   // An invite link: wait until the person is set up, then ask.
   useEffect(() => {
     const check = () => {
@@ -94,6 +107,7 @@ export function useFriends() {
         state.people.map((p) => p.link?.chan),
         state.groups.map((g) => [g.id, g.name, g.emoji, g.members, g.shared?.gid, g.shared?.claim]),
         state.user.name,
+        state.user.face,
         state.user.door?.id,
       ])
     : '';

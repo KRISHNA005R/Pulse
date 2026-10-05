@@ -17,6 +17,7 @@ import type { Door, FriendLink, Group, GroupShare, ISODate, Person, Settlement, 
 import { fromB64Url, toB64Url, utf8 } from './codec';
 import { roundMoney } from './currency';
 import { daysBetween, rupees } from './format';
+import { okFace } from './photo';
 
 // ---------------------------------------------------------------------------------------------
 // Invites
@@ -110,6 +111,8 @@ export interface Box {
   name: string;
   /** The writer's PULSE id, so the same friend met in a group isn't listed twice. */
   uid?: string;
+  /** The writer's profile photo (the small copy), if they have one. */
+  face?: string;
   items: BoxItem[];
 }
 
@@ -160,10 +163,16 @@ export function buildBox(s: State, personId: string): Box {
     else if (st.from === personId && st.to === 'me') items.push({ id: st.id, k: 'p', dir: 'you', amt: roundMoney(st.amount), date: st.date });
   }
   items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), items };
+  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...myFace(s), items };
 }
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
+const myFace = (s: State) => (okFace(s.user.face) ? { face: s.user.face } : {});
+/** A friend's photo follows what their own PULSE says: shown when they have one, gone when they take it off. */
+function setFace(p: Person, face: unknown) {
+  if (okFace(face)) p.photo = face;
+  else delete p.photo;
+}
 const myShort = (s: State) => (s.user.name || myName(s).split(' ')[0]).trim().slice(0, 24);
 
 const remoteId = (chan: string, id: string) => `fr-${chan.slice(0, 10)}-${id}`;
@@ -246,6 +255,7 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
   p.link.status = 'linked';
   const name = clip(box.name, 40);
   if (name) p.link.theirName = name;
+  setFace(p, box.face);
   // The same friend may already be here from a shared group: keep one of them.
   if (typeof box.uid === 'string' && UID.test(box.uid)) {
     for (const twinP of s.people.filter((x) => x.uid === box.uid && x.id !== personId && !x.link)) mergePeople(s, twinP.id, personId);
@@ -286,6 +296,7 @@ export function mergePeople(s: State, fromId: string, intoId: string) {
   for (const tx of s.transactions) if (tx.people?.includes(fromId)) tx.people = [...new Set(tx.people.map(sw))];
   if (!into.link && from.link) into.link = from.link;
   if (!into.uid && from.uid) into.uid = from.uid;
+  if (!into.photo && from.photo) into.photo = from.photo;
   s.people = s.people.filter((p) => p.id !== fromId);
 }
 
@@ -627,6 +638,8 @@ export interface GroupBox {
   v: 1;
   uid: string;
   name: string;
+  /** The writer's profile photo (the small copy), if they have one. */
+  face?: string;
   /** The group's title. The one from the person who made the group is used. */
   g: { name: string; emoji: string };
   /** A hand-typed name (a ref) that is really me. */
@@ -704,6 +717,7 @@ export function buildGroupBox(s: State, group: Group): GroupBox {
     v: 1,
     uid: s.user.uid ?? '',
     name: myName(s),
+    ...myFace(s),
     g: { name: group.name.slice(0, 40), emoji: group.emoji },
     ...(sh.claim ? { claim: sh.claim } : {}),
     ...(also.length ? { also } : {}),
@@ -764,6 +778,8 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
       }
     }
     if (uid && !p.uid) p.uid = uid;
+    // Someone who left stopped updating this group, so what it says about their photo may be old.
+    if (!m.gone) setFace(p, m.box.face);
     sh.refs[m.mid] = p.id;
     if (!known && !m.gone) news.push({ person: p.id, group: group.id, title: `${p.short} joined ${group.name}`, body: 'They see the group’s expenses and can add their own.' });
   }

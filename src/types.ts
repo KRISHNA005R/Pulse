@@ -38,8 +38,10 @@ export interface User {
   uid?: string;
   /** This person's own PULSE link: one link for everybody (lib/friends.ts). */
   door?: Door;
-  /** Profile photo: a small square JPEG kept as a data URL (lib/photo.ts). Never sent to friends. */
+  /** Profile photo: a small square JPEG kept as a data URL (lib/photo.ts). */
   photo?: string;
+  /** A much smaller copy of the photo: the one connected friends and group members see. */
+  face?: string;
 }
 
 /** A personal link. The key only ever travels inside the link itself. */
@@ -222,6 +224,8 @@ export interface Person {
   link?: FriendLink;
   /** Their PULSE id (User.uid), once known from a link or a shared group. */
   uid?: string;
+  /** Their profile photo (the small copy), when they are on PULSE and have added one. */
+  photo?: string;
 }
 
 /** The private channel shared with one friend. The key only ever travels inside the invite link. */

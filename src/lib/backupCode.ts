@@ -9,8 +9,10 @@ import { canCompress, deflate, fromB64Url, inflate, sha256Hex, toB64Url, utf8 } 
 const PREFIX = 'PULSE1-';
 
 export async function encodeBackup(state: State): Promise<string> {
-  // The profile photo stays out: it would make the code many times longer, and it is easy to add again.
-  const json = JSON.stringify({ app: 'pulse', version: 2, savedAt: new Date().toISOString(), state: { ...state, user: { ...state.user, photo: undefined } } });
+  // Photos stay out: they would make the code many times longer. Yours is easy to add again, and
+  // friends' photos come back by themselves.
+  const light = { ...state, user: { ...state.user, photo: undefined, face: undefined }, people: state.people.map((p) => ({ ...p, photo: undefined })) };
+  const json = JSON.stringify({ app: 'pulse', version: 2, savedAt: new Date().toISOString(), state: light });
   const zip = canCompress();
   const body = zip ? await deflate(json) : utf8(json);
   const check = (await sha256Hex(body)).slice(0, 8);
