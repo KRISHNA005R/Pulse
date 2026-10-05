@@ -42,6 +42,8 @@ export interface User {
   photo?: string;
   /** A much smaller copy of the photo: the one connected friends and group members see. */
   face?: string;
+  /** When the photo is a GIF: its id on PULSE's server (lib/photo.ts). `photo` and `face` are then its first frame. */
+  gif?: string;
 }
 
 /** A personal link. The key only ever travels inside the link itself. */
@@ -226,6 +228,8 @@ export interface Person {
   uid?: string;
   /** Their profile photo (the small copy), when they are on PULSE and have added one. */
   photo?: string;
+  /** When their photo is a GIF: its id on PULSE's server. `photo` is then its first frame. */
+  gif?: string;
 }
 
 /** The private channel shared with one friend. The key only ever travels inside the invite link. */

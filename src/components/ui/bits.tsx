@@ -4,7 +4,7 @@ import type { Person, State } from '../../types';
 import { Icon } from './Icon';
 import { useStore } from '../../store/store';
 import { rupees } from '../../lib/format';
-import { okFace, okPhoto } from '../../lib/photo';
+import { calm, gifUrl, okFace, okGif, okPhoto } from '../../lib/photo';
 
 // ---------- Section header ----------
 export function SectionHeader({ title, action, id }: { title: string; action?: { label: string; onClick: () => void }; id?: string }) {
@@ -101,8 +101,13 @@ export function PersonAvatar({ person, size = 36, me }: { person?: Person; size?
   const label = me ? state.user.name : person?.short ?? '?';
   const initials = label.slice(0, 1).toUpperCase() + (me ? '' : (person?.name.split(' ')[1]?.[0] ?? ''));
   const hue = me ? 18 : person?.hue ?? 0;
-  const photo = me ? (okPhoto(state.user.photo) ? state.user.photo : null) : okFace(person?.photo) ? person.photo : null;
-  if (photo) return <img src={photo} alt="" width={size} height={size} draggable={false} className="inline-block shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
+  const still = me ? (okPhoto(state.user.photo) ? state.user.photo : null) : okFace(person?.photo) ? person.photo : null;
+  // A GIF photo moves, unless the phone asks for less motion or the GIF can't be loaded (no internet): then its still frame shows.
+  const gif = still && okGif(me ? state.user.gif : person?.gif) ? ((me ? state.user.gif : person?.gif) as string) : null;
+  const [missing, setMissing] = useState<string | null>(null);
+  const photo = gif && missing !== gif && !calm() ? gifUrl(gif) : still;
+  if (photo)
+    return <img src={photo} alt="" width={size} height={size} draggable={false} decoding="async" onError={() => gif && setMissing(gif)} className="inline-block shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
   return (
     <span
       className="inline-grid shrink-0 place-items-center rounded-full font-semibold"

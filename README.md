@@ -101,6 +101,10 @@ How it fits together: `netlify/lib/auth.ts` (accounts, sessions, codes, checking
 existing sync engine (`src/lib/sync.ts`) does the saving and merging. This means the server can open a
 signed-in person's data; `/privacy/` says so.
 
+## Profile photos and GIFs
+
+A still photo is cut to a small square on the phone and kept inside the person's own data (`src/lib/photo.ts`); connected friends get a tiny copy in the sealed boxes they already exchange. A GIF is first cut to a small 3-second loop on the phone (`src/lib/gif.ts`, loaded only when a GIF is picked), then kept on the server under a random id (`netlify/lib/faces.ts`, `/api/face`). Phones load it by that id, and fall back to its first frame without internet or when the phone asks for less motion. GIFs need a signed-in account.
+
 ## Deploy
 
 Netlify builds this repository on every push to `main` (see `netlify.toml`):

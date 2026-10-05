@@ -108,6 +108,7 @@ export function useFriends() {
         state.groups.map((g) => [g.id, g.name, g.emoji, g.members, g.shared?.gid, g.shared?.claim]),
         state.user.name,
         state.user.face,
+        state.user.gif,
         state.user.door?.id,
       ])
     : '';

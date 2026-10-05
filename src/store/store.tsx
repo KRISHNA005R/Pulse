@@ -705,7 +705,10 @@ function useStoreImpl() {
         if (!p || !chan) return;
         delete p.link;
         // No longer connected: their photo goes, unless a shared group still brings it.
-        if (!s.groups.some((g) => inGroupOnPulse(g, personId))) delete p.photo;
+        if (!s.groups.some((g) => inGroupOnPulse(g, personId))) {
+          delete p.photo;
+          delete p.gif;
+        }
         for (const x of s.splits) if (x.remote === chan) delete x.remote;
         for (const x of s.settlements) if (x.remote === chan) delete x.remote;
       }),

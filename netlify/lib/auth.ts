@@ -18,6 +18,7 @@
 //   n/<number>               -> { uid }                 a member number, claimed once, never reused
 //   meta/count               -> { n }                   the highest number given out
 //   rate/<kind>/<key>/<hour> -> { c }                   how many emails went out, per sender and in all
+//   face/<id>                -> a GIF profile photo (netlify/lib/faces.ts)
 import { EMAIL, type Mail } from './emails';
 
 export interface AuthStore {
@@ -40,6 +41,8 @@ export interface Account {
   google?: string;
   /** Hashes of this account's sessions, newest last, so they can all be ended. */
   sess: string[];
+  /** The id of this person's GIF profile photo, when they have one (netlify/lib/faces.ts). */
+  face?: string;
 }
 
 export interface GoogleUser {
@@ -131,7 +134,7 @@ async function signIn(ctx: AuthCtx, who: { email: string; name: string; google?:
 }
 
 /** Count something against an hourly (or daily) limit. False when the limit is already reached. */
-async function allow(store: AuthStore, kind: string, key: string, slot: string, max: number): Promise<boolean> {
+export async function allow(store: AuthStore, kind: string, key: string, slot: string, max: number): Promise<boolean> {
   const k = `rate/${kind}/${key}/${slot}`;
   const c = (await get<{ c: number }>(store, k))?.c ?? 0;
   if (c >= max) return false;
@@ -148,6 +151,13 @@ interface Otp {
 
 /** What the app needs to know before showing its sign-in buttons. */
 export const authConfig = (ctx: Pick<AuthCtx, 'googleClientId' | 'sendMail'>) => ({ ok: true, google: ctx.googleClientId, email: !!ctx.sendMail });
+
+/** The account a session token belongs to, or null when it is not signed in (any more). */
+export async function accountFor(store: AuthStore, token: string): Promise<Account | null> {
+  if (!TOKEN.test(token)) return null;
+  const sess = await get<{ uid: string }>(store, `sess/${await sha256(token)}`);
+  return sess ? await get<Account>(store, `acct/${sess.uid}`) : null;
+}
 
 export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, bearer = ''): Promise<Result> {
   const { store } = ctx;
@@ -218,11 +228,9 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
 
   // ---- Everything below needs a signed-in session ----
   const token = bearer || String(body.token ?? '');
-  if (!TOKEN.test(token)) return fail(401, 'signed out');
-  const th = await sha256(token);
-  const sess = await get<{ uid: string }>(store, `sess/${th}`);
-  const acct = sess ? await get<Account>(store, `acct/${sess.uid}`) : null;
+  const acct = await accountFor(store, token);
   if (!acct) return fail(401, 'signed out');
+  const th = await sha256(token);
 
   if (action === 'me') return { status: 200, body: { ok: true, account: pub(acct) } };
 
@@ -258,6 +266,7 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
     await Promise.all(acct.sess.map((h) => store.delete(`sess/${h}`)));
     await store.delete(`sess/${th}`);
     await store.delete(`mail/${await sha256(acct.email)}`);
+    if (acct.face) await store.delete(`face/${acct.face}`);
     await store.delete(`acct/${acct.uid}`);
     return { status: 200, body: { ok: true } };
   }

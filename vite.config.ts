@@ -91,6 +91,15 @@ export default defineConfig(({ mode }) => {
                 importScripts: ['/push-sw.js'],
                 navigateFallback: '/index.html',
                 navigateFallbackDenylist: [/^\/stats/, /^\/founder/, /^\/about/, /^\/404/, /^\/migrate/, /^\/api\//, /\.(xml|txt)$/],
+                // GIF profile photos: an id never gets a different picture, so the phone keeps its copy
+                // and friends' photos still move without internet.
+                runtimeCaching: [
+                  {
+                    urlPattern: ({ url }: { url: URL }) => url.pathname === '/api/face',
+                    handler: 'CacheFirst',
+                    options: { cacheName: 'pulse-faces', expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 90 }, cacheableResponse: { statuses: [200] } },
+                  },
+                ],
                 cleanupOutdatedCaches: true,
                 clientsClaim: true,
                 skipWaiting: true,

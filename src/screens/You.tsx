@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
@@ -16,7 +16,7 @@ import { Icon } from '../components/ui/Icon';
 import { useInstall } from '../lib/pwa';
 import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
-import { okPhoto, squarePhoto } from '../lib/photo';
+import { dropGif, GIF_MAX_FILE, okGif, okPhoto, saveGif, squarePhoto, stillsOf } from '../lib/photo';
 
 export function YouScreen() {
   const store = useStore();
@@ -794,37 +794,149 @@ export function CategoriesScreen() {
 }
 
 /** Profile photo: pick one from the phone, change it, or take it off. */
+/** A GIF that has been made small and is waiting for a yes. */
+interface GifDraft {
+  bytes: Uint8Array;
+  /** A local address for showing it before it is saved. */
+  url: string;
+  stills: { photo: string; face: string };
+  before: string;
+  after: string;
+}
+const fileSize = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} sec`;
+
 function PhotoEditor() {
   const store = useStore();
   const { state } = store;
+  const token = useAuth().session?.token;
   const input = useRef<HTMLInputElement>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<'' | 'photo' | 'gif' | 'saving'>('');
+  const [draft, setDraft] = useState<GifDraft | null>(null);
   const has = okPhoto(state.user.photo);
+  const hadGif = okGif(state.user.gif);
+  useEffect(() => () => void (draft && URL.revokeObjectURL(draft.url)), [draft]);
+
+  /** A still picture becomes the photo. A GIF that was there before is let go. */
+  const setStill = (made: { photo: string; face: string }, text?: string) => {
+    store.updateUser({ ...made, gif: undefined });
+    if (hadGif && token) void dropGif(token);
+    store.toast({ text: text ?? (has ? 'Photo changed.' : 'Looking good. Photo added.'), tone: 'good', emoji: '📸' });
+  };
   const choose = async (file: File | undefined) => {
     if (!file) return;
-    setBusy(true);
+    const oops = () => store.toast({ text: "PULSE couldn't open that picture. Try another one, or a screenshot of it." });
+    let head = new Uint8Array();
+    try {
+      head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    } catch {
+      /* read as a photo below */
+    }
+    if (head[0] === 0x47 && head[1] === 0x49 && head[2] === 0x46 && head[3] === 0x38) {
+      // A GIF: keep the first seconds, make it small, and show it before anything is saved.
+      if (file.size > GIF_MAX_FILE) return store.toast({ text: `That GIF is ${fileSize(file.size)}. Pick one under 12 MB.` });
+      setBusy('gif');
+      try {
+        const [{ shrinkGif }, buffer] = await Promise.all([import('../lib/gif'), file.arrayBuffer()]);
+        await new Promise((r) => window.setTimeout(r, 40)); // let "Making it small…" show first
+        const r = shrinkGif(buffer);
+        const stills = r ? stillsOf(r.first.rgba, r.first.size) : null;
+        if (!r || !stills) store.toast({ text: "PULSE couldn't use that GIF. Try another one." });
+        else if (!r.animated) setStill(stills);
+        else setDraft({ bytes: r.bytes, url: URL.createObjectURL(new Blob([r.bytes.slice().buffer as ArrayBuffer], { type: 'image/gif' })), stills, before: `${fileSize(file.size)} · ${seconds(r.source.ms)}`, after: `${fileSize(r.bytes.length)} · ${seconds(r.ms)}` });
+      } catch {
+        oops();
+      }
+      return setBusy('');
+    }
+    setBusy('photo');
     const made = await squarePhoto(file);
-    setBusy(false);
-    if (!made) return store.toast({ text: "PULSE couldn't open that picture. Try another one, or a screenshot of it." });
-    store.updateUser(made);
-    store.toast({ text: has ? 'Photo changed.' : 'Looking good. Photo added.', tone: 'good', emoji: '📸' });
+    setBusy('');
+    if (!made) return oops();
+    setStill(made);
   };
+  const useGif = async () => {
+    if (!draft) return;
+    if (!token) {
+      // Without an account there is nowhere to keep a GIF: its first frame becomes the photo.
+      setStill(draft.stills, 'Saved as a still photo. Sign in to make it move.');
+      return setDraft(null);
+    }
+    setBusy('saving');
+    const r = await saveGif(draft.bytes, token);
+    setBusy('');
+    if (!r.ok) return store.toast({ text: r.error });
+    store.updateUser({ ...draft.stills, gif: r.id });
+    setDraft(null);
+    store.toast({ text: 'GIF added. Your friends see it move too.', tone: 'good', emoji: '🎬' });
+  };
+  const picker = (
+    <input
+      ref={input}
+      id="profile-photo"
+      type="file"
+      accept="image/*"
+      className="sr-only"
+      tabIndex={-1}
+      aria-label="Choose a photo or a GIF"
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        e.target.value = ''; // so the same picture can be chosen again
+        void choose(f);
+      }}
+    />
+  );
+
+  if (draft)
+    return (
+      <div className="rounded-2xl border border-line bg-surface p-4 text-center" aria-live="polite">
+        <p className="eyebrow">This is how it will look</p>
+        <img src={draft.url} alt="Your GIF, moving" width={120} height={120} className="mx-auto mt-3 h-[120px] w-[120px] rounded-full object-cover" />
+        <p className="mt-3 text-[13.5px] leading-snug text-ink2">PULSE keeps the first 3 seconds and makes it small.</p>
+        <p className="num mt-1 text-[12.5px] text-ink3">
+          {draft.before} → {draft.after}
+        </p>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <button type="button" className="btn-accent min-h-[40px] px-5 text-[14px]" disabled={busy === 'saving'} onClick={() => void useGif()}>
+            {busy === 'saving' ? 'Saving…' : 'Use this GIF'}
+          </button>
+          <button
+            type="button"
+            className="btn-quiet min-h-[40px] px-4 text-[14px]"
+            disabled={busy === 'saving'}
+            onClick={() => {
+              setDraft(null);
+              input.current?.click();
+            }}
+          >
+            Pick another
+          </button>
+          <button type="button" className="btn-ghost min-h-[40px] px-4 text-[14px]" disabled={busy === 'saving'} onClick={() => setDraft(null)}>
+            Cancel
+          </button>
+        </div>
+        {picker}
+      </div>
+    );
+
   return (
     <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-4">
       <PersonAvatar me size={76} />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold leading-tight">Your photo</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-ink3">Shown on your profile, and to friends you split with on PULSE.</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-ink3">A photo or a GIF. Shown on your profile, and to friends you split with on PULSE.</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" className="btn-primary min-h-[38px] px-4 text-[14px]" disabled={busy} onClick={() => input.current?.click()}>
-            <Icon name="camera" size={15} /> {busy ? 'Adding…' : has ? 'Change photo' : 'Add photo'}
+          <button type="button" className="btn-primary min-h-[38px] px-4 text-[14px]" disabled={!!busy} onClick={() => input.current?.click()}>
+            <Icon name="camera" size={15} /> {busy === 'gif' ? 'Making it small…' : busy ? 'Adding…' : has ? 'Change photo or GIF' : 'Add photo or GIF'}
           </button>
           {has && (
             <button
               type="button"
               className="btn-quiet min-h-[38px] px-4 text-[14px]"
+              disabled={!!busy}
               onClick={() => {
-                store.updateUser({ photo: undefined, face: undefined });
+                store.updateUser({ photo: undefined, face: undefined, gif: undefined });
+                if (hadGif && token) void dropGif(token);
                 store.toast({ text: 'Photo removed.' });
               }}
             >
@@ -832,20 +944,7 @@ function PhotoEditor() {
             </button>
           )}
         </div>
-        <input
-          ref={input}
-          id="profile-photo"
-          type="file"
-          accept="image/*"
-          className="sr-only"
-          tabIndex={-1}
-          aria-label="Choose a photo"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = ''; // so the same picture can be chosen again
-            void choose(f);
-          }}
-        />
+        {picker}
       </div>
     </div>
   );

@@ -34,6 +34,9 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 # ---- Accounts: sign in with Google or an emailed code (see netlify/functions/auth.ts) ---------
 /api/auth  /.netlify/functions/auth  200
 
+# ---- GIF profile photos (see netlify/functions/face.ts) ---------------------------------------
+/api/face  /.netlify/functions/face  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301
