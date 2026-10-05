@@ -167,11 +167,16 @@ export function buildBox(s: State, personId: string): Box {
 }
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
-const myFace = (s: State) => (okFace(s.user.face) ? { face: s.user.face } : {});
-/** A friend's photo follows what their own PULSE says: shown when they have one, gone when they take it off. */
+/** My photo for friends. An empty one says "I have no photo", so it comes off their phones too. */
+const myFace = (s: State) => ({ face: okFace(s.user.face) ? s.user.face : '' });
+/**
+ * A friend's photo follows what their own PULSE says: shown when they have one, gone when they take
+ * it off. A box that says nothing about a photo was written by an older PULSE (say, their other
+ * phone that hasn't updated yet): it changes nothing.
+ */
 function setFace(p: Person, face: unknown) {
   if (okFace(face)) p.photo = face;
-  else delete p.photo;
+  else if (face === '') delete p.photo;
 }
 const myShort = (s: State) => (s.user.name || myName(s).split(' ')[0]).trim().slice(0, 24);
 

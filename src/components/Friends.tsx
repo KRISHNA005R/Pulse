@@ -603,7 +603,7 @@ export function GroupShareCard({ group }: { group: Group }) {
   const send = async (g: Group) => {
     const how = await shareText(`${me} added you to "${g.name}" on PULSE. Open this to join and see who owes what:`, groupUrl(g));
     if (how === 'copied') store.toast({ text: 'Group link copied. Paste it in your group chat.', emoji: '📋' });
-    else if (how === 'failed') store.toast({ text: 'Couldn’t copy here. Long-press the link to copy it.' });
+    else if (how === 'failed') store.toast({ text: 'Couldn’t share from here. Open PULSE in your browser and try again.' });
   };
 
   if (!sh)
@@ -638,16 +638,10 @@ export function GroupShareCard({ group }: { group: Group }) {
         <p className="text-[15px] font-semibold">Shared group</p>
         <StatusPill status={joined.length ? 'good' : 'close'}>{joined.length ? `${joined.length + 1} on PULSE` : 'Waiting for people'}</StatusPill>
       </div>
-      <p className="mt-1 text-[13.5px] text-ink3">Everyone who opens this link joins from their own PULSE and shows up here by themselves.{sh.closed ? ' New people can’t join right now.' : ''}</p>
-      <p className="num mt-3 select-all break-all rounded-xl bg-sunk px-3 py-2 text-[12.5px] text-ink2">{groupUrl(group)}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => void send(group)}>
-          <Icon name="share" size={16} /> Share link
-        </button>
-        <button type="button" className="btn-quiet min-h-[40px] px-4 text-[14px]" onClick={() => void syncFriends(host)}>
-          Check now
-        </button>
-      </div>
+      <p className="mt-1 text-[13.5px] text-ink3">Share the link in your group chat. Everyone who opens it joins from their own PULSE and shows up here by themselves.{sh.closed ? ' New people can’t join right now.' : ''}</p>
+      <button type="button" className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]" onClick={() => void send(group)}>
+        <Icon name="share" size={16} /> Share link
+      </button>
       {sh.owner && (
         <div className="mt-3 border-t border-line pt-1">
           <Toggle

@@ -441,7 +441,7 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
         <Icon name="chevron" size={20} className="text-ink3" />
         {iPay ? <PersonAvatar person={person} size={44} /> : <PersonAvatar me size={44} />}
       </div>
-      <p className="mt-2 text-[15px] text-ink2">{bal === 0 ? `You and ${person.short} are square.` : iPay ? `You owe ${person.short} ${rupees(-bal)}` : `${person.short} owes you ${rupees(bal)}`}</p>
+      <p className="mt-2 text-[15px] text-ink2">{bal === 0 ? `Nothing to settle with ${person.short}.` : iPay ? `You owe ${person.short} ${rupees(-bal)}` : `${person.short} owes you ${rupees(bal)}`}</p>
       <MoneyInput value={amount} onChange={setAmount} label="Settlement amount" autoFocus id="settle-amount" />
       <p className="text-[13px] text-ink3">Record a payment made outside PULSE, like a UPI transfer or cash.</p>
       <button

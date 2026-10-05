@@ -113,10 +113,11 @@ function SplitsView() {
                   <button type="button" className="row-btn flex-1" onClick={() => ui.push({ name: 'person', id })}>
                     <PersonAvatar person={p} size={40} />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-semibold">{v === 0 ? `You and ${p.short} are square` : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</span>
-                      <span className="block text-[13px] text-ink3">
-                        {p.name}
-                        {p.link ? (p.link.status === 'linked' ? ' · on PULSE' : p.link.door ? ' · connecting' : ' · invite sent') : together(p.id) ? ' · in a group with you' : ''}
+                      <span className="block truncate text-[15px] font-semibold">{p.name}</span>
+                      <span className="block truncate text-[13px] text-ink3">
+                        {v !== 0 && <span className={v > 0 ? 'font-medium text-pos' : 'font-medium text-ink2'}>{v < 0 ? `You owe ${rupees(-v)}` : `Owes you ${rupees(v)}`}</span>}
+                        {v !== 0 && (p.link || together(p.id)) ? ' · ' : ''}
+                        {p.link ? (p.link.status === 'linked' ? 'on PULSE' : p.link.door ? 'connecting' : 'invite sent') : together(p.id) ? 'in a group with you' : ''}
                       </span>
                     </span>
                   </button>
@@ -518,7 +519,7 @@ export function PersonDetail({ id }: { id: string }) {
       <TopNavigation title={p.name} onBack={ui.pop} />
       <div className="flex flex-col items-center rounded-3xl border border-line bg-surface p-6 text-center">
         <PersonAvatar person={p} size={64} />
-        <p className="display mt-4 text-[24px]">{v === 0 ? `You and ${p.short} are square` : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</p>
+        <p className="display mt-4 text-[24px]">{v === 0 ? 'All settled' : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</p>
         <div className="mt-4 flex gap-2">
           {v !== 0 && (
             <button type="button" className="btn-accent" onClick={() => ui.openSheet({ type: 'settle', personId: id })}>
