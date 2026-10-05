@@ -9,6 +9,7 @@ import { TransactionDetail } from './TransactionDetail';
 import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
+import { AuthNudge, MemberCardSheet } from './Auth';
 import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, DebtForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
 import { ShareCard } from './ShareCard';
 import { CommandBar } from './CommandBar';
@@ -109,6 +110,18 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title={spec.code?.startsWith('group=') ? 'Join a group' : 'Connect on PULSE'} onClose={close} size="sm" z={z}>
           <FriendJoin code={spec.code} onDone={close} />
+        </Sheet>
+      );
+    case 'auth-nudge':
+      return (
+        <Sheet title={`Save your PULSE, ${state.user.name}`} onClose={close} size="sm" z={z}>
+          <AuthNudge onDone={close} />
+        </Sheet>
+      );
+    case 'member-card':
+      return (
+        <Sheet title="Your member card" onClose={close} size="sm" z={z}>
+          <MemberCardSheet onDone={close} />
         </Sheet>
       );
     case 'person-merge':

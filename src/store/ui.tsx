@@ -24,6 +24,7 @@ export type Route =
   | { name: 'install' }
   | { name: 'history'; year?: number }
   | { name: 'sync'; code?: string }
+  | { name: 'account' }
   | { name: 'settings'; section: 'notifications' | 'security' | 'privacy' | 'appearance' | 'currency' | 'budget-prefs' | 'profile' | 'export' | 'connected' };
 
 export type SheetSpec =
@@ -42,6 +43,8 @@ export type SheetSpec =
   | { type: 'friend-invite' }
   | { type: 'friend-join'; code?: string }
   | { type: 'person-merge'; personId: string }
+  | { type: 'auth-nudge' }
+  | { type: 'member-card' }
   | { type: 'share-card'; preset?: 'weekend' | 'plan' }
   | { type: 'receipt' }
   | { type: 'command'; query?: string }

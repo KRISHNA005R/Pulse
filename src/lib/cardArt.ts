@@ -841,3 +841,90 @@ export function drawCard(canvas: HTMLCanvasElement, c: CardSpec) {
 export function cardBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
   return new Promise((res) => canvas.toBlob((b) => res(b), 'image/png'));
 }
+
+// ---------- the member card (shown after signing in, shareable as a story) ----------
+export interface MemberSpec {
+  n: number;
+  name: string;
+  /** "Day-one member" */
+  title: string;
+  /** "Oct 2026" */
+  since: string;
+}
+
+export function drawMemberCard(canvas: HTMLCanvasElement, m: MemberSpec) {
+  const [W, H] = SIZES.story;
+  if (canvas.width !== W) canvas.width = W;
+  if (canvas.height !== H) canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.textBaseline = 'alphabetic';
+  spacing(ctx, 0);
+  const r = rng(hash(`member|${m.n}`));
+
+  // Paper, with the card sitting on it.
+  ctx.fillStyle = BRAND.paper;
+  ctx.fillRect(0, 0, W, H);
+  grain(ctx, W, H, r, BRAND.ink, 0.05, 2600);
+  wordmark(ctx, 96, 190, 64, BRAND.ink);
+
+  ctx.fillStyle = BRAND.ink;
+  font(ctx, 800, 96, BRAND.display);
+  ctx.textAlign = 'left';
+  const first = (m.name.trim().split(' ')[0] || 'I').slice(0, 14);
+  ctx.fillText(m.name.trim() ? `${first} is in.` : 'I’m in.', 96, 470);
+  font(ctx, 500, 44, BRAND.body);
+  ctx.fillStyle = mix(BRAND.ink, BRAND.paper, 0.35);
+  ctx.fillText('Know what you can spend,', 96, 560);
+  ctx.fillText('without doing the math.', 96, 620);
+
+  // The card.
+  const x = 96;
+  const y = 760;
+  const w = W - 192;
+  const h = 760;
+  ctx.save();
+  ctx.shadowColor = 'rgba(23,20,15,0.35)';
+  ctx.shadowBlur = 80;
+  ctx.shadowOffsetY = 40;
+  rr(ctx, x, y, w, h, 64);
+  ctx.fillStyle = BRAND.ink;
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  rr(ctx, x, y, w, h, 64);
+  ctx.clip();
+  // A soft glow in the corner, in the brand orange.
+  const glow = ctx.createRadialGradient(x + w, y, 0, x + w, y, w * 0.9);
+  glow.addColorStop(0, 'rgba(236,91,43,0.42)');
+  glow.addColorStop(1, 'rgba(236,91,43,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x, y, w, h);
+  grain(ctx, W, H, r, '#FFFFFF', 0.05, 1800);
+  ctx.restore();
+
+  ctx.fillStyle = 'rgba(246,245,242,0.7)';
+  font(ctx, 700, 34, BRAND.body);
+  spacing(ctx, 8);
+  ctx.fillText('PULSE MEMBER', x + 72, y + 130);
+  spacing(ctx, 0);
+  ctx.fillStyle = BRAND.accent;
+  const label = `#${m.n}`;
+  font(ctx, 800, fit(ctx, label, 800, 300, BRAND.display, w - 144, 120), BRAND.display);
+  ctx.fillText(label, x + 64, y + 440);
+  ctx.fillStyle = '#F6F5F2';
+  font(ctx, 700, 46, BRAND.body);
+  ctx.fillText(m.title, x + 72, y + 570);
+  ctx.fillStyle = 'rgba(246,245,242,0.7)';
+  font(ctx, 500, 40, BRAND.body);
+  if (m.since) ctx.fillText(`Joined ${m.since}`, x + 72, y + 634);
+  wordmark(ctx, x + w - 72, y + h - 64, 40, '#F6F5F2', 'right');
+
+  ctx.fillStyle = BRAND.ink;
+  font(ctx, 700, 46, BRAND.body);
+  ctx.textAlign = 'center';
+  ctx.fillText('Get your number at pulsemoney.in', W / 2, H - 170);
+  ctx.textAlign = 'left';
+}

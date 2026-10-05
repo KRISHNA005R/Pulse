@@ -1445,6 +1445,54 @@ function useStoreImpl() {
     [personalState, restoreState, syncNow],
   );
 
+  /**
+   * The person signed in: their data lives under their account's sync code from now on.
+   *   'restored' this device had nothing, and their saved data has been brought down
+   *   'new'      this device had nothing and neither did the account: setup comes next
+   *   'kept'     this device had data: it is saved to the account (and combined with what was there)
+   *   'offline'  the saved data couldn't be reached
+   */
+  const attachAccount = useCallback(
+    async (code: string): Promise<'restored' | 'new' | 'kept' | 'offline'> => {
+      const clearBase = () => {
+        try {
+          localStorage.removeItem('pulse-sync-base-v1');
+        } catch {
+          /* ignore */
+        }
+      };
+      const mine = personalState();
+      if (!mine) {
+        let remote: Awaited<ReturnType<typeof pull>>;
+        try {
+          remote = await pull(code);
+        } catch {
+          return 'offline';
+        }
+        const at = new Date().toISOString();
+        if (remote) {
+          restoreState(remote.state, `Welcome back, ${remote.state.user.name}. Your money is right here.`);
+          saveSync({ code, rev: remote.rev, lastSync: at });
+          saveBase(remote.state);
+          setSync({ enabled: true, code, status: 'synced', lastSync: at });
+          return 'restored';
+        }
+        saveSync({ code, rev: 0 });
+        clearBase();
+        setSync({ enabled: true, code, status: 'idle', lastSync: null });
+        return 'new';
+      }
+      if (loadSync()?.code !== code) {
+        saveSync({ code, rev: 0 });
+        clearBase();
+      }
+      setSync({ enabled: true, code, status: 'syncing', lastSync: null });
+      await syncNow();
+      return 'kept';
+    },
+    [personalState, restoreState, syncNow],
+  );
+
   const disableSync = useCallback(async (removeOnline: boolean): Promise<string | null> => {
     const cfg = loadSync();
     if (cfg && removeOnline) {
@@ -1542,6 +1590,7 @@ function useStoreImpl() {
     syncNow,
     enableSync,
     joinSync,
+    attachAccount,
     disableSync,
     saveAccount,
     ensureCashAccount,

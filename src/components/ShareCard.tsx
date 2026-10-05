@@ -4,6 +4,7 @@ import { planMetrics } from '../lib/finance';
 import { parseDate, rupees } from '../lib/format';
 import { cardBlob, drawCard, ensureFonts, type CardFormat, type CardSpec, type CardStyle } from '../lib/cardArt';
 import { Icon } from './ui/Icon';
+import { BrandIcon, brandColor, type Brand } from './ui/BrandIcon';
 import { Field, Segmented } from './ui/bits';
 
 type Preset = 'weekend' | 'plan' | 'nospend' | 'custom';
@@ -133,17 +134,18 @@ export function ShareCard({ preset: initial }: { preset?: 'weekend' | 'plan' }) 
   };
 
   const enc = encodeURIComponent;
-  type Target = { key: string; label: string; icon: string; tint: string; href?: string; run?: () => void };
+  // Apps get their own mark on their own colour; the rest use PULSE's icons.
+  type Target = { key: string; label: string; icon: string; tint: string; brand?: Brand; href?: string; run?: () => void };
   const targets: Target[] = [
     canShareFiles
-      ? { key: 'wa', label: 'WhatsApp', icon: 'message', tint: '#1FAF55', run: () => shareNative() }
-      : { key: 'wa', label: 'WhatsApp', icon: 'message', tint: '#1FAF55', href: `https://wa.me/?text=${enc(caption)}` },
-    { key: 'ig', label: 'Instagram', icon: 'camera', tint: '#D62976', run: () => (canShareFiles ? shareNative() : save('Image saved. In Instagram, tap + → Story and pick it from your photos.')) },
-    { key: 'sc', label: 'Snapchat', icon: 'zap', tint: '#E8C800', run: () => (canShareFiles ? shareNative() : save('Image saved. In Snapchat, open Memories → Camera Roll and send it.')) },
+      ? { key: 'wa', label: 'WhatsApp', icon: 'message', brand: 'whatsapp', tint: brandColor('whatsapp'), run: () => shareNative() }
+      : { key: 'wa', label: 'WhatsApp', icon: 'message', brand: 'whatsapp', tint: brandColor('whatsapp'), href: `https://wa.me/?text=${enc(caption)}` },
+    { key: 'ig', label: 'Instagram', icon: 'camera', brand: 'instagram', tint: brandColor('instagram'), run: () => (canShareFiles ? shareNative() : save('Image saved. In Instagram, tap + → Story and pick it from your photos.')) },
+    { key: 'sc', label: 'Snapchat', icon: 'zap', brand: 'snapchat', tint: brandColor('snapchat'), run: () => (canShareFiles ? shareNative() : save('Image saved. In Snapchat, open Memories → Camera Roll and send it.')) },
     canShareFiles
-      ? { key: 'tg', label: 'Telegram', icon: 'send', tint: '#2AA3DF', run: () => shareNative() }
-      : { key: 'tg', label: 'Telegram', icon: 'send', tint: '#2AA3DF', href: `https://t.me/share/url?url=${enc(url || 'https://pulse')}&text=${enc(caption)}` },
-    { key: 'x', label: 'X', icon: 'at', tint: '#17140F', href: `https://twitter.com/intent/tweet?text=${enc(caption)}` },
+      ? { key: 'tg', label: 'Telegram', icon: 'send', brand: 'telegram', tint: brandColor('telegram'), run: () => shareNative() }
+      : { key: 'tg', label: 'Telegram', icon: 'send', brand: 'telegram', tint: brandColor('telegram'), href: `https://t.me/share/url?url=${enc(url || 'https://pulse')}&text=${enc(caption)}` },
+    { key: 'x', label: 'X', icon: 'at', brand: 'x', tint: brandColor('x'), href: `https://twitter.com/intent/tweet?text=${enc(caption)}` },
     { key: 'save', label: 'Save image', icon: 'download', tint: '#57524A', run: () => save() },
     { key: 'copy', label: 'Copy caption', icon: 'copy', tint: '#57524A', run: copy },
     { key: 'more', label: 'More', icon: 'share', tint: '#57524A', run: () => (canShareFiles ? shareNative() : save('Image saved. Share it from your gallery to any app.')) },
@@ -192,8 +194,8 @@ export function ShareCard({ preset: initial }: { preset?: 'weekend' | 'plan' }) 
           {targets.map((t) => {
             const inner = (
               <>
-                <span className="grid h-12 w-12 place-items-center rounded-2xl text-white" style={{ background: t.tint }} aria-hidden="true">
-                  <Icon name={t.icon} size={21} />
+                <span className="grid h-12 w-12 place-items-center rounded-2xl" style={{ background: t.tint, color: t.brand === 'snapchat' ? '#17140F' : '#FFFFFF' }} aria-hidden="true">
+                  {t.brand ? <BrandIcon name={t.brand} size={24} /> : <Icon name={t.icon} size={21} />}
                 </span>
                 <span className="text-center text-[12px] font-semibold leading-tight text-ink2">{t.label}</span>
               </>

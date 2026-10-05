@@ -31,6 +31,9 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 # ---- Friends: shared splits between two people (see netlify/functions/friends.ts) -------------
 /api/friends  /.netlify/functions/friends  200
 
+# ---- Accounts: sign in with Google or an emailed code (see netlify/functions/auth.ts) ---------
+/api/auth  /.netlify/functions/auth  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301

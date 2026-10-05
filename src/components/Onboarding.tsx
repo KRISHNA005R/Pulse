@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { inFrame, isIOS, isStandalone } from '../lib/pwa';
 import { CURRENCIES, detectCurrency, setCurrency, sym, type CurrencyCode } from '../lib/currency';
 import { useStore } from '../store/store';
@@ -9,6 +9,8 @@ import { Icon } from './ui/Icon';
 import { MoneyInput } from './ui/bits';
 import { JoinWithCode } from '../screens/Sync';
 import { takeSyncLink } from '../lib/sync';
+import { useAuth } from '../store/auth';
+import { LoginLegal, LoginPanel } from './Auth';
 
 const REASONS = ['Track spending', 'Save more', 'Control subscriptions', 'Plan a goal', 'Manage shared expenses', 'All of these'];
 const PAY = ['Salary', 'Freelance', 'Allowance', 'Multiple sources', 'Other'];
@@ -19,13 +21,27 @@ const FLOW: Step[] = ['name', 'reasons', 'pay', 'money', 'priorities'];
 
 export function Onboarding() {
   const { startPersonal, startDemo, closeOnboarding, state } = useStore();
+  const auth = useAuth();
   const hasOwnData = state.mode === 'personal' && (state.transactions.length > 0 || state.plans.length > 0);
-  // Opened from a sync QR/link: go straight to linking this device.
+  // With accounts on, setting up your own money starts with signing in. The demo stays open to everyone.
+  const needLogin = auth.on && !auth.session;
+  // Opened from a sync QR/link: go straight to linking this device (accounts replace sync codes).
   const [linkCode] = useState(() => takeSyncLink());
-  const [step, setStep] = useState<Step>(linkCode ? 'join' : 'welcome');
+  const [step, setStep] = useState<Step>(linkCode && !auth.on ? 'join' : 'welcome');
   // On iPhone the home-screen app keeps its own data, so it's better to install before setting up.
   const iosBrowser = isIOS() && !isStandalone() && !inFrame();
-  const [name, setName] = useState(state.mode === 'personal' ? state.user.fullName : '');
+  const [name, setName] = useState(state.mode === 'personal' ? state.user.fullName : (auth.session?.account.name ?? ''));
+  // Just signed in and there's nothing saved anywhere yet: straight into setup. Google already told
+  // us the name, so that question is skipped.
+  const moved = useRef(false);
+  useEffect(() => {
+    if (auth.outcome !== 'new' || !auth.session || step !== 'welcome' || moved.current) return;
+    moved.current = true;
+    const known = auth.session.account.name;
+    if (known && !name.trim()) setName(known);
+    setStep(known || name.trim() ? 'reasons' : 'name');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.outcome, auth.session, step]);
   const [reasons, setReasons] = useState<string[]>([]);
   const [pay, setPay] = useState('');
   const [income, setIncome] = useState('');
@@ -122,26 +138,45 @@ export function Onboarding() {
                   Either option replaces the money you've already entered on this device. Copy a backup first from You → Export data.
                 </p>
               )}
-              <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep('name')} data-autofocus>
-                Start with my own money
-              </button>
-              <button type="button" className="btn-quiet w-full" onClick={startDemo}>
-                Explore a demo first
-              </button>
-              <button type="button" className="btn-ghost w-full" onClick={() => setStep('join')}>
-                I use PULSE on another device
-              </button>
+              {auth.loading ? (
+                <div className="grid min-h-[112px] place-items-center" role="status" aria-label="Loading">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink/20 border-t-ink" aria-hidden="true" />
+                </div>
+              ) : needLogin ? (
+                <>
+                  <LoginPanel />
+                  {!auth.busy && (
+                    <button type="button" className="btn-ghost w-full" onClick={startDemo}>
+                      Just looking? Try the demo
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
+                    Start with my own money
+                  </button>
+                  <button type="button" className="btn-quiet w-full" onClick={startDemo}>
+                    Explore a demo first
+                  </button>
+                  {!auth.on && (
+                    <button type="button" className="btn-ghost w-full" onClick={() => setStep('join')}>
+                      I use PULSE on another device
+                    </button>
+                  )}
+                </>
+              )}
               {hasOwnData && (
                 <button type="button" className="btn-ghost w-full" onClick={closeOnboarding}>
                   Cancel, keep my data
                 </button>
               )}
-              {iosBrowser && (
+              {iosBrowser && !auth.on && (
                 <p className="rounded-2xl bg-sunk p-3 text-[13.5px] leading-snug text-ink2">
                   <b className="text-ink">On iPhone?</b> Add PULSE to your Home Screen first (tap Share, then <b className="text-ink">Add to Home Screen</b>) and set up there. The home-screen app keeps its own data.
                 </p>
               )}
-              <p className="text-center text-[12.5px] text-ink3">Your numbers stay in this browser on this device. No bank login needed.</p>
+              {auth.loading ? null : needLogin ? <LoginLegal /> : <p className="text-center text-[12.5px] text-ink3">{auth.on ? 'No bank login needed. Your money is saved to your PULSE account.' : 'Your numbers stay in this browser on this device. No bank login needed.'}</p>}
             </div>
           </div>
         )}
@@ -387,7 +422,14 @@ export function Onboarding() {
                 </li>
               ))}
             </ul>
-            <button type="button" className="btn-accent mt-auto w-full" onClick={() => startPersonal(fresh)}>
+            <button
+              type="button"
+              className="btn-accent mt-auto w-full"
+              onClick={() => {
+                auth.rename(fresh.user.fullName || fresh.user.name);
+                startPersonal(fresh);
+              }}
+            >
               Open PULSE
             </button>
             <button type="button" className="btn-ghost mt-2 w-full" onClick={() => setStep('priorities')}>

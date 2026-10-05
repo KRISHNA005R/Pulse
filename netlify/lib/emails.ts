@@ -250,3 +250,20 @@ export function thanksEmail(fb: Feedback): Mail {
     text,
   };
 }
+
+// ---------------------------------------------------------------------------------------------
+// 3. The code for signing in by email
+// ---------------------------------------------------------------------------------------------
+export function codeEmail(code: string): Mail {
+  const spaced = `${code.slice(0, 3)} ${code.slice(3)}`;
+  const body =
+    h1('Your PULSE code') +
+    p('Type this in PULSE to sign in. It works for 10 minutes.') +
+    `<div class="e-box" style="margin:18px 0;padding:18px 12px;text-align:center;background:${C.sunk};border-radius:18px;font-family:${DISPLAY};font-size:34px;font-weight:800;letter-spacing:6px;color:${C.ink}">${esc(spaced)}</div>` +
+    p('Nobody from PULSE will ever ask you for this code. If you didn’t ask for it, you can ignore this email: nothing happens without the code.', C.ink3);
+  return {
+    subject: `${code} is your PULSE code`,
+    html: shell({ preheader: `Your code is ${code}. It works for 10 minutes.`, tag: 'Sign in', body, footer: `PULSE · <a href="${SITE}" style="color:${C.ink3}">pulsemoney.in</a>` }),
+    text: [`Your PULSE code is ${code}`, '', 'Type it in PULSE to sign in. It works for 10 minutes.', '', 'Nobody from PULSE will ever ask you for this code. If you didn’t ask for it, you can ignore this email.', '', SITE].join('\n'),
+  };
+}

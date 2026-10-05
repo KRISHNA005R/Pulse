@@ -3,6 +3,8 @@ import { HistoryScreen } from './screens/History';
 import { SyncScreen } from './screens/Sync';
 import { takeSyncLink } from './lib/sync';
 import { StoreProvider, useStore } from './store/store';
+import { AuthProvider } from './store/auth';
+import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
 import { UIProvider, useUI } from './store/ui';
 import { BottomNavigation, MobileTopBar, SideNavigation } from './components/Navigation';
 import { SheetHost } from './components/SheetHost';
@@ -66,6 +68,8 @@ function Screen() {
         return <HistoryScreen year={r.year} />;
       case 'sync':
         return <SyncScreen code={r.code} />;
+      case 'account':
+        return <AccountScreen />;
       case 'settings':
         return <SettingsScreen section={r.section} />;
     }
@@ -146,6 +150,8 @@ function Shell() {
   );
   const ui = useUI();
   useInstallNudge();
+  // Someone who isn't signed in: a friendly ask for a week, then sign-in is needed to carry on.
+  const wall = useAuthGate();
   useFriends();
   // Keep this device's queued reminders in step with the data (a few seconds after things settle).
   useEffect(() => {
@@ -269,6 +275,14 @@ function Shell() {
     );
   }
 
+  if (wall)
+    return (
+      <>
+        {wall}
+        <Toasts />
+      </>
+    );
+
   return (
     <div className="flex min-h-full bg-bg">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-ink focus:px-3 focus:py-2 focus:text-bg">
@@ -312,6 +326,7 @@ function Shell() {
       <ContextPanel />
       <BottomNavigation />
       <SheetHost />
+      <MemberMoment />
       <Toasts />
     </div>
   );
@@ -320,9 +335,11 @@ function Shell() {
 export default function App() {
   return (
     <StoreProvider>
-      <UIProvider>
-        <Shell />
-      </UIProvider>
+      <AuthProvider>
+        <UIProvider>
+          <Shell />
+        </UIProvider>
+      </AuthProvider>
     </StoreProvider>
   );
 }

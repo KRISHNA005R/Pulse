@@ -15,11 +15,14 @@ import { BackupPanel } from '../components/Forms';
 import { Icon } from '../components/ui/Icon';
 import { useInstall } from '../lib/pwa';
 import { syncSummary } from './Sync';
+import { useAuth } from '../store/auth';
 
 export function YouScreen() {
   const store = useStore();
   const { state } = store;
   const ui = useUI();
+  const auth = useAuth();
+  const account = state.mode === 'personal' ? auth.session?.account : undefined;
   const nw = useMemo(() => netWorth(state), [state]);
   const rec = recurringTotals(state);
   const ins = insuranceTotals(state);
@@ -31,7 +34,7 @@ export function YouScreen() {
         <div className="min-w-0 flex-1">
           <h1 className="display text-[28px] leading-tight">{state.user.fullName}</h1>
           <p className="text-[14px] text-ink3">
-            {state.mode === 'demo' ? `Demo data as of ${fmtDate(state.today, true)}` : `${state.user.handle} · your data stays on this device`}
+            {state.mode === 'demo' ? `Demo data as of ${fmtDate(state.today, true)}` : account ? `PULSE member #${account.n} · saved to your account` : `${state.user.handle} · your data stays on this device`}
           </p>
         </div>
       </div>
@@ -83,7 +86,13 @@ export function YouScreen() {
       <section aria-labelledby="you-privacy" className="mb-8">
         <SectionHeader id="you-privacy" title="Privacy & data" />
         <NavRow icon="shield" label="Data & privacy" onClick={() => go({ name: 'settings', section: 'privacy' })} />
-        <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
+        {account ? (
+          <NavRow icon="user" label="Your account" sub={`${account.email} · member #${account.n}`} onClick={() => go({ name: 'account' })} />
+        ) : auth.on && state.mode === 'personal' ? (
+          <NavRow icon="user" label="Sign in" sub="Save your money to an account, so it's on every device" onClick={() => ui.openSheet({ type: 'auth-nudge' })} />
+        ) : (
+          <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
+        )}
         <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
         <NavRow icon="message" label="Send feedback" sub="Spill the tea: bugs, ideas, vibes" onClick={() => go({ name: 'feedback' })} />
         <a href="/about/" className="row-btn min-h-[56px]">
@@ -782,6 +791,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
   const { state, updateSettings } = store;
   const ui = useUI();
   const s = state.settings;
+  const signedIn = !!useAuth().session && state.mode === 'personal';
   const [buffer, setBuffer] = useState(String(s.buffer));
   const [nm, setNm] = useState(state.user.fullName);
 
@@ -818,9 +828,19 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       )}
       {section === 'privacy' && (
         <div className="flex flex-col gap-4 text-[15px] text-ink2">
-          <p>PULSE never asks for bank passwords or card numbers. Your money data stays on your device. If you turn on sync, it's locked before upload so only your devices can open it.</p>
+          {signedIn ? (
+            <p>
+              PULSE never asks for bank passwords or card numbers. Your money data is saved on PULSE's server under your account, so it's there on any device you sign in on. It isn't sold or shown to anyone else. The details are in the{' '}
+              <a href="/privacy/" className="font-semibold text-ink underline underline-offset-2">
+                Privacy Policy
+              </a>
+              .
+            </p>
+          ) : (
+            <p>PULSE never asks for bank passwords or card numbers. Your money data stays on your device. If you turn on sync, it's locked before upload so only your devices can open it.</p>
+          )}
           <p>Shared budget cards only show the amount and line you type. Balances are never included.</p>
-          <p>Everyone who opens PULSE on their own phone or laptop gets their own private copy. Nothing is shared between people.</p>
+          <p>What you split with friends on PULSE is shared with those friends only, and nothing else of yours is.</p>
           {state.mode === 'demo' ? (
             <>
               <button type="button" className="btn-accent self-start" onClick={store.hasStash ? store.backToMine : store.replayOnboarding}>
@@ -837,13 +857,23 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
               </button>
             </>
           )}
-          <div className="mt-4 border-t border-line pt-5">
-            <p className="text-[15px] font-semibold text-ink">Erase all data</p>
-            <p className="mt-1 text-[14px]">Delete everything saved on this device and start again from the welcome screen.</p>
-            <button type="button" className="btn mt-3 bg-neg/10 text-neg" onClick={() => ui.openSheet({ type: 'erase' })}>
-              <Icon name="trash" size={16} /> Erase all data
-            </button>
-          </div>
+          {signedIn ? (
+            <div className="mt-4 border-t border-line pt-5">
+              <p className="text-[15px] font-semibold text-ink">Sign out or delete your account</p>
+              <p className="mt-1 text-[14px]">Both are in Your account. Deleting removes your data from PULSE's server too.</p>
+              <button type="button" className="btn-quiet mt-3" onClick={() => ui.push({ name: 'account' })}>
+                <Icon name="user" size={16} /> Your account
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 border-t border-line pt-5">
+              <p className="text-[15px] font-semibold text-ink">Erase all data</p>
+              <p className="mt-1 text-[14px]">Delete everything saved on this device and start again from the welcome screen.</p>
+              <button type="button" className="btn mt-3 bg-neg/10 text-neg" onClick={() => ui.openSheet({ type: 'erase' })}>
+                <Icon name="trash" size={16} /> Erase all data
+              </button>
+            </div>
+          )}
         </div>
       )}
       {section === 'appearance' && (

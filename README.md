@@ -79,6 +79,28 @@ A 3.3-second opener that plays the moment the app opens, before any JavaScript l
 - The status bar turns ink while it plays, and the manifest `background_color` is ink, so the phone's own launch screen blends into it.
 - Timing, colours and the reel contents live in `scripts/make-splash.py` (glyph outlines in `scripts/*-glyphs.json`). Edit it, then run `python3 scripts/make-splash.py` to rewrite the splash in `index.html`.
 
+## Accounts (sign-in)
+
+People sign in with Google or with a 6-digit code sent to their email; there are no passwords. Sign-in is
+switched on from Netlify, and until it is, the app works exactly as it did without accounts. Set these in
+Netlify → Site configuration → Environment variables, then redeploy:
+
+| Variable | What it does |
+| --- | --- |
+| `GOOGLE_CLIENT_ID` | The Web client ID from Google Cloud. Turns "Continue with Google" on. In Google Cloud, the client needs `https://pulsemoney.in` as an authorized JavaScript origin and `https://pulsemoney.in/api/auth` as an authorized redirect URI. |
+| `RESEND_API_KEY` | Already used for feedback emails. Never commit it. |
+| `AUTH_FROM` | e.g. `PULSE <login@pulsemoney.in>`. Turns email codes on. The domain must be verified in Resend. |
+
+With sign-in on: new people sign in on the welcome screen before setup (the demo stays open), and people who
+already have data on their phone are asked once a day for 7 days, then must sign in to carry on. Their data
+moves into the account; nothing is deleted. Each account gets a member number in joining order.
+
+How it fits together: `netlify/lib/auth.ts` (accounts, sessions, codes, checking Google's sign-in),
+`netlify/functions/auth.ts` (the endpoint), `src/lib/auth.ts` + `src/store/auth.tsx` (the app's side) and
+`src/components/Auth.tsx` (the screens). An account stores the sync code its data is saved under, so the
+existing sync engine (`src/lib/sync.ts`) does the saving and merging. This means the server can open a
+signed-in person's data; `/privacy/` says so.
+
 ## Deploy
 
 Netlify builds this repository on every push to `main` (see `netlify.toml`):

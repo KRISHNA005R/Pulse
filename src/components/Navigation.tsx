@@ -1,3 +1,4 @@
+import { useAuth } from '../store/auth';
 import { useUI, type Tab } from '../store/ui';
 import { useStore } from '../store/store';
 import { Icon } from './ui/Icon';
@@ -85,6 +86,7 @@ export function BottomNavigation() {
 export function SideNavigation() {
   const ui = useUI();
   const { state } = useStore();
+  const signedIn = !!useAuth().session;
   return (
     <nav aria-label="Main" className="sticky top-0 hidden h-screen w-[232px] shrink-0 flex-col border-r border-line px-4 py-6 lg:flex">
       <p className="display px-3 text-[24px] tracking-tight">
@@ -114,7 +116,7 @@ export function SideNavigation() {
         <Icon name="spark" size={17} /> Ask PULSE AI
       </button>
       <div className="mt-auto px-3 text-[12px] leading-relaxed text-ink3">
-        {state.mode === 'demo' ? 'Demo data. None of these numbers are real.' : `${state.user.name}'s money, saved on this device.`}
+        {state.mode === 'demo' ? 'Demo data. None of these numbers are real.' : `${state.user.name}'s money, saved ${signedIn ? 'to your account' : 'on this device'}.`}
       </div>
     </nav>
   );

@@ -1,3 +1,4 @@
+import { useAuth } from '../store/auth';
 import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
 import type { BudgetPeriod, CategoryId, Debt, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
@@ -860,6 +861,7 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
 export function BackupPanel() {
   const store = useStore();
   const ui = useUI();
+  const signedIn = !!useAuth().session;
   const mine = store.personalState();
   const [code, setCode] = useState<string | null>(null);
   const [paste, setPaste] = useState('');
@@ -920,7 +922,7 @@ export function BackupPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[15px] text-ink2">Your data lives only on this device. A backup code is all of it packed into one line of text. Keep it somewhere safe, or paste it on another phone or browser to move everything there.</p>
+      <p className="text-[15px] text-ink2">{signedIn ? 'Your data is saved to your account.' : 'Your data lives only on this device.'} A backup code is all of it packed into one line of text. Keep it somewhere safe, or paste it on another phone or browser to move everything there.</p>
 
       {mine ? (
         <div className="rounded-3xl border border-line bg-surface p-4">
@@ -1354,12 +1356,33 @@ export function EraseForm({ onDone }: { onDone: () => void }) {
   const [sure, setSure] = useState(false);
   const [copied, setCopied] = useState(false);
   const { state } = store;
+  const signedIn = !!useAuth().session && state.mode === 'personal';
   const counts = [
     [state.transactions.length, 'transactions'],
     [state.plans.length, 'plans'],
     [state.investments?.length ?? 0, 'SIPs'],
     [state.groups.length, 'groups'],
   ].filter(([n]) => (n as number) > 0);
+  // With an account, "erase" has two honest meanings, and both live on the account screen.
+  if (signedIn)
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-[15px] text-ink2">Your money is saved in your account. To clear just this phone, sign out. To remove everything for good, delete your account. Both are in Your account.</p>
+        <button
+          type="button"
+          className="btn-primary w-full"
+          onClick={() => {
+            onDone();
+            ui.resetTo('you', { name: 'account' });
+          }}
+        >
+          Open Your account
+        </button>
+        <button type="button" className="btn-ghost w-full" onClick={onDone}>
+          Cancel
+        </button>
+      </div>
+    );
   return (
     <div className="flex flex-col gap-4">
       <p className="text-[15px] text-ink2">
