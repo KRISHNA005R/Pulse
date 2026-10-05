@@ -48,8 +48,10 @@ function GoogleButton({ clientId }: { clientId: string }) {
   }, [clientId]);
   return (
     <div>
-      {/* Google draws its own button in here, with its own logo. */}
-      <div ref={box} className="flex min-h-[44px] w-full justify-center" data-google-button />
+      {/* Google draws its own button in here, with its own logo. It lives in a frame of Google's;
+          in dark mode a browser paints such a frame white unless it is told the frame is "light",
+          which is what Google's page is. That keeps the corners around the pill see-through. */}
+      <div ref={box} className="flex min-h-[44px] w-full justify-center" style={{ colorScheme: 'light' }} data-google-button />
       {state === 'loading' && <p className="text-center text-[13px] text-ink3">Getting Google ready…</p>}
       {state === 'failed' && (
         <p className="rounded-2xl bg-sunk p-3 text-center text-[13.5px] text-ink2" role="status">
