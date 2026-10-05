@@ -216,6 +216,13 @@ function useUIImpl() {
   }, [rewind]);
   useEffect(() => {
     try {
+      // PULSE puts each screen back where it was scrolled (scroll memory, above). Left to itself the
+      // browser would also "restore" a position on every back step, and pull the screen to the top.
+      if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+    } catch {
+      /* ignore */
+    }
+    try {
       // Reloaded with screens open: the app starts again at the top, so step history back to the top too.
       const was = (history.state as { pulse?: unknown } | null)?.pulse;
       if (typeof was === 'number' && was > 0 && was < 50) {
