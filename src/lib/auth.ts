@@ -94,7 +94,7 @@ export function takeAuthReturn(): { once?: string; failed?: boolean } {
   try {
     const m = location.hash.match(/^#auth(-error)?=([A-Za-z0-9_-]+)$/);
     if (!m) return {};
-    history.replaceState(null, '', location.pathname + location.search);
+    history.replaceState(history.state, '', location.pathname + location.search);
     return m[1] ? { failed: true } : { once: m[2] };
   } catch {
     return {};

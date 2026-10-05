@@ -18,7 +18,7 @@ function fromB64Url(s: string): Uint8Array<ArrayBuffer> {
 export async function receiveMigration(): Promise<'moved' | 'kept' | null> {
   const m = location.hash.match(/^#migrate=([zj])\.([A-Za-z0-9_-]+)$/);
   if (!m) return null;
-  history.replaceState(null, '', location.pathname + location.search);
+  history.replaceState(history.state, '', location.pathname + location.search);
   try {
     const bytes = fromB64Url(m[2]);
     let text: string;

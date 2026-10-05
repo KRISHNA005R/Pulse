@@ -38,6 +38,8 @@ export interface User {
   uid?: string;
   /** This person's own PULSE link: one link for everybody (lib/friends.ts). */
   door?: Door;
+  /** Profile photo: a small square JPEG kept as a data URL (lib/photo.ts). Never sent to friends. */
+  photo?: string;
 }
 
 /** A personal link. The key only ever travels inside the link itself. */

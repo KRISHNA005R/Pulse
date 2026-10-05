@@ -88,10 +88,13 @@ function SplitsView() {
   const t = useMemo(() => socialTotals(state), [state]);
   const together = (pid: string) => state.groups.some((g) => inGroupOnPulse(g, pid));
   // Anyone with a balance, plus friends on PULSE (connected, or in a shared group with you) even when you're square.
-  const people = state.people
+  const everyone = state.people
     .filter((p) => (t.balances.get(p.id) ?? 0) !== 0 || p.link || together(p.id))
-    .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number])
-    .sort((a, b) => a[1] - b[1]);
+    .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number]);
+  // With a lot of friends this page shows the few that matter most (the biggest balances). The rest are one tap away.
+  const TOP = 5;
+  const people = (everyone.length > TOP + 1 ? [...everyone].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, TOP) : everyone).sort((a, b) => a[1] - b[1]);
+  const more = state.people.length - people.length;
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -128,6 +131,18 @@ function SplitsView() {
           </ul>
         ) : (
           <p className="px-1 text-[14.5px] text-ink3">Everyone's square. Nice.</p>
+        )}
+        {more > 0 && (
+          <button type="button" className="row-btn mt-1 w-full" onClick={() => ui.push({ name: 'people' })}>
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-sunk text-ink2">
+              <Icon name="users" size={18} />
+            </span>
+            <span className="min-w-0 flex-1 text-left">
+              <span className="block text-[15px] font-semibold">See all {state.people.length} people</span>
+              <span className="block text-[13px] text-ink3">Search, or see who owes what</span>
+            </span>
+            <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
+          </button>
         )}
         {state.mode === 'personal' && (
           <div className="mt-3 grid grid-cols-2 gap-2">

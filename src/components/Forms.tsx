@@ -10,6 +10,7 @@ import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
 import { CYCLE_MONTHS, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
+import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
 
 export const PLAN_TEMPLATES: { key: string; name: string; icon: string; target: number; months: number; kind: Plan['kind']; categories: CategoryId[] }[] = [
@@ -381,7 +382,6 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('🍜');
   const [members, setMembers] = useState<string[]>([]);
-  const [friend, setFriend] = useState('');
   const [plan, setPlan] = useState('');
   return (
     <div className="flex flex-col gap-4">
@@ -398,31 +398,7 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
       <div>
         <p className="mb-1 text-[13px] font-semibold text-ink2">Who's in?</p>
         <p className="mb-2 text-[12.5px] text-ink3">Pick or add names now, or skip this: after creating the group you can share one link and everyone who opens it joins by themselves.</p>
-        <div className="flex flex-wrap gap-2">
-          {state.people.map((p) => (
-            <button key={p.id} type="button" className="chip pl-1" aria-pressed={members.includes(p.id)} onClick={() => setMembers(members.includes(p.id) ? members.filter((x) => x !== p.id) : [...members, p.id])}>
-              <PersonAvatar person={p} size={24} /> {p.short}
-            </button>
-          ))}
-        </div>
-        <form
-          className="mt-3 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!friend.trim()) return;
-            const p = store.addPerson(friend);
-            setMembers([...members, p.id]);
-            setFriend('');
-          }}
-        >
-          <label htmlFor="group-friend" className="sr-only">
-            Add a friend by name
-          </label>
-          <input id="group-friend" className="field py-2" placeholder="Add a friend by name" value={friend} onChange={(e) => setFriend(e.target.value)} />
-          <button type="submit" className="btn-quiet min-h-[42px] px-4">
-            <Icon name="user-plus" size={16} /> Add
-          </button>
-        </form>
+        <PeoplePicker selected={members} onChange={setMembers} inputId="group-friend" />
       </div>
       <Field label="Link to a plan (optional)" htmlFor="group-plan" hint="Group expenses will count toward this plan automatically.">
         <select id="group-plan" className="field" value={plan} onChange={(e) => setPlan(e.target.value)}>

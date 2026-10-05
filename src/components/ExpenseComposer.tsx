@@ -9,6 +9,7 @@ import { emojiFor } from '../lib/lexicon';
 import { addDays, fmtDate, haptic, rupees } from '../lib/format';
 import { budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
 import { Icon } from './ui/Icon';
+import { PeoplePicker } from './People';
 import { SwipeToConfirm } from './ui/SwipeToConfirm';
 import { CategoryMark, MoneyInput, PersonAvatar, Segmented } from './ui/bits';
 
@@ -75,7 +76,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   });
   const [plan, setPlan] = useState<string | null | undefined>(preset?.plan);
   const [people, setPeople] = useState<string[] | null>(preset?.people ?? null);
-  const [newName, setNewName] = useState('');
   const [recurring, setRecurring] = useState(false);
   const [mode, setMode] = useState<SplitMode>('equal');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -442,34 +442,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       )}
       {panel === 'people' && (
         <div className="mt-4 animate-rise">
-          <div className="flex flex-wrap justify-center gap-2">
-            {state.people.map((p) => {
-              const on = effPeople.includes(p.id);
-              return (
-                <button key={p.id} type="button" className="chip pl-1" aria-pressed={on} onClick={() => setPeople(on ? effPeople.filter((x) => x !== p.id) : [...effPeople, p.id])}>
-                  <PersonAvatar person={p} size={26} /> {p.short}
-                </button>
-              );
-            })}
-          </div>
-          <form
-            className="mx-auto mt-3 flex max-w-[320px] gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!newName.trim()) return;
-              const p = store.addPerson(newName);
-              setPeople([...effPeople, p.id]);
-              setNewName('');
-            }}
-          >
-            <label htmlFor="composer-new-person" className="sr-only">
-              Add a friend
-            </label>
-            <input id="composer-new-person" className="field py-2" placeholder="Add a friend" value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <button type="submit" className="btn-quiet min-h-[42px] px-4">
-              Add
-            </button>
-          </form>
+          <PeoplePicker selected={effPeople} onChange={setPeople} inputId="composer-new-person" center />
         </div>
       )}
 

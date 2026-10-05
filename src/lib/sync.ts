@@ -49,7 +49,7 @@ export const syncLink = (code: string) => `${location.origin}/#sync=${code}`;
 export function takeSyncLink(): string | null {
   const m = location.hash.match(/^#sync=([A-Za-z0-9-]+)$/);
   if (!m) return null;
-  history.replaceState(null, '', location.pathname + location.search);
+  history.replaceState(history.state, '', location.pathname + location.search);
   return normalizeCode(m[1]);
 }
 

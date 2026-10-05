@@ -70,7 +70,7 @@ export function takeJoinLink(): string | null {
   try {
     const m = location.hash.match(/^#((?:join|hi|group)=.+)$/);
     if (m) {
-      history.replaceState(null, '', location.pathname + location.search);
+      history.replaceState(history.state, '', location.pathname + location.search);
       if (parseInvite(m[1])) localStorage.setItem(JOIN, m[1]);
     }
     return localStorage.getItem(JOIN);

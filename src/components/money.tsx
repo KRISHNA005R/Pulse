@@ -290,6 +290,7 @@ export function SafeBreakdown() {
 // TransactionRow with swipe actions
 // ------------------------------------------------------------------
 const ACTIONS_W = 166; // two 74px pills, the gap and the edge padding
+const ACTIONS_W_ONE = 86; // just Delete: money in, transfers and balance corrections can't be split
 const FULL_SWIPE = 0.62; // share of the row width that turns a swipe into delete
 
 export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boolean }) {
@@ -310,6 +311,9 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
   const share = tx.splitId ? myCost(state, tx) : null;
   const cat = categoryName(state, tx.category);
   const card = state.cards.find((c) => c.id === tx.account);
+  // Splitting is for money you spent. Income, transfers and balance corrections only offer Delete.
+  const canSplit = tx.type === 'expense' && !tx.splitId;
+  const actionsW = canSplit ? ACTIONS_W : ACTIONS_W_ONE;
 
   // Paint a drag position straight onto the DOM: no React render per frame, so it tracks the finger.
   const paint = (x: number, animate: boolean) => {
@@ -317,25 +321,27 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
     const sp = splitRef.current;
     const del = delRef.current;
     const li = liRef.current;
-    if (!row || !sp || !del || !li) return;
+    if (!row || !del || !li) return;
     const w = li.clientWidth;
     const ease = 'cubic-bezier(.2,.9,.25,1.12)';
     const t = animate ? `transform .42s ${ease}` : 'none';
     row.style.transition = t;
     row.style.transform = x ? `translate3d(${x}px,0,0)` : '';
-    const reveal = Math.min(1, -x / ACTIONS_W);
+    const reveal = Math.min(1, -x / actionsW);
     const full = -x > w * FULL_SWIPE;
     // Past the full-swipe point, delete stretches across the whole row.
     const a = Math.min(1, Math.max(0, (reveal - 0.05) / 0.5));
     const b = Math.min(1, Math.max(0, (reveal - 0.3) / 0.55));
     const tr = animate ? `transform .42s ${ease}, opacity .25s ease, width .28s ${ease}` : 'width .22s cubic-bezier(.2,.9,.25,1), transform .12s linear, opacity .12s linear';
-    sp.style.transition = tr;
     del.style.transition = tr;
     // Delete sits at the edge so it shows first; split follows it in.
     del.style.opacity = String(full ? 1 : a);
     del.style.transform = `scale(${full ? 1 : 0.55 + a * 0.45})`;
-    sp.style.opacity = full ? '0' : String(b);
-    sp.style.transform = `scale(${0.55 + b * 0.45}) translateX(${(1 - b) * 30}px)`;
+    if (sp) {
+      sp.style.transition = tr;
+      sp.style.opacity = full ? '0' : String(b);
+      sp.style.transform = `scale(${0.55 + b * 0.45}) translateX(${(1 - b) * 30}px)`;
+    }
     del.style.width = full ? `${Math.max(74, -x - 8)}px` : '74px';
     li.dataset.full = full ? '1' : '';
   };
@@ -360,7 +366,7 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
   };
   const openRow = () => {
     setOpen(true);
-    paint(-ACTIONS_W, true);
+    paint(-actionsW, true);
     window.dispatchEvent(new CustomEvent('pulse-swipe-open', { detail: tx.id }));
   };
   const remove = () => {
@@ -391,7 +397,7 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
 
   const onDown = (e: RPE) => {
     if (e.pointerType === 'mouse' || leaving) return;
-    const base = open ? -ACTIONS_W : 0;
+    const base = open ? -actionsW : 0;
     drag.current = { x: e.clientX, y: e.clientY, base, active: false, t: performance.now(), lastX: e.clientX, lastT: performance.now(), v: 0, armed: false };
     moved.current = false;
   };
@@ -430,7 +436,7 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
     const row = rowRef.current;
     const x = row ? new DOMMatrixReadOnly(getComputedStyle(row).transform).m41 : 0;
     if (d.armed) return remove();
-    if (d.v < -0.45 || (d.v <= 0.3 && -x > ACTIONS_W * 0.42)) openRow();
+    if (d.v < -0.45 || (d.v <= 0.3 && -x > actionsW * 0.42)) openRow();
     else close();
   };
   const sub = [cat, card ? `${card.name} card` : null].filter(Boolean).join(' · ');
@@ -439,19 +445,21 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
     <li ref={liRef} className="group/row relative overflow-hidden rounded-xl">
       {/* swipe actions (touch): revealed as the row slides left */}
       <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 py-1 pr-1.5" aria-hidden={!open}>
-        <button
-          ref={splitRef}
-          type="button"
-          tabIndex={open ? 0 : -1}
-          style={{ opacity: 0, transform: 'scale(.55)' }}
-          className="flex h-full w-[74px] origin-right flex-col items-center justify-center gap-0.5 rounded-2xl bg-ink text-[12.5px] font-semibold text-bg active:scale-95"
-          onClick={() => {
-            close();
-            ui.openSheet({ type: 'group-expense', personId: tx.people?.[0] });
-          }}
-        >
-          <Icon name="split" size={18} /> Split
-        </button>
+        {canSplit && (
+          <button
+            ref={splitRef}
+            type="button"
+            tabIndex={open ? 0 : -1}
+            style={{ opacity: 0, transform: 'scale(.55)' }}
+            className="flex h-full w-[74px] origin-right flex-col items-center justify-center gap-0.5 rounded-2xl bg-ink text-[12.5px] font-semibold text-bg active:scale-95"
+            onClick={() => {
+              close();
+              ui.openSheet({ type: 'group-expense', personId: tx.people?.[0] });
+            }}
+          >
+            <Icon name="split" size={18} /> Split
+          </button>
+        )}
         <button
           ref={delRef}
           type="button"

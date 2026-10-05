@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { inFrame, isIOS, isStandalone } from '../lib/pwa';
 import { CURRENCIES, detectCurrency, setCurrency, sym, type CurrencyCode } from '../lib/currency';
 import { useStore } from '../store/store';
+import { useBackSteps } from '../store/ui';
 import { createFresh, nextFirstOfMonth } from '../data/seed';
 import { safeToSpend } from '../lib/finance';
 import { fmtDate, ordinal, realToday, rupees } from '../lib/format';
@@ -93,6 +94,9 @@ export function Onboarding() {
   const idx = FLOW.indexOf(step);
   const next = () => setStep(idx < FLOW.length - 1 ? FLOW[idx + 1] : 'building');
   const back = () => setStep(idx > 0 ? FLOW[idx - 1] : 'welcome');
+  // The phone's back gesture goes back one step of setup rather than out of PULSE.
+  const DEPTH: Record<Step, number> = { welcome: 0, join: 1, name: 1, reasons: 2, pay: 3, money: 4, priorities: 5, building: 6, done: 6 };
+  useBackSteps(DEPTH[step], () => (step === 'building' || step === 'done' ? setStep('priorities') : back()));
 
   const Choice = ({ label, on, onClick, multi }: { label: string; on: boolean; onClick: () => void; multi?: boolean }) => (
     <button type="button" role={multi ? 'checkbox' : 'radio'} aria-checked={on} onClick={onClick} className={`tap flex min-h-[52px] w-full items-center justify-between gap-3 rounded-2xl border px-4 text-left text-[15.5px] font-medium ${on ? 'border-ink bg-ink text-bg' : 'border-line bg-surface hover:border-ink3/50'}`}>

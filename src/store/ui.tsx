@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { Insight } from '../types';
 import type { AIAnswer } from '../lib/assistant';
 import type { ComposerPreset } from '../components/ExpenseComposer';
@@ -9,6 +9,7 @@ export type Route =
   | { name: 'plan'; id: string }
   | { name: 'group'; id: string }
   | { name: 'person'; id: string }
+  | { name: 'people' }
   | { name: 'subscriptions' }
   | { name: 'networth' }
   | { name: 'investments' }
@@ -161,6 +162,98 @@ function useUIImpl() {
   const closeAllSheets = useCallback(() => setSheets([]), []);
   const replaceSheet = useCallback((s: SheetSpec) => setSheets((xs) => [...xs.slice(0, -1), s]), []);
 
+  // ---------- the phone's back gesture ----------
+  // Every screen or sheet opened on top of a tab adds one entry to the browser's history, so the
+  // back swipe (or Android's back button) closes the top one instead of leaving PULSE. The browser's
+  // history is kept as a mirror of what is on screen: `hist` is how many entries are ours.
+  // A flow with steps of its own (setup) counts too: each step it is in adds one, and going back
+  // takes it back a step.
+  const [flowPos, setFlowPos] = useState(0);
+  const flowBack = useRef<(() => void) | null>(null);
+  const flowRef = useRef(0);
+  flowRef.current = flowPos;
+  const setFlow = useCallback((pos: number, onBack: (() => void) | null) => {
+    flowBack.current = onBack;
+    setFlowPos(onBack ? Math.max(0, pos) : 0);
+  }, []);
+  const depth = sheets.length + stacks[tab].length + flowPos;
+  const depthRef = useRef(depth);
+  depthRef.current = depth;
+  const sheetsRef = useRef(sheets);
+  sheetsRef.current = sheets;
+  const hist = useRef(0);
+  /** History moves we made ourselves (closing something on screen), whose event is not a gesture. */
+  const ours = useRef(0);
+  const settle = useRef(0);
+  /** Step the browser's history back ourselves. Its event arrives a moment later; nothing else moves until then. */
+  const rewind = useCallback((by: number) => {
+    ours.current++;
+    history.go(-by);
+    // If the browser never answers (nothing there to go back to), stop waiting.
+    window.clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => {
+      if (!ours.current) return;
+      ours.current = 0;
+      mirror();
+    }, 700);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const mirror = useCallback(() => {
+    if (ours.current > 0) return; // a move of ours is still on its way: line up when it lands
+    const want = depthRef.current;
+    try {
+      if (want > hist.current) {
+        for (let n = hist.current + 1; n <= want; n++) history.pushState({ pulse: n }, '');
+        hist.current = want;
+      } else if (want < hist.current) {
+        const by = hist.current - want;
+        hist.current = want;
+        rewind(by);
+      }
+    } catch {
+      /* history unavailable (a sandboxed frame): the app works without the gesture */
+    }
+  }, [rewind]);
+  useEffect(() => {
+    try {
+      // Reloaded with screens open: the app starts again at the top, so step history back to the top too.
+      const was = (history.state as { pulse?: unknown } | null)?.pulse;
+      if (typeof was === 'number' && was > 0 && was < 50) {
+        hist.current = was;
+        rewind(was);
+      } else history.replaceState({ ...(history.state as object | null), pulse: 0 }, '');
+    } catch {
+      /* ignore */
+    }
+    const onPop = (e: PopStateEvent) => {
+      const n = (e.state as { pulse?: unknown } | null)?.pulse;
+      if (typeof n !== 'number') return; // not one of our entries (an in-page link)
+      if (ours.current > 0) {
+        ours.current--;
+        hist.current = n;
+      } else {
+        // The person went back: close what is on top, once per step.
+        const steps = hist.current - n;
+        hist.current = n;
+        for (let i = 0; i < steps; i++) {
+          if (sheetsRef.current.length > i) closeSheet();
+          else if (flowRef.current > 0 && flowBack.current) flowBack.current();
+          else pop();
+        }
+        if (steps > 0) return; // the screen is about to match; the effect below confirms it
+      }
+      // Landed somewhere that doesn't match the screen (a forward swipe, or a reload mid-way): line up again.
+      window.setTimeout(mirror, 0);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      window.clearTimeout(settle.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(mirror, [depth, mirror]);
+
   return {
     tab,
     setTab,
@@ -174,6 +267,7 @@ function useUIImpl() {
     closeSheet,
     closeAllSheets,
     replaceSheet,
+    setFlow,
     plansSegment,
     setPlansSegment,
     activityFilter,
@@ -195,4 +289,18 @@ export function useUI(): UI {
   const u = useContext(Ctx);
   if (!u) throw new Error('UIProvider missing');
   return u;
+}
+
+/**
+ * For a flow with steps of its own, like setup: tells the navigation how many steps in it is, so
+ * the phone's back gesture goes back one step (by calling `onBack`) instead of leaving PULSE.
+ */
+export function useBackSteps(pos: number, onBack: () => void) {
+  const { setFlow } = useUI();
+  const back = useRef(onBack);
+  back.current = onBack;
+  useEffect(() => {
+    setFlow(pos, () => back.current());
+  }, [pos, setFlow]);
+  useEffect(() => () => setFlow(0, null), [setFlow]);
 }

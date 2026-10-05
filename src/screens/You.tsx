@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
@@ -16,6 +16,7 @@ import { Icon } from '../components/ui/Icon';
 import { useInstall } from '../lib/pwa';
 import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
+import { okPhoto, squarePhoto } from '../lib/photo';
 
 export function YouScreen() {
   const store = useStore();
@@ -30,7 +31,16 @@ export function YouScreen() {
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
-        <PersonAvatar me size={56} />
+        {state.mode === 'personal' ? (
+          <button type="button" className="tap relative shrink-0 rounded-full" aria-label={okPhoto(state.user.photo) ? 'Change your photo' : 'Add your photo'} onClick={() => go({ name: 'settings', section: 'profile' })}>
+            <PersonAvatar me size={56} />
+            <span className="absolute -bottom-0.5 -right-0.5 grid h-[22px] w-[22px] place-items-center rounded-full bg-ink text-bg ring-2 ring-bg" aria-hidden="true">
+              <Icon name={okPhoto(state.user.photo) ? 'pencil' : 'camera'} size={11} />
+            </span>
+          </button>
+        ) : (
+          <PersonAvatar me size={56} />
+        )}
         <div className="min-w-0 flex-1">
           <h1 className="display text-[28px] leading-tight">{state.user.fullName}</h1>
           <p className="text-[14px] text-ink3">
@@ -783,6 +793,64 @@ export function CategoriesScreen() {
   );
 }
 
+/** Profile photo: pick one from the phone, change it, or take it off. */
+function PhotoEditor() {
+  const store = useStore();
+  const { state } = store;
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const has = okPhoto(state.user.photo);
+  const choose = async (file: File | undefined) => {
+    if (!file) return;
+    setBusy(true);
+    const photo = await squarePhoto(file);
+    setBusy(false);
+    if (!photo) return store.toast({ text: "PULSE couldn't open that picture. Try another one, or a screenshot of it." });
+    store.updateUser({ photo });
+    store.toast({ text: has ? 'Photo changed.' : 'Looking good. Photo added.', tone: 'good', emoji: '📸' });
+  };
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-line bg-surface p-4">
+      <PersonAvatar me size={76} />
+      <div className="min-w-0 flex-1">
+        <p className="text-[15px] font-semibold leading-tight">Your photo</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-ink3">Shown on your profile. Friends don't see it.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="btn-primary min-h-[38px] px-4 text-[14px]" disabled={busy} onClick={() => input.current?.click()}>
+            <Icon name="camera" size={15} /> {busy ? 'Adding…' : has ? 'Change photo' : 'Add photo'}
+          </button>
+          {has && (
+            <button
+              type="button"
+              className="btn-quiet min-h-[38px] px-4 text-[14px]"
+              onClick={() => {
+                store.updateUser({ photo: undefined });
+                store.toast({ text: 'Photo removed.' });
+              }}
+            >
+              Remove
+            </button>
+          )}
+        </div>
+        <input
+          ref={input}
+          id="profile-photo"
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          tabIndex={-1}
+          aria-label="Choose a photo"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = ''; // so the same picture can be chosen again
+            void choose(f);
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------
 // Settings sections
 // ------------------------------------------------------------------
@@ -910,6 +978,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       )}
       {section === 'profile' && (
         <div className="flex flex-col gap-4">
+          {state.mode === 'personal' && <PhotoEditor />}
           <Field label="Name" htmlFor="profile-name">
             <input id="profile-name" className="field" value={nm} onChange={(e) => setNm(e.target.value)} onBlur={() => nm.trim() && store.updateUser({ fullName: nm.trim(), name: nm.trim().split(' ')[0] })} />
           </Field>

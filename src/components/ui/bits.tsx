@@ -4,6 +4,7 @@ import type { Person, State } from '../../types';
 import { Icon } from './Icon';
 import { useStore } from '../../store/store';
 import { rupees } from '../../lib/format';
+import { okPhoto } from '../../lib/photo';
 
 // ---------- Section header ----------
 export function SectionHeader({ title, action, id }: { title: string; action?: { label: string; onClick: () => void }; id?: string }) {
@@ -100,6 +101,7 @@ export function PersonAvatar({ person, size = 36, me }: { person?: Person; size?
   const label = me ? state.user.name : person?.short ?? '?';
   const initials = label.slice(0, 1).toUpperCase() + (me ? '' : (person?.name.split(' ')[1]?.[0] ?? ''));
   const hue = me ? 18 : person?.hue ?? 0;
+  if (me && okPhoto(state.user.photo)) return <img src={state.user.photo} alt="" width={size} height={size} draggable={false} className="inline-block shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
   return (
     <span
       className="inline-grid shrink-0 place-items-center rounded-full font-semibold"
