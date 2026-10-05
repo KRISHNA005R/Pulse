@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HistoryScreen } from './screens/History';
 import { SyncScreen } from './screens/Sync';
 import { takeSyncLink } from './lib/sync';
@@ -127,7 +127,7 @@ function ContextPanel() {
 
 function Shell() {
   const store = useStore();
-  const { state, replayOnboarding, hasStash, backToMine, toast, exploreDemo, updateSettings } = store;
+  const { state, replayOnboarding, hasStash, backToMine, toast, exploreDemo } = store;
   // Tell people whose data just moved over from the old address.
   useEffect(() => {
     let moved: string | null = null;
@@ -247,6 +247,24 @@ function Shell() {
 
   const onRoot = !ui.route;
 
+  // The "Peek at the demo" box on Home. Hiding it is remembered on this device only: it used to be
+  // saved with the person's settings, so hiding it once hid it on every device they signed in on.
+  const [demoBoxHidden, setDemoBoxHidden] = useState(() => {
+    try {
+      return localStorage.getItem('pulse-demo-box-v1') === 'hidden';
+    } catch {
+      return false;
+    }
+  });
+  const hideDemoBox = () => {
+    setDemoBoxHidden(true);
+    try {
+      localStorage.setItem('pulse-demo-box-v1', 'hidden');
+    } catch {
+      /* storage unavailable: hidden until the app is reopened */
+    }
+  };
+
   // Setup is a page of its own: nothing renders behind it, so the phone keyboard can't
   // reveal the dashboard, and finishing lands on Home scrolled to the very top.
   const wasOnboarding = useRef(!state.onboarding.done);
@@ -305,7 +323,7 @@ function Shell() {
               </button>
             </div>
           )}
-          {state.mode === 'personal' && state.onboarding.done && onRoot && ui.tab === 'home' && !state.settings.hideDemoPrompt && (
+          {state.mode === 'personal' && state.onboarding.done && onRoot && ui.tab === 'home' && !demoBoxHidden && (
             <div className="mb-5 flex items-center gap-3 rounded-2xl border border-line bg-surface py-3 pl-4 pr-2">
               <p className="min-w-0 flex-1 text-[14px] text-ink2">
                 Peek at the <span className="font-semibold text-ink">demo</span> anytime. Your money stays saved.
@@ -313,7 +331,7 @@ function Shell() {
               <button type="button" className="btn-accent min-h-[38px] shrink-0 px-4 text-[13.5px]" onClick={exploreDemo}>
                 Explore demo
               </button>
-              <button type="button" className="tap grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Hide this" onClick={() => updateSettings({ hideDemoPrompt: true })}>
+              <button type="button" className="tap grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Hide this" onClick={hideDemoBox}>
                 <Icon name="x" size={16} />
               </button>
             </div>
