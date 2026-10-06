@@ -22,15 +22,25 @@ import { TopNavigation } from './ui/bits';
 let onGoogle: (credential: string) => void = () => {};
 let googleStarted = '';
 
+/** Google's "large" button: its height, the widest it can be drawn, and how much PULSE enlarges it (44 / 40). */
+const GOOGLE_HEIGHT = 40;
+const GOOGLE_MAX_WIDTH = 400;
+const GOOGLE_GROW = 1.1;
+
 function GoogleButton({ clientId }: { clientId: string }) {
   const auth = useAuth();
+  const wrap = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  // Google's button is at most 400 wide and 40 tall; PULSE's own buttons are 44 tall and as wide as
+  // the column. So Google draws it a little smaller and it is shown a little larger (the same on
+  // both sides), which makes it line up with the buttons under it.
+  const [fit, setFit] = useState({ width: 0, scale: 1 });
   onGoogle = (c) => void auth.google(c);
   useEffect(() => {
     let live = true;
     void loadGoogle().then((g) => {
-      if (!live || !box.current) return;
+      if (!live || !box.current || !wrap.current) return;
       if (!g) return setState('failed');
       if (googleStarted !== clientId) {
         // Inside the installed app a pop-up can't hand its answer back, so Google sends the person
@@ -39,8 +49,11 @@ function GoogleButton({ clientId }: { clientId: string }) {
         g.initialize({ client_id: clientId, callback: (r: { credential?: string }) => r.credential && onGoogle(r.credential), ux_mode: redirect ? 'redirect' : 'popup', ...(redirect ? { login_uri: `${location.origin}/api/auth` } : {}), auto_select: false, itp_support: true });
         googleStarted = clientId;
       }
+      const column = wrap.current.clientWidth || 320;
+      const width = Math.max(200, Math.min(GOOGLE_MAX_WIDTH, Math.round(column / GOOGLE_GROW)));
+      setFit({ width, scale: Math.min(GOOGLE_GROW, column / width) });
       box.current.replaceChildren();
-      g.renderButton(box.current, { type: 'standard', theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width: Math.max(220, Math.min(400, Math.round(box.current.clientWidth))) });
+      g.renderButton(box.current, { type: 'standard', theme: 'filled_black', size: 'large', shape: 'pill', text: 'continue_with', logo_alignment: 'center', width });
       setState('ready');
     });
     return () => {
@@ -52,7 +65,9 @@ function GoogleButton({ clientId }: { clientId: string }) {
       {/* Google draws its own button in here, with its own logo. It lives in a frame of Google's;
           in dark mode a browser paints such a frame white unless it is told the frame is "light",
           which is what Google's page is. That keeps the corners around the pill see-through. */}
-      <div ref={box} className="flex min-h-[44px] w-full justify-center" style={{ colorScheme: 'light' }} data-google-button />
+      <div ref={wrap} className="w-full" style={{ height: GOOGLE_HEIGHT * fit.scale, colorScheme: 'light' }}>
+        <div ref={box} className="mx-auto flex justify-center" style={{ width: fit.width || undefined, height: GOOGLE_HEIGHT, transform: `scale(${fit.scale})`, transformOrigin: 'top center' }} data-google-button />
+      </div>
       {state === 'loading' && <p className="text-center text-[13px] text-ink3">Getting Google ready…</p>}
       {state === 'failed' && (
         <p className="rounded-2xl bg-sunk p-3 text-center text-[13.5px] text-ink2" role="status">
@@ -480,13 +495,6 @@ export function MemberMoment() {
         <div className="mt-6">
           <MemberBadge account={account} />
         </div>
-        <ul className="mt-5 flex flex-col gap-2.5 text-[15px] text-ink2">
-          {['Same data in the app and the browser', 'Safe even if you lose your phone', 'No more sync codes'].map((t) => (
-            <li key={t} className="flex items-center gap-2.5">
-              <Icon name="check" size={16} strokeWidth={2.6} className="shrink-0 text-pos" /> {t}
-            </li>
-          ))}
-        </ul>
         <div className="mt-auto flex flex-col gap-3 pt-8">
           <button type="button" className="btn-accent w-full text-[16px]" onClick={auth.seenWelcome}>
             {entries > 0 ? 'Back to my money' : 'Open PULSE'}
