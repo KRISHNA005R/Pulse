@@ -409,14 +409,63 @@ function useStoreImpl() {
   const dismissToast = useCallback((id: string) => setToasts((xs) => xs.filter((x) => x.id !== id)), []);
 
   // Say what PULSE recorded while the person was away, so a changed balance is never a mystery.
+  const sayAutoMade = useCallback(
+    (after: number) => {
+      const made = takeAutoMade();
+      if (!made.length) return 0;
+      const total = made.reduce((a, t) => a + t.amount, 0);
+      const text = made.length === 1 ? `${made[0].merchant} was due: ${rupees(made[0].amount)} is recorded.` : `${made.length} payments were due: ${rupees(total)} is recorded. See Activity.`;
+      return window.setTimeout(() => toast({ text, emoji: '🧾' }), after);
+    },
+    [toast],
+  );
   useEffect(() => {
-    const made = takeAutoMade();
-    if (!made.length) return;
-    const total = made.reduce((a, t) => a + t.amount, 0);
-    const text = made.length === 1 ? `${made[0].merchant} was due: ${rupees(made[0].amount)} is recorded.` : `${made.length} payments were due: ${rupees(total)} is recorded. See Activity.`;
-    const t = window.setTimeout(() => toast({ text, emoji: '🧾' }), 3800);
+    const t = sayAutoMade(3800);
     return () => window.clearTimeout(t);
-  }, [toast]);
+  }, [sayAutoMade]);
+
+  // A new day starts at midnight on the phone's own clock: safe to spend, days to payday, bills due
+  // and budgets all move with it. An installed app is rarely closed (the phone only puts it to
+  // sleep), so it can't wait for the next fresh start: it checks at midnight itself, every minute
+  // while it is open, and the moment it comes back to the front.
+  useEffect(() => {
+    if (state.mode !== 'personal') return;
+    const roll = () => {
+      const now = ref.current;
+      if (now.mode !== 'personal' || now.today === realToday()) return;
+      const next = refresh(now);
+      ref.current = next;
+      setState(next);
+      sayAutoMade(900);
+    };
+    let midnight = 0;
+    const arm = () => {
+      window.clearTimeout(midnight);
+      const d = new Date();
+      const wait = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 1).getTime() - d.getTime();
+      midnight = window.setTimeout(() => {
+        roll();
+        arm();
+      }, Math.max(1000, wait));
+    };
+    const wake = () => {
+      if (document.visibilityState !== 'visible') return;
+      roll();
+      arm(); // a sleeping phone doesn't run timers, so the one for midnight is set again
+    };
+    arm();
+    const every = window.setInterval(roll, 60_000);
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
+    window.addEventListener('pageshow', wake);
+    return () => {
+      window.clearTimeout(midnight);
+      window.clearInterval(every);
+      document.removeEventListener('visibilitychange', wake);
+      window.removeEventListener('focus', wake);
+      window.removeEventListener('pageshow', wake);
+    };
+  }, [state.mode, sayAutoMade]);
 
   // ---------- money moments ----------
   const momentAfterExpense = useCallback(
