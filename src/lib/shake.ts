@@ -1,13 +1,14 @@
 // Shake the phone to add an expense.
 //
 // The phone tells a page how it is being moved (the "devicemotion" event). Android gives that to any
-// page. An iPhone asks the person first, and only when the page asks from a tap. Either way it only
-// works while PULSE is open on the screen: a web app is not running when it is closed.
+// page. An iPhone asks the person first, and only when the page asks from a tap, so there PULSE asks
+// on the first tap after it opens. Either way it only works while PULSE is open on the screen: a
+// web app is not running when it is closed. There is no switch for it: it is simply on.
 //
 // A shake here means a few hard back-and-forth moves within a second. Walking, a bumpy auto ride or
 // putting the phone down are single jolts or soft ones, and are ignored.
 
-const KEY = 'pulse-shake-v1';
+const KEY = 'pulse-shake-no-v1';
 const SEEN = 'pulse-shake-seen-v1';
 
 type MotionCtor = typeof DeviceMotionEvent & { requestPermission?: () => Promise<'granted' | 'denied'> };
@@ -25,22 +26,23 @@ export function canShake(): boolean {
 /** iPhone and iPad: the person has to say yes to motion first. */
 export const needsAsk = () => typeof motion()?.requestPermission === 'function';
 
-/** On, off, or not chosen yet (then it is on where no permission is needed). Kept per device. */
+/**
+ * Shake is on for everyone. The one exception: an iPhone whose owner said no when the phone asked
+ * about motion. That answer is remembered on the device, so PULSE doesn't keep asking.
+ */
 export function shakeOn(): boolean {
   try {
-    const v = localStorage.getItem(KEY);
-    return v ? v === 'on' : !needsAsk();
+    return localStorage.getItem(KEY) !== '1';
   } catch {
-    return false;
+    return true;
   }
 }
-export function setShake(on: boolean) {
+export function shakeRefused() {
   try {
-    localStorage.setItem(KEY, on ? 'on' : 'off');
+    localStorage.setItem(KEY, '1');
   } catch {
-    /* storage unavailable: on until the app is reopened */
+    /* storage unavailable: it will ask again next time */
   }
-  window.dispatchEvent(new Event('pulse-shake'));
 }
 /** True the first time only, to say once what just opened the sheet. */
 export function firstShake(): boolean {
