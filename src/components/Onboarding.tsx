@@ -147,22 +147,18 @@ export function Onboarding() {
                   <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink/20 border-t-ink" aria-hidden="true" />
                 </div>
               ) : needLogin ? (
-                <>
-                  <LoginPanel />
-                  {!auth.busy && (
-                    <button type="button" className="btn-quiet w-full" onClick={startDemo}>
-                      Explore a demo first
-                    </button>
-                  )}
-                </>
+                <LoginPanel />
               ) : (
                 <>
                   <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
                     Start with my own money
                   </button>
-                  <button type="button" className="btn-quiet w-full" onClick={startDemo}>
-                    Explore a demo first
-                  </button>
+                  {/* With accounts on, the first screen is only about getting in. The demo is one tap away inside the app (Home, and You). */}
+                  {!auth.on && (
+                    <button type="button" className="btn-quiet w-full" onClick={startDemo}>
+                      Explore a demo first
+                    </button>
+                  )}
                   {!auth.on && (
                     <button type="button" className="btn-ghost w-full" onClick={() => setStep('join')}>
                       I use PULSE on another device
