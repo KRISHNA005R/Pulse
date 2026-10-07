@@ -6,6 +6,7 @@ import { StoreProvider, useStore } from './store/store';
 import { AuthProvider } from './store/auth';
 import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
 import { PeopleScreen } from './components/People';
+import { useShakeToAdd } from './components/Shake';
 import { UIProvider, useUI } from './store/ui';
 import { BottomNavigation, MobileTopBar, SideNavigation } from './components/Navigation';
 import { SheetHost } from './components/SheetHost';
@@ -156,6 +157,7 @@ function Shell() {
   // Someone who isn't signed in: a friendly ask for a week, then sign-in is needed to carry on.
   const wall = useAuthGate();
   useFriends();
+  useShakeToAdd();
   // Keep this device's queued reminders in step with the data (a few seconds after things settle).
   useEffect(() => {
     const t = window.setTimeout(() => void syncReminders(state), 6000);
