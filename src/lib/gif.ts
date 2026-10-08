@@ -1,39 +1,58 @@
-// A GIF as a profile photo. Any animated GIF is turned into a small square loop that is cheap to
-// keep and to send: the first few seconds, cut to a square from the middle, a couple of dozen
-// frames, one shared palette, and only what changes between frames.
-// Typed arrays only (no canvas), so it runs the same in the app and in a test. Loaded on demand
-// (it brings two small libraries), only when someone actually picks a GIF.
+// A GIF or a video as a profile photo. Either one becomes a small square loop that is cheap to keep
+// and to send: up to 5 seconds (the person picks which), cut to a square from the middle, a couple of
+// dozen frames, one shared palette, and only what changes between frames.
+//
+// It happens in two steps. First the source becomes a "timeline": every frame of a GIF, or frames
+// taken from a video, each cut down to a small square. Then the part the person picked is packed as
+// a GIF. The pixel work is typed arrays only (no canvas), so it runs the same in the app and in a test.
+// Loaded on demand (it brings two small libraries), only when someone actually picks a GIF or a video.
 import { decompressFrame, parseGIF, type ParsedGif } from 'gifuct-js';
 import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 
 /** How much of the loop is kept. */
-export const GIF_MAX_MS = 3000;
+export const LOOP_MAX_MS = 5000;
 /** The size the result should fit in, in bytes. */
-export const GIF_TARGET = 140_000;
+export const LOOP_TARGET = 140_000;
 /** Frames are first cut down to this many pixels a side, then to their final size. */
-const MID = 160;
+export const MID = 128;
+/** A video gives this many frames a second to the loop. */
+export const VIDEO_FPS = 8;
+/** A GIF longer than this is only read this far (the slider picks from it). */
+const GIF_READ_MS = 60_000;
+const GIF_READ_FRAMES = 400;
 /** Tried in order until the result fits. */
 const TRIES = [
-  { size: 112, frames: 24, colors: 96 },
-  { size: 96, frames: 20, colors: 64 },
-  { size: 96, frames: 16, colors: 48 },
-  { size: 80, frames: 14, colors: 32 },
-  { size: 64, frames: 10, colors: 24 },
+  { size: 112, frames: 32, colors: 96 },
+  { size: 96, frames: 26, colors: 64 },
+  { size: 96, frames: 20, colors: 48 },
+  { size: 80, frames: 16, colors: 32 },
+  { size: 64, frames: 12, colors: 24 },
 ];
 
 export const isGif = (b: Uint8Array) => b.length > 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38;
 
-export interface GifStill {
+export interface LoopFrame {
   rgba: Uint8ClampedArray;
-  size: number;
+  /** How long it shows, in milliseconds. */
+  delay: number;
 }
-export type Shrunk =
-  /** A GIF with a single frame: treat it as a photo. */
-  | { animated: false; first: GifStill }
-  | { animated: true; bytes: Uint8Array; size: number; frames: number; ms: number; first: GifStill; source: { width: number; height: number; frames: number; ms: number } };
+export interface Timeline {
+  /** Each frame with the moment it starts. */
+  frames: (LoopFrame & { t: number })[];
+  /** How long all of it lasts. */
+  ms: number;
+  /** One frame only: it is a still picture. */
+  still: boolean;
+}
+export interface Loop {
+  bytes: Uint8Array;
+  size: number;
+  frames: number;
+  ms: number;
+}
 
 /** Cut a square from the middle of `src` (w x h, RGBA) and scale it to n x n over white. */
-function square(src: Uint8ClampedArray, w: number, h: number, n: number): Uint8ClampedArray {
+export function square(src: Uint8ClampedArray, w: number, h: number, n: number): Uint8ClampedArray {
   const s = Math.min(w, h);
   const ox = (w - s) >> 1;
   const oy = (h - s) >> 1;
@@ -77,7 +96,7 @@ function pick(delays: number[], want: number): { i: number; delay: number }[] {
   return at.map((i, j) => ({ i, delay: delays.slice(i, j + 1 < k ? at[j + 1] : have).reduce((a, b) => a + b, 0) }));
 }
 
-function encode(frames: { rgba: Uint8ClampedArray; delay: number }[], n: number, colors: number): Uint8Array {
+function encode(frames: LoopFrame[], n: number, colors: number): Uint8Array {
   // One palette for the whole loop, learnt from a sample of every frame.
   const step = Math.max(1, Math.floor((frames.length * n * n) / 60_000));
   const sample = new Uint8Array(frames.length * Math.ceil((n * n) / step) * 4);
@@ -96,15 +115,15 @@ function encode(frames: { rgba: Uint8ClampedArray; delay: number }[], n: number,
       out = new Uint8Array(idx.length);
       for (let p = 0; p < idx.length; p++) out[p] = idx[p] === prev[p] ? clear : idx[p];
     }
-    gif.writeFrame(out, n, n, { palette: i === 0 ? table : undefined, delay: f.delay, transparent: i > 0, transparentIndex: clear, dispose: 1, repeat: 0 });
+    gif.writeFrame(out, n, n, { palette: i === 0 ? table : undefined, delay: Math.max(20, Math.round(f.delay / 10) * 10), transparent: i > 0, transparentIndex: clear, dispose: 1, repeat: 0 });
     prev = idx;
   });
   gif.finish();
   return gif.bytes();
 }
 
-/** Null when the bytes are not a GIF this can read, or it can't be made small enough. */
-export function shrinkGif(buffer: ArrayBuffer, target = GIF_TARGET): Shrunk | null {
+/** Every frame of a GIF, cut to MID x MID. Null when the bytes are not a GIF this can read. */
+export function gifTimeline(buffer: ArrayBuffer): Timeline | null {
   let gif: ParsedGif;
   try {
     if (!isGif(new Uint8Array(buffer))) return null;
@@ -116,25 +135,18 @@ export function shrinkGif(buffer: ArrayBuffer, target = GIF_TARGET): Shrunk | nu
   const H = gif.lsd?.height ?? 0;
   const imgs = (gif.frames ?? []).filter((f) => f.image);
   if (!W || !H || !imgs.length || W * H > 40_000_000) return null;
-
-  // Which frames to keep: the first few seconds, at most two dozen of them.
-  const all = imgs.map((f) => {
-    const d = (f.gce?.delay ?? 10) * 10;
-    return d < 20 ? 100 : d; // what browsers do with a GIF that says "no delay"
-  });
-  let end = 0;
-  let t = 0;
-  while (end < all.length && (end === 0 || t + all[end] <= GIF_MAX_MS)) t += all[end++];
-  const wanted = new Map(pick(all.slice(0, end), TRIES[0].frames).map((k) => [k.i, k.delay]));
-
-  // Play the GIF onto one screen, frame by frame, and take a small copy of each frame that is kept.
+  // Play the GIF onto one screen, frame by frame, keeping a small copy of each.
   const screen = new Uint8ClampedArray(W * H * 4);
   let saved: Uint8ClampedArray | null = null;
-  const mids: { rgba: Uint8ClampedArray; delay: number }[] = [];
+  const frames: Timeline['frames'] = [];
+  let t = 0;
   try {
-    for (let i = 0; i < end; i++) {
-      const f = decompressFrame(imgs[i], gif.gct, true);
+    for (const img of imgs) {
+      if (t >= GIF_READ_MS || frames.length >= GIF_READ_FRAMES) break;
+      const f = decompressFrame(img, gif.gct, true);
       if (!f) continue;
+      const d = (img.gce?.delay ?? 10) * 10;
+      const delay = d < 20 ? 100 : d; // what browsers do with a GIF that says "no delay"
       const { top, left, width, height } = f.dims;
       if (f.disposalType === 3) saved = screen.slice();
       for (let y = 0; y < height; y++) {
@@ -152,8 +164,8 @@ export function shrinkGif(buffer: ArrayBuffer, target = GIF_TARGET): Shrunk | nu
           screen[o + 3] = 255;
         }
       }
-      const delay = wanted.get(i);
-      if (delay !== undefined) mids.push({ rgba: square(screen, W, H, MID), delay });
+      frames.push({ rgba: square(screen, W, H, MID), delay, t });
+      t += delay;
       if (f.disposalType === 2) {
         for (let y = Math.max(0, top); y < Math.min(H, top + height); y++) screen.fill(0, (y * W + Math.max(0, left)) * 4, (y * W + Math.min(W, left + width)) * 4);
       } else if (f.disposalType === 3 && saved) screen.set(saved);
@@ -161,16 +173,30 @@ export function shrinkGif(buffer: ArrayBuffer, target = GIF_TARGET): Shrunk | nu
   } catch {
     return null;
   }
-  if (!mids.length) return null;
-  const first: GifStill = { rgba: mids[0].rgba, size: MID };
-  if (imgs.length < 2 || mids.length < 2) return { animated: false, first };
-  const source = { width: W, height: H, frames: imgs.length, ms: all.reduce((a, b) => a + b, 0) };
+  if (!frames.length) return null;
+  return { frames, ms: t, still: frames.length < 2 };
+}
 
-  let best: Extract<Shrunk, { animated: true }> | null = null;
+/** The frames that show between `start` and `start + len` (ms), with the first and last trimmed to fit. */
+export function windowOf(tl: Timeline, start: number, len = LOOP_MAX_MS): LoopFrame[] {
+  const end = start + len;
+  const out: LoopFrame[] = [];
+  for (const f of tl.frames) {
+    const from = Math.max(f.t, start);
+    const to = Math.min(f.t + f.delay, end);
+    if (to - from >= 10) out.push({ rgba: f.rgba, delay: to - from });
+  }
+  return out;
+}
+
+/** Pack frames (MID x MID) as the small loop. Null when it can't be made small enough. */
+export function encodeLoop(frames: LoopFrame[], target = LOOP_TARGET): Loop | null {
+  if (frames.length < 2) return null;
+  let best: Loop | null = null;
   for (const tr of TRIES) {
-    const sub = pick(mids.map((m) => m.delay), tr.frames).map((k) => ({ rgba: square(mids[k.i].rgba, MID, MID, tr.size), delay: k.delay }));
+    const sub = pick(frames.map((f) => f.delay), tr.frames).map((k) => ({ rgba: square(frames[k.i].rgba, MID, MID, tr.size), delay: k.delay }));
     const bytes = encode(sub, tr.size, tr.colors);
-    best = { animated: true, bytes, size: tr.size, frames: sub.length, ms: sub.reduce((a, f) => a + f.delay, 0), first, source };
+    best = { bytes, size: tr.size, frames: sub.length, ms: sub.reduce((a, f) => a + f.delay, 0) };
     if (bytes.length <= target) break;
   }
   return best && best.bytes.length <= target * 1.5 ? best : null;
