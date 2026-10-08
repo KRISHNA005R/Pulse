@@ -103,7 +103,7 @@ signed-in person's data; `/privacy/` says so.
 
 ## Profile photos and GIFs
 
-A still photo is cut to a small square on the phone and kept inside the person's own data (`src/lib/photo.ts`); connected friends get a tiny copy in the sealed boxes they already exchange. A GIF or a video is first cut on the phone to a small loop of up to 5 seconds, the person sliding to pick which part when it is longer (`src/components/PhotoEditor.tsx`, `src/lib/gif.ts`, `src/lib/videoLoop.ts`; the video is only played, never uploaded), then kept on the server under a random id (`netlify/lib/faces.ts`, `/api/face`). Phones load it by that id, and fall back to its first frame without internet or when the phone asks for less motion. GIFs need a signed-in account.
+A still photo is cut to a small square on the phone and kept inside the person's own data (`src/lib/photo.ts`); connected friends get a tiny copy in the sealed boxes they already exchange. A GIF is first cut on the phone to a small loop of up to 5 seconds, the person sliding to pick which part when it is longer (`src/components/PhotoEditor.tsx`, `src/lib/gif.ts`, loaded only when a GIF is picked), then kept on the server under a random id (`netlify/lib/faces.ts`, `/api/face`). Phones load it by that id, and fall back to its first frame without internet or when the phone asks for less motion. GIFs need a signed-in account.
 
 ## Deploy
 

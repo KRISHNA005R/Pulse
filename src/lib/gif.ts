@@ -1,11 +1,11 @@
-// A GIF or a video as a profile photo. Either one becomes a small square loop that is cheap to keep
-// and to send: up to 5 seconds (the person picks which), cut to a square from the middle, a couple of
+// A GIF as a profile photo. Any animated GIF becomes a small square loop that is cheap to keep and
+// to send: up to 5 seconds (the person picks which), cut to a square from the middle, a couple of
 // dozen frames, one shared palette, and only what changes between frames.
 //
-// It happens in two steps. First the source becomes a "timeline": every frame of a GIF, or frames
-// taken from a video, each cut down to a small square. Then the part the person picked is packed as
-// a GIF. The pixel work is typed arrays only (no canvas), so it runs the same in the app and in a test.
-// Loaded on demand (it brings two small libraries), only when someone actually picks a GIF or a video.
+// It happens in two steps. First the GIF becomes a "timeline": every frame, cut down to a small
+// square. Then the part the person picked is packed as a GIF again. The pixel work is typed arrays
+// only (no canvas), so it runs the same in the app and in a test. Loaded on demand (it brings two
+// small libraries), only when someone actually picks a GIF.
 import { decompressFrame, parseGIF, type ParsedGif } from 'gifuct-js';
 import { applyPalette, GIFEncoder, quantize } from 'gifenc';
 
@@ -15,8 +15,6 @@ export const LOOP_MAX_MS = 5000;
 export const LOOP_TARGET = 140_000;
 /** Frames are first cut down to this many pixels a side, then to their final size. */
 export const MID = 128;
-/** A video gives this many frames a second to the loop. */
-export const VIDEO_FPS = 8;
 /** A GIF longer than this is only read this far (the slider picks from it). */
 const GIF_READ_MS = 60_000;
 const GIF_READ_FRAMES = 400;

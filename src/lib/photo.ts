@@ -66,18 +66,6 @@ export async function squarePhoto(file: Blob): Promise<{ photo: string; face: st
   }
 }
 
-/** The two still pictures from anything that can be drawn (a video frame, say): a centre square. */
-export function stillsFromSource(src: CanvasImageSource, w: number, h: number): { photo: string; face: string } | null {
-  try {
-    const pic = { src, w, h };
-    const photo = square(pic, SIZE, MAX_CHARS);
-    const face = square(pic, FACE, FACE_CHARS);
-    return photo && face ? { photo, face } : null;
-  } catch {
-    return null;
-  }
-}
-
 /** The two still pictures from one frame of a GIF (its first frame), given as RGBA pixels. */
 export function stillsOf(rgba: Uint8ClampedArray, size: number): { photo: string; face: string } | null {
   try {
@@ -114,7 +102,7 @@ export const okFace = (p: unknown): p is string => typeof p === 'string' && /^da
 const GIF_ID = /^[0-9a-f]{32}$/;
 export const okGif = (id: unknown): id is string => typeof id === 'string' && GIF_ID.test(id);
 export const gifUrl = (id: string) => `/api/face?id=${id}`;
-/** GIF files bigger than this are turned away before being read. (Videos are only played, never read whole.) */
+/** GIF files bigger than this are turned away before being read. */
 export const GIF_MAX_FILE = 12_000_000;
 
 /** The phone is set to reduce motion: moving photos stay still. */
