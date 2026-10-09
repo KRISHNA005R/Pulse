@@ -434,6 +434,24 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
   const [amount, setAmount] = useState(String(Math.abs(bal)));
   const iPay = bal < 0;
   const n = parseFloat(amount) || 0;
+  // Settling everything from People also settles it inside each group it was owed in, so the group
+  // and the person's page always agree. (An amount changed by hand is a payment between the two of you.)
+  const parts = useMemo(() => {
+    if (groupId) return [];
+    const out: { group?: string; name?: string; v: number }[] = [];
+    let rest = bal;
+    for (const g of state.groups) {
+      if (!g.members.includes(personId)) continue;
+      const v = personBalances(state, g.id).get(personId) ?? 0;
+      if (Math.abs(v) < 0.01) continue;
+      out.push({ group: g.id, name: g.name, v });
+      rest -= v;
+    }
+    if (out.length && Math.abs(rest) >= 0.01) out.push({ v: roundMoney(rest) });
+    return out;
+  }, [state, groupId, personId, bal]);
+  const all = parts.length > 0 && Math.abs(n - Math.abs(bal)) < 0.01;
+  const groupsToo = all ? parts.filter((x) => x.name).map((x) => x.name as string) : [];
   return (
     <div className="flex flex-col items-center text-center">
       <div className="flex items-center gap-3 py-2">
@@ -444,12 +462,15 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
       <p className="mt-2 text-[15px] text-ink2">{bal === 0 ? `Nothing to settle with ${person.short}.` : iPay ? `You owe ${person.short} ${rupees(-bal)}` : `${person.short} owes you ${rupees(bal)}`}</p>
       <MoneyInput value={amount} onChange={setAmount} label="Settlement amount" autoFocus id="settle-amount" />
       <p className="text-[13px] text-ink3">Record a payment made outside PULSE, like a UPI transfer or cash.</p>
+      {groupsToo.length > 0 && <p className="mt-2 rounded-xl bg-sunk px-3 py-2 text-[13px] text-ink2">This also settles {groupsToo.join(', ')}.</p>}
       <button
         type="button"
         disabled={!n}
         className="btn-accent mt-5 w-full disabled:opacity-40"
         onClick={() => {
-          store.recordSettlement({ group: groupId, from: iPay ? 'me' : personId, to: iPay ? personId : 'me', amount: roundMoney(n) });
+          if (all)
+            store.recordSettlement(parts.map((x) => ({ group: x.group, from: x.v < 0 ? 'me' : personId, to: x.v < 0 ? personId : 'me', amount: roundMoney(Math.abs(x.v)) })));
+          else store.recordSettlement({ group: groupId, from: iPay ? 'me' : personId, to: iPay ? personId : 'me', amount: roundMoney(n) });
           onDone();
         }}
       >

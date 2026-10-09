@@ -940,30 +940,16 @@ function useStoreImpl() {
     [commit, toast],
   );
 
+  /**
+   * Record settle-ups made in one go (one per group the money was owed in, say). Each one is its own
+   * entry, so every group and the person's own balance all show it.
+   */
   const recordSettlement = useCallback(
-    (st: Omit<Settlement, 'id' | 'date'>, accountId?: string) => {
+    (st: Omit<Settlement, 'id' | 'date'> | Omit<Settlement, 'id' | 'date'>[], accountId?: string) => {
+      const list = (Array.isArray(st) ? st : [st]).filter((x) => x.amount > 0);
+      if (!list.length) return;
       commit((s) => {
-        const account = accountId ?? defaultAccount(s);
-        s.settlements.unshift({ ...st, id: uid('st'), date: s.today });
-        const other = st.from === 'me' ? st.to : st.from;
-        const person = s.people.find((p) => p.id === other);
-        const g = s.groups.find((x) => x.id === st.group);
-        const tx: Transaction = {
-          id: uid('t'),
-          merchant: person?.name ?? 'Settle up',
-          amount: st.amount,
-          type: 'transfer',
-          direction: st.from === 'me' ? 'out' : 'in',
-          category: 'transfer',
-          date: s.today,
-          account,
-          people: [other],
-          notes: `Settled up${g ? ` · ${g.name}` : ''}`,
-          recurring: false,
-          status: 'completed',
-        };
-        s.transactions.unshift(tx);
-        applyMoney(s, tx, 1);
+        for (const one of list) settleOne(s, one, accountId);
       });
       haptic(14);
       burst({ kind: 'mini', power: 1 });
@@ -971,6 +957,30 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** One settle-up: the record, and the money moving in or out of the account. */
+  const settleOne = (s: State, st: Omit<Settlement, 'id' | 'date'>, accountId?: string) => {
+    const account = accountId ?? defaultAccount(s);
+    s.settlements.unshift({ ...st, id: uid('st'), date: s.today });
+    const other = st.from === 'me' ? st.to : st.from;
+    const person = s.people.find((p) => p.id === other);
+    const g = s.groups.find((x) => x.id === st.group);
+    const tx: Transaction = {
+      id: uid('t'),
+      merchant: person?.name ?? 'Settle up',
+      amount: st.amount,
+      type: 'transfer',
+      direction: st.from === 'me' ? 'out' : 'in',
+      category: 'transfer',
+      date: s.today,
+      account,
+      people: [other],
+      notes: `Settled up${g ? ` · ${g.name}` : ''}`,
+      recurring: false,
+      status: 'completed',
+    };
+    s.transactions.unshift(tx);
+    applyMoney(s, tx, 1);
+  };
 
   // ---------- misc ----------
   const updateSettings = useCallback((patch: Partial<Settings>) => commit((s) => void Object.assign(s.settings, patch)), [commit]);
