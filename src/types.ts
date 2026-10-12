@@ -368,7 +368,7 @@ export interface Settings {
   hideDemoPrompt?: boolean;
   /** The "how's PULSE so far?" card was answered or dismissed. */
   feedbackAsked?: boolean;
-  /** "Finish setup" items the person said they don't have (lib/setup.ts). */
+  /** Things the person said during setup they don't have, e.g. 'bills' (lib/setup.ts). */
   setupSkipped?: string[];
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
   reminders?: ReminderPrefs;

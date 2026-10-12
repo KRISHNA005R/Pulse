@@ -516,7 +516,7 @@ export function Onboarding() {
             </div>
             <ul className="mt-4 flex flex-col gap-2.5">
               {[
-                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.length} monthly ${fresh.subscriptions.length === 1 ? 'payment is' : 'payments are'} kept aside before ${fresh.subscriptions.length === 1 ? 'it’s' : 'they’re'} due` : 'Finish setup from Home: loans, cards, other income and more'],
+                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.length} monthly ${fresh.subscriptions.length === 1 ? 'payment is' : 'payments are'} kept aside before ${fresh.subscriptions.length === 1 ? 'it’s' : 'they’re'} due` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
                 ['target', fresh.plans.length ? 'An emergency fund plan is ready to top up' : 'Create a plan for something you’re saving for'],
                 ...(fresh.investments.length ? [['trend', `Your ${rupees(fresh.investments[0].amount)} SIP is deducted on the ${ordinal(Number(fresh.investments[0].nextDate.slice(8)))} of every month`]] : []),
                 ['users', 'Split costs with friends from the + button'],
