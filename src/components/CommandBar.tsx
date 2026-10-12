@@ -16,7 +16,7 @@ interface Cmd {
   run: () => void;
 }
 
-const CAT_ALIASES: Record<string, string> = { food: 'food', dining: 'food', transport: 'transport', rides: 'transport', shopping: 'shopping', bills: 'bills', entertainment: 'entertainment', subscriptions: 'subscriptions', health: 'health', travel: 'travel', education: 'education' };
+const CAT_ALIASES: Record<string, string> = { delivery: 'delivery', food: 'food', dining: 'food', transport: 'transport', rides: 'transport', shopping: 'shopping', bills: 'bills', entertainment: 'entertainment', subscriptions: 'subscriptions', health: 'health', travel: 'travel', education: 'education' };
 
 export function CommandBar({ initial = '' }: { initial?: string; onClose?: () => void }) {
   const { state } = useStore();

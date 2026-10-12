@@ -8,6 +8,13 @@ import type { Category, CategoryId } from '../types';
  * More specific words come first. Includes common Hinglish words.
  */
 export const LEXICON: { k: string[]; e: string; c: CategoryId }[] = [
+  // delivery apps first, so "zomato pizza" or "zepto milk" counts as a delivery order
+  { k: [
+      'swiggy', 'swigy', 'zomato', 'zomoto', 'zepto', 'zepto cafe', 'blinkit', 'blinkit bistro', 'instamart', 'insta mart', 'swiggy instamart',
+      'bigbasket', 'big basket', 'bb now', 'bbnow', 'jiomart', 'flipkart minutes', 'amazon now', 'amazon fresh', 'dunzo', 'swiggy genie',
+      'eatsure', 'magicpin', 'box8', 'faasos', 'licious', 'freshtohome', 'country delight', 'milkbasket', 'swish',
+      'delivery', 'home delivery', 'food delivery', 'delivery app', 'delivery apps', 'online order',
+    ], e: '🛵', c: 'delivery' },
   // pets first so "dog food" isn't just food
   { k: ['dog food', 'cat food', 'dog', 'puppy', 'cat', 'kitten', 'pet', 'pets', 'vet', 'pedigree', 'whiskas', 'supertails'], e: '🐶', c: 'pets' },
   { k: ['plant', 'plants', 'nursery', 'gardening', 'pots'], e: '🪴', c: 'shopping' },
@@ -28,7 +35,7 @@ export const LEXICON: { k: string[]; e: string; c: CategoryId }[] = [
   { k: ['breakfast', 'nashta', 'poha', 'paratha'], e: '🍳', c: 'food' },
   { k: ['sandwich', 'subway', 'wrap', 'roll', 'shawarma', 'kathi'], e: '🌯', c: 'food' },
   { k: ['kfc', 'chicken', 'wings', 'tandoori'], e: '🍗', c: 'food' },
-  { k: ['swiggy', 'zomato', 'dinner', 'lunch', 'brunch', 'khana', 'food', 'restaurant', 'dhaba', 'thali', 'meal', 'canteen', 'mess', 'tiffin', 'snacks', 'eatsure'], e: '🍜', c: 'food' },
+  { k: ['dinner', 'lunch', 'brunch', 'khana', 'food', 'restaurant', 'dhaba', 'thali', 'meal', 'canteen', 'mess', 'tiffin', 'snacks'], e: '🍜', c: 'food' },
 
   // ---- cafe ----
   { k: ['chai', 'tea', 'chaayos', 'chai point', 'cutting'], e: '☕', c: 'cafe' },
@@ -38,7 +45,7 @@ export const LEXICON: { k: string[]; e: string; c: CategoryId }[] = [
   { k: ['milk', 'doodh', 'curd', 'dahi', 'paneer', 'eggs', 'anda'], e: '🥛', c: 'groceries' },
   { k: ['fruits', 'fruit', 'banana', 'apple', 'mango'], e: '🍎', c: 'groceries' },
   { k: ['vegetables', 'veggies', 'sabzi', 'sabji', 'onion', 'tomato'], e: '🥦', c: 'groceries' },
-  { k: ['zepto', 'blinkit', 'instamart', 'bigbasket', 'dmart', 'grocery', 'groceries', 'kirana', 'ration', 'jiomart', 'swiggy instamart', 'reliance fresh'], e: '🛒', c: 'groceries' },
+  { k: ['dmart', 'grocery', 'groceries', 'kirana', 'ration', 'reliance fresh', 'more supermarket', 'star bazaar'], e: '🛒', c: 'groceries' },
 
   // ---- transport / fuel ----
   { k: ['petrol', 'diesel', 'fuel', 'cng', 'hp pump', 'indian oil', 'ev charge', 'charging'], e: '⛽', c: 'fuel' },

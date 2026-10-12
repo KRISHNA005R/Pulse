@@ -25,6 +25,7 @@ export const DEMO_TODAY = '2026-09-27';
 export const CATEGORIES: Category[] = [
   { id: 'food', name: 'Food', icon: 'utensils', emoji: '🍜', kind: 'expense' },
   { id: 'groceries', name: 'Groceries', icon: 'bag', emoji: '🛒', kind: 'expense' },
+  { id: 'delivery', name: 'Delivery apps', icon: 'bag', emoji: '🛵', kind: 'expense' },
   { id: 'cafe', name: 'Chai & coffee', icon: 'utensils', emoji: '☕', kind: 'expense' },
   { id: 'transport', name: 'Transport', icon: 'car', emoji: '🛺', kind: 'expense' },
   { id: 'fuel', name: 'Fuel', icon: 'car', emoji: '⛽', kind: 'expense' },

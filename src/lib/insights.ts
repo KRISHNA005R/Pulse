@@ -265,7 +265,7 @@ export function buildRecap(s: State, anyDayInMonth: string): Recap {
   if (dup && notice.length < 3) notice.push(`${dup.text} Worth a check.`);
 
   const foodBudget = s.budgets.find((b) => b.category === 'food');
-  const deliveries = s.transactions.filter((t) => t.date >= st && t.date <= end && /swiggy|zomato/i.test(t.merchant) && !t.splitId);
+  const deliveries = s.transactions.filter((t) => t.date >= st && t.date <= end && (t.category === 'delivery' || /swiggy|zomato/i.test(t.merchant)) && t.type === 'expense' && !t.splitId);
   const avgOrder = deliveries.length ? deliveries.reduce((a, t) => a + t.amount, 0) / deliveries.length : scaled(400);
   const adjustment =
     food > foodPrev && foodBudget

@@ -87,7 +87,8 @@ export const starterDefaults = (): string[] => [
 ];
 
 const CAT_WORDS: [CategoryId, RegExp][] = [
-  ['food', /\b(food|eating|dining|swiggy|zomato|delivery|groceries|grocery)\b/],
+  ['delivery', /\b(delivery|deliveries|delivery apps?|quick commerce|instamart|bigbasket|jiomart|dunzo)\b/],
+  ['food', /\b(food|eating|dining|swiggy|zomato|groceries|grocery)\b/],
   ['transport', /\b(transport|travel(l)?ing around|uber|cabs?|rides?|commute|rapido|metro)\b/],
   ['shopping', /\b(shopping|clothes|amazon|myntra|flipkart)\b/],
   ['entertainment', /\b(entertainment|movies?|going out|fun)\b/],
@@ -322,7 +323,7 @@ export function askPulse(s: State, question: string): AIAnswer {
   const catHit = CAT_WORDS.find(([, re]) => re.test(q))?.[0] ?? (/(spend|spent)/.test(q) ? guessCategory(q) : null);
   if (catHit && /(how much|spent|spend|spending)/.test(q)) {
     const lastMonth = /last month/.test(q);
-    const merchant = ['swiggy', 'zomato', 'uber', 'rapido', 'amazon', 'myntra', 'flipkart', 'zepto', 'blinkit'].find((m) => q.includes(m));
+    const merchant = ['instamart', 'swiggy', 'zomato', 'uber', 'rapido', 'amazon', 'myntra', 'flipkart', 'zepto', 'blinkit', 'bigbasket', 'jiomart'].find((m) => q.includes(m));
     if (merchant) {
       const sum = (a: string, b: string) => s.transactions.filter((t) => t.type === 'expense' && t.merchant.toLowerCase().includes(merchant) && t.date >= a && t.date <= b).reduce((x, t) => x + t.amount, 0);
       const now = sum(mStart, today);

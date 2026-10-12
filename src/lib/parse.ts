@@ -6,7 +6,7 @@ import { addDays } from './format';
 // Lightweight natural-language understanding for the composer and command bar.
 // "₹450 dinner with Rahul" (or "$12 dinner with Rahul") -> amount 450, food, people [rahul], split equally.
 
-const MERCHANTS = ['Swiggy', 'Zomato', 'Zepto', 'Blinkit', 'Uber', 'Ola', 'Rapido', 'Netflix', 'Spotify', 'Amazon', 'Flipkart', 'Myntra', 'BookMyShow', 'Nykaa', 'Apollo', 'Starbucks', 'Blue Tokai', 'Third Wave', 'Chai Point', 'IndiGo', 'Airbnb', 'Udemy', 'Cult.fit', 'Dunzo', 'Instamart', 'BigBasket'];
+const MERCHANTS = ['Swiggy Instamart', 'Instamart', 'Swiggy', 'Zomato', 'Zepto', 'Blinkit', 'Flipkart Minutes', 'Amazon Now', 'Amazon Fresh', 'JioMart', 'BB Now', 'EatSure', 'Magicpin', 'Licious', 'Country Delight', 'Box8', 'Faasos', 'Uber', 'Ola', 'Rapido', 'Netflix', 'Spotify', 'Amazon', 'Flipkart', 'Myntra', 'BookMyShow', 'Nykaa', 'Apollo', 'Starbucks', 'Blue Tokai', 'Third Wave', 'Chai Point', 'IndiGo', 'Airbnb', 'Udemy', 'Cult.fit', 'Dunzo', 'BigBasket'];
 
 export function guessCategory(text: string, categories?: Category[]): CategoryId | null {
   return categoryFor(text, categories);

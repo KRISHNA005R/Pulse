@@ -327,7 +327,13 @@ export function refresh(input: State): State {
   s.settings.notifications = { ...s.settings.notifications, moments: true };
   s.settings.hideBalances = false;
   s.settings.currency = s.settings.currency ?? 'INR';
-  for (const c of CATEGORIES) if (!s.categories.some((x) => x.id === c.id)) s.categories.push(structuredClone(c));
+  // A new built-in category goes in its usual place (e.g. Delivery apps right after Groceries), not at the end.
+  CATEGORIES.forEach((c, i) => {
+    if (s.categories.some((x) => x.id === c.id)) return;
+    const prev = CATEGORIES.slice(0, i).reverse().find((d) => s.categories.some((x) => x.id === d.id));
+    const at = prev ? s.categories.findIndex((x) => x.id === prev.id) + 1 : s.categories.length;
+    s.categories.splice(at, 0, structuredClone(c));
+  });
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
   repairHoldings(s);
   if (s.mode !== 'personal') return s;

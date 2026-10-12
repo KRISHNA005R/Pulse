@@ -10,6 +10,7 @@ import { Icon } from '../components/ui/Icon';
 const CHIPS: { key: string; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'food', label: 'Food' },
+  { key: 'delivery', label: 'Delivery' },
   { key: 'shopping', label: 'Shopping' },
   { key: 'bills', label: 'Bills' },
   { key: 'transport', label: 'Transport' },
