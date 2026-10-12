@@ -371,6 +371,24 @@ export interface FreshInput {
   sipDate?: string | null;
   /** Currency to track in; defaults to rupees. */
   currency?: import('../lib/currency').CurrencyCode;
+  /** Monthly bills and subscriptions picked during setup: amount and day of the month. */
+  bills?: { name: string; amount: number; day: number; kind: 'bill' | 'subscription'; category: string }[];
+  /** "Finish setup" items already answered with "I don't have this". */
+  skipped?: string[];
+}
+
+/** The next date after today that falls on this day of the month (31 means the month's last day). */
+export function nextOnDay(today: string, day: number): string {
+  const d = Math.min(31, Math.max(1, Math.round(day) || 1));
+  const [y, m, t] = today.split('-').map(Number);
+  const on = (yy: number, mm: number) => {
+    const last = new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+    return `${yy}-${String(mm).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+  };
+  const here = on(y, m);
+  // Due today counts as paid: the balance typed during setup is today's.
+  if (Number(here.slice(8)) > t) return here;
+  return m === 12 ? on(y + 1, 1) : on(y, m + 1);
 }
 
 export function nextFirstOfMonth(today: string): string {
@@ -447,7 +465,9 @@ export function createFresh(input: FreshInput): State {
     transactions: [],
     budgets,
     plans,
-    subscriptions: [],
+    subscriptions: (input.bills ?? [])
+      .filter((b) => b.amount > 0 && b.name.trim())
+      .map((b, i): Subscription => ({ id: `sub-setup-${i + 1}`, name: b.name.trim(), amount: Math.round(b.amount), cycle: 'monthly', nextDate: nextOnDay(today, b.day), category: b.category, status: 'active', kind: b.kind, account: 'main' })),
     investments,
     incomes,
     people: [],
@@ -461,6 +481,7 @@ export function createFresh(input: FreshInput): State {
       notifications: { bills: true, moments: true, weekly: true, splits: true },
       hideBalances: false,
       appLock: false,
+      ...(input.skipped?.length ? { setupSkipped: [...input.skipped] } : {}),
     },
     netWorthHistory: [],
     onboarding: { done: true, reasons: input.reasons, payType: input.payType, income, priorities: input.priorities },

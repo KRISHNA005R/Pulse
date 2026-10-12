@@ -77,7 +77,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
     case 'sub-form':
       return (
         <Sheet title={spec.subId ? 'Recurring payment' : 'Add recurring payment'} onClose={close} size="sm" z={z}>
-          <SubscriptionForm subId={spec.subId} preset={spec.preset} onDone={close} />
+          <SubscriptionForm subId={spec.subId} preset={spec.preset} kind={spec.kind} onDone={close} />
         </Sheet>
       );
     case 'group-form':

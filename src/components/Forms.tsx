@@ -288,7 +288,7 @@ export function BudgetForm({ budgetId, category, onDone }: { budgetId?: string; 
   );
 }
 
-export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; preset?: { name: string; amount: number; category: string }; onDone: () => void }) {
+export function SubscriptionForm({ subId, preset, kind: kind0, onDone }: { subId?: string; preset?: { name: string; amount: number; category: string }; kind?: Subscription['kind']; onDone: () => void }) {
   const store = useStore();
   const { state } = store;
   const ex = state.subscriptions.find((s) => s.id === subId);
@@ -296,7 +296,7 @@ export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; pr
   const [amount, setAmount] = useState(String(ex?.amount ?? preset?.amount ?? ''));
   const [cycle, setCycle] = useState<Subscription['cycle']>(ex?.cycle ?? 'monthly');
   const [next, setNext] = useState(ex?.nextDate ?? addMonths(state.today, 1));
-  const [kind, setKind] = useState<Subscription['kind']>(ex?.kind ?? 'subscription');
+  const [kind, setKind] = useState<Subscription['kind']>(ex?.kind ?? kind0 ?? 'subscription');
   const [status, setStatus] = useState<Subscription['status']>(ex?.status ?? 'active');
   const [account, setAccount] = useState(ex?.account ?? defaultAccount(state));
   const [auto, setAuto] = useState(ex?.autoDebit !== false);
@@ -306,7 +306,7 @@ export function SubscriptionForm({ subId, preset, onDone }: { subId?: string; pr
     <div className="flex flex-col gap-4">
       <Segmented label="Type" value={kind} onChange={setKind} options={[{ value: 'subscription', label: 'Subscription' }, { value: 'bill', label: 'Bill' }]} />
       <Field label="Name" htmlFor="sub-name">
-        <input id="sub-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Spotify, rent, gym…" />
+        <input id="sub-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'bill' ? 'Rent, electricity, Wi-Fi…' : 'Spotify, Netflix, gym…'} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Amount" htmlFor="sub-amount">

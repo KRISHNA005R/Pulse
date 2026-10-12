@@ -13,6 +13,7 @@ import { CategoryMark, EmptyState, PersonAvatar, SectionHeader } from '../compon
 import { Icon } from '../components/ui/Icon';
 import { InstallBanner } from '../components/InstallPrompt';
 import { ReminderCard } from './Reminders';
+import { SetupChecklist } from '../components/SetupChecklist';
 
 export function HomeScreen() {
   const { state, updateSettings } = useStore();
@@ -23,7 +24,9 @@ export function HomeScreen() {
   const next = useMemo(() => {
     const all = upcoming(state, addDays(state.today, 10), true);
     const soon = addDays(state.today, 3);
-    return all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.kind === 'insurance' || u.amount >= scaled(5000)).slice(0, 5);
+    const list = all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.kind === 'insurance' || u.amount >= scaled(5000)).slice(0, 5);
+    // Nothing soon: still show the next payment, so Home never looks like no bills were added.
+    return list.length ? list : upcoming(state, addDays(state.today, 35)).slice(0, 1);
   }, [state]);
   const plans = state.plans.filter((p) => p.status === 'active').slice(0, 3);
   const recent = useMemo(() => [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4), [state.transactions]);
@@ -39,6 +42,7 @@ export function HomeScreen() {
       <InstallBanner />
       <ReminderCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />
+      <SetupChecklist />
 
       <section aria-labelledby="h-next">
         <SectionHeader id="h-next" title="Up next" action={{ label: 'All bills', onClick: () => ui.push({ name: 'subscriptions' }, 'you') }} />

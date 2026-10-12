@@ -189,7 +189,7 @@ export function askPulse(s: State, question: string): AIAnswer {
     const { amount, what } = parseAffordQuery(question);
     if (!amount) return { text: `Tell me the amount and I'll check it against your week. For example: "Can I afford ${ex(3000)} on shoes?"`, followups: [`Can I afford ${ex(3000)}?`, `Can I afford ${ex(6000)} on shoes?`] };
     const r = canIAfford(s, amount, what);
-    return { text: `${r.headline} ${r.explanation}`, blocks: [{ type: 'afford', result: r }], followups: ['How much can I spend this weekend?', ...(s.plans.some((p) => p.status === 'active') ? [`When will I reach my ${s.plans.find((p) => p.status === 'active')!.name} goal?`] : [])] };
+    return { text: `${r.headline} ${r.explanation}${r.billsMissing ? " Heads-up: you haven't added rent or bills yet, so this may be too generous." : ''}`, blocks: [{ type: 'afford', result: r }], followups: ['How much can I spend this weekend?', ...(s.plans.some((p) => p.status === 'active') ? [`When will I reach my ${s.plans.find((p) => p.status === 'active')!.name} goal?`] : [])] };
   }
 
   // --- Weekend ---

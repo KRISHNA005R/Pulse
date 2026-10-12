@@ -37,7 +37,7 @@ export type SheetSpec =
   | { type: 'plan-form'; planId?: string; template?: string }
   | { type: 'contribute'; planId: string }
   | { type: 'budget-form'; budgetId?: string; category?: string }
-  | { type: 'sub-form'; subId?: string; preset?: { name: string; amount: number; category: string } }
+  | { type: 'sub-form'; subId?: string; preset?: { name: string; amount: number; category: string }; kind?: 'bill' | 'subscription' }
   | { type: 'group-form' }
   | { type: 'group-expense'; groupId?: string; personId?: string }
   | { type: 'settle'; personId: string; groupId?: string }

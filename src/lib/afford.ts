@@ -1,3 +1,4 @@
+import { billsUnknown } from './setup';
 import type { CategoryId, State } from '../types';
 import { AMOUNT_PREFIX } from './currency';
 import { budgetFor, budgetState, categoryName, planMetrics, safeToSpend } from './finance';
@@ -20,6 +21,8 @@ export interface AffordResult {
   planImpacts: { planId: string; name: string; icon: string; days: number; amount: number }[];
   budget: { name: string; period: string; leftBefore: number; leftAfter: number } | null;
   explanation: string;
+  /** No rent, bills or loans added yet: the answer may be too generous (lib/setup.ts). */
+  billsMissing: boolean;
 }
 
 /**
@@ -106,6 +109,7 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
     planImpacts,
     budget,
     explanation,
+    billsMissing: billsUnknown(s),
   };
 }
 

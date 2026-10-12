@@ -17,6 +17,24 @@ import { MoneyInput, ProgressBar } from './ui/bits';
 // ------------------------------------------------------------------
 // Can I afford this?
 // ------------------------------------------------------------------
+/** Shown when no rent, bills or loans are known yet, so the answer may be too generous. */
+function BillsMissingNote() {
+  const ui = useUI();
+  return (
+    <div className="mt-3 flex items-start gap-2.5 rounded-xl bg-sunk p-3 text-[13.5px] leading-snug">
+      <span className="mt-px text-warn" aria-hidden="true">
+        ▲
+      </span>
+      <p className="flex-1 text-ink2">
+        <span className="font-semibold text-ink">Heads-up:</span> you haven't added rent or bills yet, so this may be too generous.{' '}
+        <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => ui.openSheet({ type: 'sub-form', kind: 'bill' })}>
+          Add bills
+        </button>
+      </p>
+    </div>
+  );
+}
+
 export function AffordCard({ r }: { r: AffordResult }) {
   const tone = r.verdict === 'comfortable' || r.verdict === 'yes' ? 'text-pos' : r.verdict === 'not-now' || r.verdict === 'tight' ? 'text-ink' : 'text-warn';
   const mark = r.verdict === 'comfortable' || r.verdict === 'yes' ? 'check' : 'info';
@@ -25,6 +43,7 @@ export function AffordCard({ r }: { r: AffordResult }) {
       <p className={`display flex items-center gap-2 text-[19px] ${tone}`}>
         <Icon name={mark} size={20} /> {r.headline}
       </p>
+      {r.billsMissing && <BillsMissingNote />}
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
         <div>
           <dt className="text-[12.5px] text-ink3">Safe to spend now</dt>
