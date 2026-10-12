@@ -514,7 +514,7 @@ export function Onboarding() {
                 </p>
               )}
             </div>
-            <ul className="mt-4 flex flex-col gap-2.5">
+            <ul className="mb-6 mt-4 flex flex-col gap-2.5">
               {[
                 ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.length} monthly ${fresh.subscriptions.length === 1 ? 'payment is' : 'payments are'} kept aside before ${fresh.subscriptions.length === 1 ? 'it’s' : 'they’re'} due` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
                 ['target', fresh.plans.length ? 'An emergency fund plan is ready to top up' : 'Create a plan for something you’re saving for'],
