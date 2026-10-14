@@ -50,7 +50,7 @@ export function CommandBar({ initial = '' }: { initial?: string; onClose?: () =>
     const addMatch = lower.match(/^(add|spent|paid|log)\b/);
     const amt = parseAmount(text);
     if (addMatch || (amt && !/afford|owe|show/.test(lower))) {
-      const p = parseEntry(text.replace(/^(add|spent|paid|log)\s*/i, ''), { people: state.people, plans: state.plans, today: state.today });
+      const p = parseEntry(text.replace(/^(add|spent|paid|log)\s*/i, ''), { people: state.people, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions });
       out.push({
         id: 'add',
         icon: 'plus',

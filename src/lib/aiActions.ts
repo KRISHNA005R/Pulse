@@ -140,7 +140,7 @@ export function parseAction(s: State, input: string): AIAction | null {
   // --- Budget ---
   if (/\bbudget\b/.test(lower) && amount) {
     const rest = lower.replace(/\bbudget\b/g, '');
-    const category = s.categories.find((c) => c.kind === 'expense' && new RegExp(`\\b${c.name.toLowerCase().split(/[ &]/)[0]}`).test(rest))?.id ?? guessCategory(rest, s.categories);
+    const category = s.categories.find((c) => c.kind === 'expense' && new RegExp(`\\b${c.name.toLowerCase().split(/[ &]/)[0]}`).test(rest))?.id ?? guessCategory(rest, s.categories, 'expense');
     if (category) {
       const period: BudgetPeriod = /\bweek(ly)?\b/.test(lower) ? 'weekly' : 'monthly';
       const existing = s.budgets.find((b) => b.category === category && b.period === period) ?? s.budgets.find((b) => b.category === category);
@@ -201,7 +201,7 @@ export function parseAction(s: State, input: string): AIAction | null {
   const bare = raw.split(/\s+/).length <= 7; // "450 dinner with rahul" style entries
   if (!expenseWords.test(lower) && !bare) return null;
   const body = raw.replace(/^\s*(please\s+)?(add|log|record|note)\s+(an?\s+)?(expense\s+(of\s+)?)?/i, '').replace(/^\s*i\s+/i, '').replace(/^\s*(spent|paid|bought)\s+/i, '');
-  const p = parseEntry(body, { people: s.people, plans: s.plans, today, categories: s.categories });
+  const p = parseEntry(body, { people: s.people, plans: s.plans, today, categories: s.categories, history: s.transactions });
   if (p.people.length || p.newPeople.length) {
     const names = [...p.people.map((id) => s.people.find((x) => x.id === id)?.short ?? ''), ...p.newPeople].filter(Boolean);
     return { kind: 'split', text: body, amount, names };

@@ -31,7 +31,7 @@ export interface AffordResult {
  */
 export function canIAfford(s: State, amount: number, what = ''): AffordResult {
   const sts = safeToSpend(s);
-  const category = guessCategory(what);
+  const category = guessCategory(what, undefined, 'expense');
   const label = what.trim();
   const safeAfter = Math.max(0, sts.safe - amount);
   const dailyAfter = Math.floor(safeAfter / sts.daysLeft);

@@ -82,7 +82,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const [paidBy, setPaidBy] = useState('me');
   const [saved, setSaved] = useState(false);
 
-  const parsed = useMemo(() => parseEntry(text, { people: state.people, plans: state.plans, today: state.today, categories: state.categories }), [text, state.people, state.plans, state.today, state.categories]);
+  const parsed = useMemo(() => parseEntry(text, { people: state.people, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions }), [text, state.people, state.plans, state.today, state.categories, state.transactions]);
 
   // Inference fills anything the user hasn't set by hand.
   const effAmount = parseFloat(amount) || (parsed.amount ?? 0);

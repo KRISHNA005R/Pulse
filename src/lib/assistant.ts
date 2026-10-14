@@ -320,7 +320,7 @@ export function askPulse(s: State, question: string): AIAnswer {
   }
 
   // --- Category or merchant spend ---
-  const catHit = CAT_WORDS.find(([, re]) => re.test(q))?.[0] ?? (/(spend|spent)/.test(q) ? guessCategory(q) : null);
+  const catHit = CAT_WORDS.find(([, re]) => re.test(q))?.[0] ?? (/(spend|spent)/.test(q) ? guessCategory(q, s.categories, 'expense') : null);
   if (catHit && /(how much|spent|spend|spending)/.test(q)) {
     const lastMonth = /last month/.test(q);
     const merchant = ['instamart', 'swiggy', 'zomato', 'uber', 'rapido', 'amazon', 'myntra', 'flipkart', 'zepto', 'blinkit', 'bigbasket', 'jiomart'].find((m) => q.includes(m));

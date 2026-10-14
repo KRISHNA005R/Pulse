@@ -1,15 +1,16 @@
-import type { Category, CategoryId, ISODate, Person, Plan, TxType } from '../types';
+import type { Category, CategoryId, ISODate, Person, Plan, Transaction, TxType } from '../types';
 import { AMOUNT_PREFIX, roundMoney } from './currency';
 import { categoryFor } from './lexicon';
 import { addDays } from './format';
+import { isAuto } from './auto';
 
 // Lightweight natural-language understanding for the composer and command bar.
 // "₹450 dinner with Rahul" (or "$12 dinner with Rahul") -> amount 450, food, people [rahul], split equally.
 
 const MERCHANTS = ['Swiggy Instamart', 'Instamart', 'Swiggy', 'Zomato', 'Zepto', 'Blinkit', 'Flipkart Minutes', 'Amazon Now', 'Amazon Fresh', 'JioMart', 'BB Now', 'EatSure', 'Magicpin', 'Licious', 'Country Delight', 'Box8', 'Faasos', 'Uber', 'Ola', 'Rapido', 'Netflix', 'Spotify', 'Amazon', 'Flipkart', 'Myntra', 'BookMyShow', 'Nykaa', 'Apollo', 'Starbucks', 'Blue Tokai', 'Third Wave', 'Chai Point', 'IndiGo', 'Airbnb', 'Udemy', 'Cult.fit', 'Dunzo', 'BigBasket'];
 
-export function guessCategory(text: string, categories?: Category[]): CategoryId | null {
-  return categoryFor(text, categories);
+export function guessCategory(text: string, categories?: Category[], kind?: 'expense' | 'income'): CategoryId | null {
+  return categoryFor(text, categories, kind);
 }
 
 export function parseAmount(text: string): number | null {
@@ -25,6 +26,9 @@ export function parseAmount(text: string): number | null {
   return Number.isFinite(v) && v > 0 ? roundMoney(v) : null;
 }
 
+/** Just the words, for comparing names: "Swiggy · Biryani" and "swiggy biryani" are the same. */
+const words = (s: string) => s.toLowerCase().replace(/[^\p{L}]+/gu, ' ').trim();
+
 export interface Parsed {
   amount: number | null;
   category: CategoryId | null;
@@ -38,11 +42,10 @@ export interface Parsed {
   label: string;
 }
 
-export function parseEntry(text: string, ctx: { people: Person[]; plans: Plan[]; today: ISODate; categories?: Category[] }): Parsed {
+export function parseEntry(text: string, ctx: { people: Person[]; plans: Plan[]; today: ISODate; categories?: Category[]; history?: Transaction[] }): Parsed {
   const raw = text.trim();
   const lower = raw.toLowerCase();
   const amount = parseAmount(raw);
-  const category = guessCategory(raw, ctx.categories);
   const merchant = MERCHANTS.find((m) => lower.includes(m.toLowerCase())) ?? null;
 
   // People: known names anywhere, or "with X", "w/ X", "and Y"
@@ -85,6 +88,12 @@ export function parseEntry(text: string, ctx: { people: Person[]; plans: Plan[];
     .trim();
   if (merchant && label.toLowerCase() === merchant.toLowerCase()) label = merchant;
   label = label ? label.charAt(0).toUpperCase() + label.slice(1) : '';
+
+  // The category this person picked last time for the same words beats any guess, so PULSE learns their own way of naming things.
+  const kind = type === 'income' ? 'income' : type === 'transfer' ? undefined : 'expense';
+  const key = words(label);
+  const learned = key ? ctx.history?.find((t) => !isAuto(t) && (kind ? t.type === kind : true) && words(t.merchant) === key)?.category : undefined;
+  const category = learned && (!ctx.categories || ctx.categories.some((c) => c.id === learned)) ? learned : guessCategory(raw, ctx.categories, kind);
 
   return { amount, category, merchant, people, newPeople, plan, date, type, split, label };
 }
