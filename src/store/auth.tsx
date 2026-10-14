@@ -33,6 +33,10 @@ interface AuthValue {
 
 const Ctx = createContext<AuthValue | null>(null);
 
+/** The name a set-up person goes by, or '' before setup (the demo's name is not theirs). */
+const personalName = (st: { mode: string; onboarding: { done: boolean }; user: { fullName: string; name: string } }) =>
+  st.mode === 'personal' && st.onboarding.done ? (st.user.fullName || st.user.name).trim().slice(0, 40) : '';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const store = useStore();
   const ref = useRef(store);
@@ -116,7 +120,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const s = loadSession();
     if (!s) return;
-    void authCall({ action: 'me' }, s.token).then((r) => {
+    // Also tells the account the name this person goes by and whether setup is done (shown on the stats page).
+    const st = ref.current.state;
+    const mine = st.mode === 'personal' && st.onboarding.done;
+    void authCall({ action: 'me', ...(mine ? { name: st.user.fullName || st.user.name, setup: true } : {}) }, s.token).then((r) => {
       if (r.ok) {
         const account = r.data.account as Account;
         saveSession({ token: s.token, account });
@@ -127,6 +134,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
   }, []);
+
+  // A new name in Profile goes to the account too (finishing setup sends it from Onboarding).
+  const myName = personalName(store.state);
+  useEffect(() => {
+    const s = loadSession();
+    if (!s || !myName || s.account.name === myName) return;
+    const t = window.setTimeout(() => {
+      void authCall({ action: 'me', name: myName, setup: true }, s.token).then((r) => {
+        if (!r.ok) return;
+        const next = { token: s.token, account: r.data.account as Account };
+        saveSession(next);
+        setSession(next);
+      });
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [myName, session?.token]);
 
   // Signed in, but this device's data isn't being saved to the account (set up again after a reset,
   // say): connect it. Being signed in must always mean the data is saved.
@@ -159,7 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emailVerify: (email, code) => run({ action: 'email-verify', email, code }),
       rename: (name) => {
         const s = loadSession();
-        if (!s || !name.trim() || s.account.name) return;
+        if (!s || !name.trim() || s.account.name === name.trim()) return;
         void authCall({ action: 'name', name }, s.token).then((r) => {
           if (!r.ok) return;
           const next = { token: s.token, account: r.data.account as Account };

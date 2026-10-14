@@ -58,6 +58,15 @@ export interface Summary {
     accounts: number;
     sync: boolean;
     streak: number;
+    /** Rent and other bills (not subscriptions). */
+    bills: number;
+    /** Friends connected on PULSE, and groups shared with a link. */
+    friends: number;
+    groups: number;
+    /** Reminders switched on for this device. */
+    reminders: boolean;
+    /** Signed in with Google or an email code. */
+    account: boolean;
   };
 }
 
@@ -102,6 +111,16 @@ let getState: () => State = () => {
 };
 const enabled = () => true;
 
+const stored = (key: string) => {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? 'null') as Record<string, unknown> | null;
+  } catch {
+    return null;
+  }
+};
+const remindersOn = () => stored('pulse-push-v1')?.on === true && typeof Notification !== 'undefined' && Notification.permission === 'granted';
+const signedIn = () => !!stored('pulse-auth-v1');
+
 const syncOn = () => {
   try {
     return !!localStorage.getItem('pulse-sync-v1');
@@ -140,8 +159,13 @@ export function buildSummary(s: State, l: Local = load()): Summary {
           accounts: s.accounts.length,
           sync: syncOn(),
           streak: streak(s).count,
+          bills: s.subscriptions.filter((x) => x.kind === 'bill').length,
+          friends: s.people.filter((p) => p.link).length,
+          groups: s.groups.filter((g) => g.shared).length,
+          reminders: remindersOn(),
+          account: signedIn(),
         }
-      : { onboarded: false, personal: false, incomes: 0, salary: false, txMonth: 0, catsMonth: 0, plans: 0, budgets: 0, subs: 0, invest: 0, insure: 0, accounts: 0, sync: false, streak: 0 },
+      : { onboarded: false, personal: false, incomes: 0, salary: false, txMonth: 0, catsMonth: 0, plans: 0, budgets: 0, subs: 0, invest: 0, insure: 0, accounts: 0, sync: false, streak: 0, bills: 0, friends: 0, groups: 0, reminders: false, account: signedIn() },
   };
 }
 

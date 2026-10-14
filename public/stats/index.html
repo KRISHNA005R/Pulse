@@ -48,7 +48,7 @@
     .ret { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
     .ret > div { background: var(--sunk); border-radius: 14px; padding: 10px 11px; min-width: 0; }
     .ret .muted { font-size: 12px; line-height: 1.3; }
-    .ret .n { font-family: var(--display); font-size: clamp(17px, 4.6vw, 22px); font-weight: 700; margin: 4px 0 2px; white-space: nowrap; }
+    .ret .n { font-family: var(--display); font-size: clamp(16px, 4.2vw, 20px); font-weight: 700; margin: 4px 0 2px; white-space: nowrap; }
     .row .top span:first-child::first-letter { text-transform: uppercase; }
     .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 5; }
     form { max-width: 380px; margin: 14vh auto 0; display: flex; flex-direction: column; gap: 12px; }
@@ -80,6 +80,15 @@
     .write textarea { resize: vertical; min-height: 76px; }
     .write .btns { display: flex; gap: 8px; flex-wrap: wrap; }
     .write .ghost { padding: 13px 18px; font-size: 14px; }
+    .mem { border-top: 1px solid var(--line); padding: 10px 0; font-size: 14px; }
+    .mem .l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .mem .l1 .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mem .l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--ink3); font-size: 12.5px; }
+    .pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 650; background: var(--sunk); color: var(--ink2); }
+    .pill.on { background: var(--accent-soft); color: var(--accent); }
+    .mem.gone { color: var(--ink3); }
+    .ret4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    @media (max-width: 560px) { .ret4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   </style>
 </head>
 <body>
@@ -179,8 +188,18 @@
     fetch('/api/auth?members=1', { headers: { 'x-stats-key': getKey() }, cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
-      .then(function (m) { var el = document.getElementById('members'); if (el) el.innerHTML = members(m); });
+      .then(function (m) {
+        var el = document.getElementById('members');
+        if (!el) return;
+        var draw = function () {
+          el.innerHTML = members(m);
+          var b = document.getElementById('memall');
+          if (b) b.onclick = function () { showAll = !showAll; draw(); };
+        };
+        draw();
+      });
   }
+  var showAll = false;
   function members(m) {
     if (!m) return '';
     var cell = function (label, n, sub) { return '<div><div class="muted">' + label + '</div><div class="n">' + fmt(n) + '</div>' + (sub ? '<div class="muted">' + sub + '</div>' : '') + '</div>'; };
@@ -192,16 +211,31 @@
       }).join('') + '</div>' +
       '<div class="muted" style="display:flex;justify-content:space-between;margin-top:4px"><span>' + esc(short(m.days[0].day)) + '</span><span>New accounts per day</span><span>Today</span></div>';
     var when = function (iso) { return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); };
-    var list = m.latest.map(function (a) {
-      return '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:14px">' +
-        '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b>#' + a.n + '</b> ' + esc(a.name || '') + ' <span class="muted">' + esc(a.email) + '</span></span>' +
-        '<span class="muted" style="white-space:nowrap">' + (a.google ? 'Google' : 'Email') + ' · ' + esc(when(a.at)) + '</span></div>';
+    var todayIst = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
+    var ago = function (day) {
+      var n = Math.round((new Date(todayIst + 'T00:00:00Z') - new Date(day + 'T00:00:00Z')) / 86400000);
+      return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+    };
+    var rows = m.members || [];
+    var shown = showAll ? rows : rows.slice(0, 25);
+    var list = shown.map(function (a) {
+      if (a.deleted) return '<div class="mem gone"><div class="l1"><b>#' + a.n + '</b><span>Account deleted</span></div></div>';
+      var name = a.name ? '<b>' + esc(a.name) + '</b> ' : '<span class="muted">No name yet</span> ';
+      return '<div class="mem"><div class="l1"><b>#' + a.n + '</b><span class="who">' + name + '<span class="muted">' + esc(a.email) + '</span></span></div>' +
+        '<div class="l2"><span>' + (a.google ? 'Google' : 'Email') + ' · joined ' + esc(when(a.at)) + '</span>' +
+        (a.seen ? '<span>Last opened ' + esc(ago(a.seen)) + '</span>' : '') +
+        '<span class="pill' + (a.devices ? ' on' : '') + '">' + (a.devices ? 'Signed in' + (a.devices > 1 ? ' · ' + a.devices + ' devices' : '') : 'Signed out') + '</span>' +
+        (a.setup ? '<span class="pill">Set up</span>' : '') + '</div></div>';
     }).join('');
+    var more = rows.length > 25 ? '<button class="ghost" id="memall" style="margin-top:10px">' + (showAll ? 'Show fewer' : 'Show all ' + rows.length) + '</button>' : '';
     var gone = m.highest - m.total;
-    return '<div class="card" style="margin-bottom:12px"><h2>Accounts</h2><div class="muted">People who have signed in with Google or an email code</div><div class="ret">' +
-      cell('Registered', m.total, gone > 0 ? gone + ' deleted theirs' : '') + cell('New today', m.today) + cell('Last 7 days', m.week) + '</div>' +
-      (m.total ? chart + '<h2 style="margin-top:18px">Latest to join</h2>' + list +
-        '<p class="note">Email addresses are partly hidden on purpose: this page opens with one shared password, so it does not show anyone\'s full address.</p>'
+    return '<div class="card" style="margin-bottom:12px"><h2>Accounts</h2><div class="muted">People who have signed in with Google or an email code</div><div class="ret ret4">' +
+      cell('Registered', m.total, gone > 0 ? gone + ' deleted theirs' : (m.google + ' with Google')) +
+      cell('Signed in now', m.signedIn, 'on at least one device') +
+      cell('Finished setup', m.setup, 'own money, not demo') +
+      cell('Opened this week', m.activeWeek, 'new today ' + fmt(m.today) + ' · this week ' + fmt(m.week)) + '</div>' +
+      (m.total ? chart + '<h2 style="margin-top:18px">Everyone, newest first</h2>' + list + more +
+        '<p class="note">Names come from Google, or from setup for email sign-ins: “No name yet” means they signed in but haven’t finished setup on the updated app. “Last opened” and “Set up” fill in as people open the app from 14 Oct onwards. Email addresses are partly hidden on purpose: this page opens with one shared password.</p>'
         : '<p class="muted" style="margin-top:10px">Nobody has signed in yet. Accounts show up here the moment someone does.</p>') + '</div>';
   }
 
@@ -350,12 +384,16 @@
 
       '<div class="card"><h2>Setup steps</h2><div class="muted">Everyone seen in the last 30 days, where they are now</div><div class="rows">' + bars(funnel, top) + '</div></div>' +
 
+      (d.setup ? '<div class="card"><h2>Using the newer features</h2><div class="muted">People with their own money, last 30 days' + (d.setup.reporting ? ', of the ' + fmt(d.setup.reporting) + ' on the app from 14 Oct onwards' : '') + '</div>' +
+        (d.setup.reporting ? '<div class="rows">' + bars(d.setup.rows.map(function (x) { return { label: x.label, n: x.n, of: Math.round((x.n / d.setup.reporting) * 100) }; }), d.setup.reporting) + '</div>'
+          : '<p class="muted" style="margin-top:10px">Fills in as people open the updated app.</p>') + '</div>' : '') +
+
       '<div class="card"><h2>Categories used this month</h2><div class="muted">Average ' + d.categories.avg + ' per person</div><div class="rows">' +
       bars(d.categories.spread, Math.max.apply(null, d.categories.spread.map(function (x) { return x.n; }).concat(1))) + '</div></div>' +
 
       '<div class="card"><h2>Features</h2><div class="muted">Devices that used each at least once, last 30 days</div><div class="rows">' + bars(f, fMax) + '</div></div>' +
 
-      '<div class="card"><h2>Devices</h2><div class="muted">Last 30 days</div><div class="rows">' + dev(d.devices.platform) + '</div>' +
+      '<div class="card"><h2>Devices</h2><div class="muted">Last 30 days</div><div class="rows">' + dev(d.devices.platform.map(function (x) { return { label: { ios: 'Apple iPhone / iPad', android: 'Android', desktop: 'Computer', other: 'Other' }[x.label] || x.label, n: x.n }; })) + '</div>' +
       '<div class="rows" style="margin-top:16px">' + dev(d.devices.mode) + '</div>' +
       '<h2 style="margin-top:16px">App version</h2><div class="rows">' + dev(d.devices.version.map(function (v) { return { label: v.label.replace('T', ' ') + (v.label.length > 10 ? ' UTC' : ''), n: v.n }; })) + '</div></div>' +
       '</div>' +

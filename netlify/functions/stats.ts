@@ -3,8 +3,11 @@
 //   POST /api/ping   { v, id, day, since, ... }   -> 204   (one device's summary for one day; re-sent = overwritten)
 //   GET  /api/stats?days=60   header x-stats-key  -> aggregated numbers for the private dashboard
 //
-// A ping holds only counts and yes/no flags (see src/lib/stats.ts). Each day is one blob,
-// `day/YYYY-MM-DD`, mapping the anonymous device id to its latest summary for that day.
+// A ping holds only counts and yes/no flags (see src/lib/stats.ts). Each device's summary for a day
+// is its own blob, `u/YYYY-MM-DD/<id>`, so phones pinging at the same moment never collide. Once a
+// day can't get pings any more (4+ days old), the stats page folds its `u/` blobs into one
+// `day/YYYY-MM-DD` blob ({ users: { id: summary } }) and removes them. Days saved before this
+// change are already in that shape.
 import { getStore } from '@netlify/blobs';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -12,11 +15,16 @@ declare const process: { env: Record<string, string | undefined> };
 type StoreLike = {
   getWithMetadata(key: string, opts: { type: 'json' }): Promise<{ data: unknown; etag?: string } | null>;
   setJSON(key: string, value: unknown, opts?: { onlyIfMatch?: string; onlyIfNew?: boolean }): Promise<{ modified: boolean } | void>;
+  list(opts: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
+  delete(key: string): Promise<void>;
 };
 
 const EVENTS = ['expense', 'income', 'split', 'ai', 'plan', 'budget', 'backup', 'sync'] as const;
 const NUMS = ['incomes', 'txMonth', 'catsMonth', 'plans', 'budgets', 'subs', 'invest', 'insure', 'accounts', 'streak'] as const;
 const BOOLS = ['onboarded', 'personal', 'salary', 'sync'] as const;
+// Sent by app versions from 14 Oct 2026. Kept only when sent, so older phones don't count as "no".
+const NUMS2 = ['bills', 'friends', 'groups'] as const;
+const BOOLS2 = ['reminders', 'account'] as const;
 const PLATFORMS = ['ios', 'android', 'desktop', 'other'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[0-9a-f]{32}$/;
@@ -30,7 +38,7 @@ export interface Rec {
   installed: boolean;
   demo: boolean;
   ev: Record<(typeof EVENTS)[number], number>;
-  s: Record<(typeof NUMS)[number], number> & Record<(typeof BOOLS)[number], boolean>;
+  s: Record<(typeof NUMS)[number], number> & Record<(typeof BOOLS)[number], boolean> & Partial<Record<(typeof NUMS2)[number], number> & Record<(typeof BOOLS2)[number], boolean>>;
   at: string;
 }
 type DayBlob = { users: Record<string, Rec> };
@@ -65,23 +73,55 @@ export function clean(b: Record<string, unknown>): { id: string; day: string; re
       installed: b.installed === true,
       demo: b.demo === true,
       ev: Object.fromEntries(EVENTS.map((e) => [e, int(ev[e])])) as Rec['ev'],
-      s: { ...Object.fromEntries(NUMS.map((k) => [k, int(s[k])])), ...Object.fromEntries(BOOLS.map((k) => [k, s[k] === true])) } as Rec['s'],
+      s: {
+        ...Object.fromEntries(NUMS.map((k) => [k, int(s[k])])),
+        ...Object.fromEntries(BOOLS.map((k) => [k, s[k] === true])),
+        ...Object.fromEntries(NUMS2.filter((k) => k in s).map((k) => [k, int(s[k])])),
+        ...Object.fromEntries(BOOLS2.filter((k) => k in s).map((k) => [k, s[k] === true])),
+      } as Rec['s'],
       at: new Date().toISOString(),
     },
   };
 }
 
 async function save(store: StoreLike, day: string, id: string, rec: Rec) {
-  const key = `day/${day}`;
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const hit = await store.getWithMetadata(key, { type: 'json' });
-    const blob = (hit?.data as DayBlob | undefined) ?? { users: {} };
-    blob.users[id] = rec;
-    const res = hit ? await store.setJSON(key, blob, hit.etag ? { onlyIfMatch: hit.etag } : undefined) : await store.setJSON(key, blob, { onlyIfNew: true });
-    if (!res || res.modified !== false) return true;
-    await new Promise((r) => setTimeout(r, 40 + Math.random() * 120 * (attempt + 1)));
+  await store.setJSON(`u/${day}/${id}`, rec);
+  return true;
+}
+
+/** Days that can still get pings (a ping may be for up to 3 days ago; India is ahead of UTC). */
+const LIVE_DAYS = 4;
+
+/**
+ * Every device's summary for each day asked for. Days that can't change any more are folded into
+ * one blob the first time they are read, so later reads stay cheap.
+ */
+export async function readDays(store: StoreLike, list: string[], today: string) {
+  const loose = new Map<string, string[]>(); // day -> u/ keys
+  for (const { key } of (await store.list({ prefix: 'u/' })).blobs) {
+    const [, day, id] = key.split('/');
+    if (!DAY.test(day ?? '') || !ID.test(id ?? '')) continue;
+    if (!loose.has(day)) loose.set(day, []);
+    loose.get(day)!.push(key);
   }
-  return false;
+  const settled = addDays(today, -LIVE_DAYS);
+  // Days older than the range asked for are folded too, so u/ never piles up.
+  const all = [...new Set([...list, ...[...loose.keys()].filter((d) => d < settled)])].sort();
+  const out = await Promise.all(
+    all.map(async (day) => {
+      const users = { ...((((await store.getWithMetadata(`day/${day}`, { type: 'json' }))?.data as DayBlob | undefined)?.users) ?? {}) };
+      const keys = loose.get(day) ?? [];
+      const recs = await Promise.all(keys.map(async (k) => [k.split('/')[2], (await store.getWithMetadata(k, { type: 'json' }))?.data as Rec | undefined] as const));
+      for (const [id, r] of recs) if (r && (!users[id] || r.at >= users[id].at)) users[id] = r;
+      if (keys.length && day < settled) {
+        await store.setJSON(`day/${day}`, { users } satisfies DayBlob);
+        await Promise.all(keys.map((k) => store.delete(k)));
+      }
+      return { day, users };
+    }),
+  );
+  const want = new Set(list);
+  return out.filter((d) => want.has(d.day));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -150,9 +190,21 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
     { label: 'Used 5+ categories this month', n: count(R, (r) => r.s.catsMonth >= 5) },
     { label: 'Made a plan', n: count(R, (r) => r.s.plans > 0) },
     { label: 'Added a SIP', n: count(R, (r) => r.s.invest > 0) },
-    { label: 'Turned on sync', n: count(R, (r) => r.s.sync) },
     { label: 'Installed the app', n: count(R, (r) => r.installed) },
   ];
+  // Only app versions from 14 Oct 2026 report these, so older phones count as "no" until they update.
+  const fresh = R.filter((r) => typeof r.s.reminders === 'boolean');
+  const setup = {
+    reporting: fresh.length,
+    rows: [
+      { label: 'Signed in', n: count(fresh, (r) => r.s.account === true) },
+      { label: 'Added rent or bills', n: count(fresh, (r) => (r.s.bills ?? 0) > 0) },
+      { label: 'Added any recurring payment', n: count(fresh, (r) => r.s.subs > 0) },
+      { label: 'Connected a friend', n: count(fresh, (r) => (r.s.friends ?? 0) > 0) },
+      { label: 'In a shared group', n: count(fresh, (r) => (r.s.groups ?? 0) > 0) },
+      { label: 'Reminders on', n: count(fresh, (r) => r.s.reminders === true) },
+    ],
+  };
 
   // Feature use in the last 30 days, by real users.
   const used = (e: keyof Rec['ev']) => {
@@ -178,6 +230,7 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
     daily,
     retention,
     funnel,
+    setup,
     habit: {
       logsPerActiveDay: userDays ? Math.round((logs30 / userDays) * 10) / 10 : 0,
       daysWithLogPct: pct(loggedDays, userDays),
@@ -197,7 +250,6 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
       { label: 'Made a plan', n: used('plan') },
       { label: 'Made a budget', n: used('budget') },
       { label: 'Copied a backup code', n: used('backup') },
-      { label: 'Set up sync', n: used('sync') },
       { label: 'Opened the demo (anyone)', n: demoOpeners.size },
     ],
     devices: {
@@ -237,10 +289,7 @@ export async function handle(req: Request, store: StoreLike, keyHash = DEFAULT_K
       // The person's "today" is up to a day ahead of UTC (India is +5:30).
       const today = url.searchParams.get('today') && DAY.test(url.searchParams.get('today')!) ? url.searchParams.get('today')! : utcToday();
       const list = Array.from({ length: n }, (_, i) => addDays(today, i - n + 1));
-      const days = await Promise.all(
-        list.map(async (day) => ({ day, users: (((await store.getWithMetadata(`day/${day}`, { type: 'json' }))?.data as DayBlob | undefined)?.users ?? {}) })),
-      );
-      return json(aggregate(days, today));
+      return json(aggregate(await readDays(store, list, today), today));
     }
 
     return json({ error: 'method not allowed' }, 405);

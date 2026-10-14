@@ -43,7 +43,14 @@ export interface Account {
   sess: string[];
   /** The id of this person's GIF profile photo, when they have one (netlify/lib/faces.ts). */
   face?: string;
+  /** India date this account last opened PULSE, for the stats page. */
+  seen?: string;
+  /** Finished setup with their own money on at least one device. */
+  setup?: boolean;
 }
+
+/** India's date for a moment, since that is where the people are. */
+const istDay = (d: Date | string) => new Date(new Date(d).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 
 export interface GoogleUser {
   sub: string;
@@ -123,6 +130,7 @@ async function signIn(ctx: AuthCtx, who: { email: string; name: string; google?:
   }
   if (!acct.name && who.name) acct.name = who.name;
   if (who.google) acct.google = who.google;
+  acct.seen = istDay(now);
   const token = b64url(rand(36));
   const th = await sha256(token);
   await store.setJSON(`sess/${th}`, { uid: acct.uid, at: now });
@@ -232,7 +240,17 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
   if (!acct) return fail(401, 'signed out');
   const th = await sha256(token);
 
-  if (action === 'me') return { status: 200, body: { ok: true, account: pub(acct) } };
+  // The app opened. It also says the name the person goes by and whether setup is done, so the
+  // stats page can show both. Saved only when something changed, so at most once a day.
+  if (action === 'me') {
+    const name = clean(body.name, 40);
+    const next = { ...acct, seen: istDay(now), ...(name ? { name } : {}), ...(body.setup === true ? { setup: true } : {}) };
+    if (next.seen !== acct.seen || next.name !== acct.name || next.setup !== acct.setup) {
+      await store.setJSON(`acct/${acct.uid}`, next);
+      return { status: 200, body: { ok: true, account: pub(next) } };
+    }
+    return { status: 200, body: { ok: true, account: pub(acct) } };
+  }
 
   // The first device to sign in says which sync code the data is under; every later device is told it.
   if (action === 'code') {
@@ -348,52 +366,57 @@ export function maskEmail(email: string): string {
   return `${name.slice(0, keep)}${'•'.repeat(Math.max(3, Math.min(6, name.length - keep)))}@${domain}`;
 }
 
+export interface MemberRow {
+  n: number;
+  /** The account was deleted; its number is never given out again. */
+  deleted?: boolean;
+  name?: string;
+  email?: string;
+  at?: string;
+  google?: boolean;
+  /** Devices signed in right now (0 = signed out everywhere). */
+  devices?: number;
+  setup?: boolean;
+  seen?: string;
+}
+
 export async function membersOverview(store: AuthStore, now = new Date()) {
-  const total = (await store.list({ prefix: 'acct/' })).blobs.length;
   const highest = (await get<{ n: number }>(store, 'meta/count'))?.n ?? 0;
-  // India's day, since that is where the people are.
-  const ist = (d: Date | string) => new Date(new Date(d).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
-  const today = ist(now);
+  const today = istDay(now);
   const days: Record<string, number> = {};
-  for (let i = 0; i < 14; i++) days[ist(new Date(now.getTime() - i * 86_400_000))] = 0;
-  const oldest = Object.keys(days).sort()[0];
-  const latest: { n: number; email: string; name: string; at: string; google: boolean }[] = [];
-  let google = 0;
-  let counted = 0;
-  // Walk back from the newest member number. Numbers of deleted accounts are skipped.
-  for (let from = highest; from > 0 && from > highest - 600; from -= 25) {
-    const ns = Array.from({ length: Math.min(25, from) }, (_, i) => from - i);
+  for (let i = 0; i < 14; i++) days[istDay(new Date(now.getTime() - i * 86_400_000))] = 0;
+  // Everyone, newest first. Numbers of deleted accounts stay in the list, marked deleted.
+  const ns = Array.from({ length: Math.min(highest, 2000) }, (_, i) => highest - i);
+  const members: MemberRow[] = [];
+  for (let i = 0; i < ns.length; i += 25) {
     const batch = await Promise.all(
-      ns.map(async (n) => {
+      ns.slice(i, i + 25).map(async (n): Promise<MemberRow> => {
         const claim = await get<{ uid: string }>(store, `n/${n}`);
         const a = claim ? await get<Account>(store, `acct/${claim.uid}`) : null;
-        return a && a.n === n ? a : null;
+        if (!a || a.n !== n) return { n, deleted: true };
+        return { n, name: a.name, email: maskEmail(a.email), at: a.created, google: !!a.google, devices: a.sess.length, setup: !!a.setup, seen: a.seen };
       }),
     );
-    let stop = false;
-    for (const a of batch) {
-      if (!a) continue;
-      const day = ist(a.created);
-      if (day in days) days[day]++;
-      counted++;
-      if (a.google) google++;
-      if (latest.length < 12) latest.push({ n: a.n, email: maskEmail(a.email), name: a.name.split(' ')[0], at: a.created, google: !!a.google });
-      if (day < oldest && latest.length >= 12) stop = true;
-    }
-    if (stop) break;
+    members.push(...batch);
   }
-  const week = Object.entries(days).filter(([d]) => d > ist(new Date(now.getTime() - 7 * 86_400_000))).reduce((s, [, c]) => s + c, 0);
+  const live = members.filter((m) => !m.deleted);
+  for (const m of live) {
+    const d = istDay(m.at!);
+    if (d in days) days[d]++;
+  }
+  const weekFrom = istDay(new Date(now.getTime() - 6 * 86_400_000));
   return {
     ok: true,
-    total,
+    total: live.length,
     today: days[today] ?? 0,
-    week,
+    week: live.filter((m) => istDay(m.at!) >= weekFrom).length,
     /** Member numbers given out so far; higher than `total` when accounts were deleted. */
     highest,
-    /** Of the accounts looked at, how many have used Google (the rest signed in by email code only). */
-    google,
-    counted,
+    google: live.filter((m) => m.google).length,
+    signedIn: live.filter((m) => (m.devices ?? 0) > 0).length,
+    setup: live.filter((m) => m.setup).length,
+    activeWeek: live.filter((m) => m.seen && m.seen >= weekFrom).length,
     days: Object.entries(days).sort(([a], [b]) => (a < b ? -1 : 1)).map(([day, n]) => ({ day, n })),
-    latest,
+    members,
   };
 }
