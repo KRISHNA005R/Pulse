@@ -104,6 +104,8 @@ async function send(mail: Mail, to: string, env: Env, replyTo?: string): Promise
 
 // A backstop against someone flooding the form, set well above normal use. Raise it if you need to.
 const THANKS_PER_DAY = 1000;
+// Messages from one sender (network address) per hour. Real people send one or two.
+const SENDS_PER_HOUR_IP = 10;
 
 /**
  * Thank the user. Every message with an email address gets one, however many that person sends.
@@ -139,6 +141,15 @@ export async function handle(req: Request, store: StoreLike, env: Env): Promise<
       if (body && typeof body.website === 'string' && body.website) return json({ ok: true });
       const fb = cleanFeedback(body);
       if (!fb) return json({ error: 'Pick a vibe or write a few words first.' }, 400);
+      // One sender can't flood the inbox or use up the Resend allowance that sign-in codes need too.
+      // shortcut: read-then-write count, so a burst sent all at once can slip a few extra through; fine unless abused at scale.
+      const ip = req.headers.get('x-nf-client-connection-ip');
+      if (ip) {
+        const rate = `rate/${await sha256(ip)}/${fb.at.slice(0, 13)}`;
+        const sent = ((await store.get(rate, { type: 'json' })) as { c?: number } | null)?.c ?? 0;
+        if (sent >= SENDS_PER_HOUR_IP) return json({ error: 'Too many messages from here. Try again in an hour.' }, 429);
+        await store.setJSON(rate, { c: sent + 1 });
+      }
       // Keys sort by time, so the newest are easy to find. Save before emailing: the message is never lost.
       const key = `fb/${fb.at}-${fb.ref}`;
       await store.setJSON(key, fb);

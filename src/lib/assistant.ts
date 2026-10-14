@@ -390,6 +390,7 @@ export function askPulse(s: State, question: string): AIAnswer {
         { label: 'Available now', value: rupees(sts.available) },
         { label: 'Upcoming bills', value: `−${rupees(sts.bills)}` },
         { label: 'SIPs & investments', value: `−${rupees(sts.invest)}` },
+        ...(sts.cards > 0 ? [{ label: 'Owed on credit cards', value: `−${rupees(sts.cards)}` }] : []),
         { label: 'Plans', value: `−${rupees(sts.goals)}` },
         { label: 'Safety buffer', value: `−${rupees(sts.buffer)}` },
       ] }],

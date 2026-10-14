@@ -9,7 +9,8 @@ React 18 + TypeScript + Tailwind CSS + Vite. No backend, no auth, no bank APIs. 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # type-check + production build in dist/
+npm run build      # type-check (app + netlify/) + production build in dist/
+npm test           # tests in tests/ (Vitest)
 ```
 
 `npm run build:artifact` builds a single self-contained HTML file (React loaded from cdnjs) in `dist-artifact/`.

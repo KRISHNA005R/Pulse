@@ -276,11 +276,12 @@ export function SafeBreakdown() {
           sub={sts.setAsideItems.length ? sts.setAsideItems.map((x) => `${x.policy.name} ${rupees(x.amount)}`).join(' · ') : 'Premiums due before payday are in bills above'}
         />
       )}
+      {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={sts.cardItems.map((c) => `${c.name} ${rupees(c.balance)}`).join(' · ') || 'Nothing owed'} />}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       <p className="text-[13.5px] text-ink3">
-        That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Credit card spending shows up when the card bill is due.
+        That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
       </p>
     </div>
   );
@@ -757,7 +758,7 @@ export function SubscriptionRow({ sub, onClick }: { sub: Subscription; onClick: 
           <span className="truncate text-[15px] font-semibold">{sub.name}</span>
           {st}
         </span>
-        <span className="block text-[13px] text-ink3">{sub.status === 'active' || sub.status === 'unknown' ? `Renews ${relDay(sub.nextDate, state.today)}` : sub.cycle === 'yearly' ? 'Yearly' : 'Monthly'}</span>
+        <span className="block text-[13px] text-ink3">{sub.status === 'active' || sub.status === 'unknown' ? sub.nextDate < state.today ? `Was due ${fmtDate(sub.nextDate)} · not marked paid` : `Renews ${relDay(sub.nextDate, state.today)}` : sub.cycle === 'yearly' ? 'Yearly' : 'Monthly'}</span>
       </span>
       <span className="num shrink-0 text-[15px] font-semibold">
         {rupees(sub.amount)}

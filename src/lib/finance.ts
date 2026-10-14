@@ -1,4 +1,4 @@
-import type { Account, Budget, CategoryId, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
+import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
 import { INSURANCE_ON } from './features';
 import {
@@ -128,7 +128,8 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
   const out: UpcomingItem[] = [];
   for (const sub of s.subscriptions) {
     if (sub.status === 'paused' || sub.status === 'cancelled') continue;
-    if (sub.nextDate >= s.today && sub.nextDate < until)
+    // One paid by hand that's past due and not marked paid still has to be paid, so it stays on the list.
+    if ((sub.nextDate >= s.today || sub.autoDebit === false) && sub.nextDate < until)
       out.push({ id: sub.id, name: sub.name, amount: sub.amount, date: sub.nextDate, kind: sub.kind, ref: sub.id, auto: sub.autoDebit !== false });
   }
   for (const c of s.cards) {
@@ -272,6 +273,9 @@ export interface SafeToSpend {
   setAside: number;
   setAsideItems: { policy: Insurance; amount: number }[];
   investItems: UpcomingItem[];
+  /** Owed on credit cards. Card spending is already spent, so it counts now, not when the bill comes. */
+  cards: number;
+  cardItems: CreditCard[];
   goals: number;
   goalItems: { plan: Plan; amount: number }[];
   buffer: number;
@@ -285,7 +289,10 @@ export function safeToSpend(s: State): SafeToSpend {
   const available = s.accounts.filter((a) => a.spendable).reduce((a, x) => a + x.balance, 0);
   const payday = nextPayday(s);
   const all = upcoming(s, payday);
-  const billItems = all.filter((u) => u.kind !== 'investment');
+  // A card bill is part of what's owed on the card, which is counted in full below.
+  const billItems = all.filter((u) => u.kind !== 'investment' && u.kind !== 'card');
+  const cardItems = s.cards.filter((c) => c.balance > 0);
+  const cards = cardItems.reduce((a, c) => a + c.balance, 0);
   const investItems = all.filter((u) => u.kind === 'investment');
   const bills = billItems.reduce((a, b) => a + b.amount, 0);
   const invest = investItems.reduce((a, b) => a + b.amount, 0);
@@ -294,9 +301,9 @@ export function safeToSpend(s: State): SafeToSpend {
   const setAsideItems = (INSURANCE_ON ? (s.insurance ?? []) : []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
   const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
   const buffer = s.settings.buffer;
-  const safe = Math.max(0, roundMoney(available - bills - invest - goals - setAside - buffer));
+  const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
   const daysLeft = Math.max(1, daysBetween(s.today, payday));
-  return { available, bills, billItems, invest, investItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
 }
 
 // ------------------------------------------------------------------

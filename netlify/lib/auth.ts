@@ -13,7 +13,8 @@
 //   mail/<sha256 of email>   -> { uid }                 finds the account for an email address
 //   acct/<uid>               -> Account
 //   sess/<sha256 of token>   -> { uid, at }             one signed-in device
-//   otp/<sha256 of email>    -> a pending email code (its hash, expiry, tries, recent sends)
+//   otp/<sha256 of email>    -> a pending email code (its hash, expiry, when it was sent)
+//   otp-try/<sha256 of email>/<sent>/<i> -> one guess at that code; there are CODE_TRIES of these
 //   once/<sha256 of code>    -> a sign-in waiting to be picked up after a Google redirect (2 minutes)
 //   n/<number>               -> { uid }                 a member number, claimed once, never reused
 //   meta/count               -> { n }                   the highest number given out
@@ -153,7 +154,6 @@ export async function allow(store: AuthStore, kind: string, key: string, slot: s
 interface Otp {
   h: string;
   exp: string;
-  tries: number;
   last: string;
 }
 
@@ -195,7 +195,7 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
     if (ctx.ip && !(await allow(store, 'ip', await sha256(ctx.ip), hour, SENDS_PER_HOUR_IP))) return fail(429, 'Too many tries from here. Try again in an hour.');
     if (!(await allow(store, 'all', 'day', now.toISOString().slice(0, 10), SENDS_PER_DAY))) return fail(429, 'Email sign-in is busy right now. Use Google, or try again later.');
     const code = String(100000 + (new DataView(rand(4).buffer).getUint32(0) % 900000));
-    await store.setJSON(key, { h: await sha256(`${code}:${email}`), exp: new Date(now.getTime() + CODE_MINUTES * 60_000).toISOString(), tries: 0, last: now.toISOString() } satisfies Otp);
+    await store.setJSON(key, { h: await sha256(`${code}:${email}`), exp: new Date(now.getTime() + CODE_MINUTES * 60_000).toISOString(), last: now.toISOString() } satisfies Otp);
     if (!(await ctx.sendMail(email, ctx.codeMail(code)))) {
       await store.delete(key);
       return fail(502, 'We couldn’t send the email. Check the address and try again.');
@@ -213,14 +213,24 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
       if (otp) await store.delete(key);
       return fail(400, 'That code has expired. Ask for a new one.');
     }
-    if (otp.tries >= CODE_TRIES) {
+    // Every guess takes one of CODE_TRIES numbered seats for this code. Taking a seat can't be shared
+    // (onlyIfNew), so guesses sent all at the same moment still get only CODE_TRIES between them.
+    const seats = Array.from({ length: CODE_TRIES }, (_, i) => `otp-try/${key.slice(4)}/${otp.last}/${i}`);
+    let seated = false;
+    for (const seat of seats) {
+      const res = (await store.setJSON(seat, 1, { onlyIfNew: true })) as { modified?: boolean } | undefined;
+      if (!res || res.modified !== false) {
+        seated = true;
+        break;
+      }
+    }
+    // The seats are left in place: removing them would free them up for guesses still on their way.
+    // A new code gets new seats (they are named after when it was sent).
+    if (!seated) {
       await store.delete(key);
       return fail(429, 'Too many wrong tries. Ask for a new code.');
     }
-    if (code.length !== 6 || (await sha256(`${code}:${email}`)) !== otp.h) {
-      await store.setJSON(key, { ...otp, tries: otp.tries + 1 });
-      return fail(400, 'That code isn’t right. Check the email and try again.');
-    }
+    if (code.length !== 6 || (await sha256(`${code}:${email}`)) !== otp.h) return fail(400, 'That code isn’t right. Check the email and try again.');
     await store.delete(key);
     return signIn(ctx, { email, name: '' });
   }

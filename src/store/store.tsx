@@ -84,6 +84,8 @@ export interface Toast {
 const KEY = 'pulse-state-v1';
 /** While someone with their own data explores the demo, their data waits here untouched. */
 const STASH = 'pulse-personal-stash-v1';
+/** A copy of saved data that couldn't be opened on launch (see load()). */
+const UNREADABLE = 'pulse-state-unreadable-v1';
 
 function readStash(): State | null {
   try {
@@ -203,8 +205,8 @@ export function processDueDebts(s: State): Transaction[] {
 
 /**
  * Bills and subscriptions: on the due date, record the payment from its account and move to the
- * next date. Skipped when the person already logged it themselves around that date, or switched
- * auto-debit off for it (then the date just moves on, as it always did).
+ * next date. Skipped when the person already logged it themselves around that date. With auto-debit
+ * off, a payment that isn't logged stays due until the person marks it paid (paySubscription).
  */
 export function processDueSubscriptions(s: State): Transaction[] {
   const made: Transaction[] = [];
@@ -221,6 +223,8 @@ export function processDueSubscriptions(s: State): Transaction[] {
       const logged = s.transactions.some(
         (t) => t.id === id || (t.type === 'expense' && !t.subscriptionId && Math.abs(daysBetween(t.date, due)) <= 3 && t.merchant.toLowerCase().includes(name)),
       );
+      // Paid by hand and not logged yet: it stays due (and counted) until the person marks it paid.
+      if (live && !auto && !logged) break;
       if (auto && !logged && sub.amount > 0) {
         const tx: Transaction = {
           id,
@@ -366,24 +370,35 @@ export function refresh(input: State): State {
 }
 
 function load(): State {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(KEY);
+    raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (isState(parsed)) return refresh(parsed);
     }
   } catch {
-    /* storage unavailable */
+    /* storage unavailable, or the saved data couldn't be opened */
+  }
+  // Saved data that couldn't be opened is put aside before the demo is saved over it, so it can still be recovered.
+  if (raw) {
+    try {
+      localStorage.setItem(UNREADABLE, raw);
+    } catch {
+      /* storage unavailable */
+    }
   }
   // First visit: demo data sits behind the welcome screen until the person chooses.
   return createSeed();
 }
 
-function save(s: State) {
+/** False when the phone refused to save (usually storage full). */
+function save(s: State): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return true;
   } catch {
-    /* ignore */
+    return false;
   }
 }
 
@@ -398,8 +413,6 @@ function useStoreImpl() {
   /** True while the person's own data is parked and the demo is showing. */
   const [hasStash, setHasStash] = useState(() => readStash() !== null);
 
-  useEffect(() => save(state), [state]);
-
   const commit = useCallback((fn: Draft) => {
     const next = produce(ref.current, fn);
     ref.current = next;
@@ -412,6 +425,14 @@ function useStoreImpl() {
     setToasts((xs) => [...xs.slice(-2), { ...t, id }]);
     window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), t.action ? 6000 : 4200);
   }, []);
+
+  // A save the phone refused would otherwise be lost silently at the next reload. Say so once, until saving works again.
+  const saveFailed = useRef(false);
+  useEffect(() => {
+    const ok = save(state);
+    if (!ok && !saveFailed.current) toast({ text: 'Couldn’t save on this phone (storage may be full). Free up space so your changes aren’t lost.', tone: 'heads-up' });
+    saveFailed.current = !ok;
+  }, [state, toast]);
   const dismissToast = useCallback((id: string) => setToasts((xs) => xs.filter((x) => x.id !== id)), []);
 
   // Say what PULSE recorded while the person was away, so a changed balance is never a mystery.
@@ -703,6 +724,28 @@ function useStoreImpl() {
     [commit],
   );
   const deleteSubscription = useCallback((id: string) => commit((s) => void (s.subscriptions = s.subscriptions.filter((x) => x.id !== id))), [commit]);
+  /** "Mark as paid" for a bill that isn't on auto-debit: record this payment now and move to the next date. */
+  const paySubscription = useCallback(
+    (id: string) => {
+      let tx: Transaction | null = null;
+      const next = commit((s) => {
+        const sub = s.subscriptions.find((x) => x.id === id);
+        if (!sub) return;
+        // Same id as an automatic payment for this date, so synced devices never record it twice.
+        const txId = `due-${sub.id}-${sub.nextDate}`;
+        if (!s.transactions.some((t) => t.id === txId)) {
+          tx = { id: txId, merchant: sub.name, amount: sub.amount, type: 'expense', category: sub.category, date: s.today, account: s.accounts.some((a) => a.id === sub.account) || s.cards.some((c) => c.id === sub.account) ? sub.account : defaultAccount(s), recurring: true, status: 'completed', subscriptionId: sub.id, notes: 'Marked as paid' };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+        }
+        sub.nextDate = sub.cycle === 'weekly' ? addDays(sub.nextDate, 7) : addMonths(sub.nextDate, sub.cycle === 'yearly' ? 12 : 1);
+      });
+      haptic(12);
+      const paid = tx as Transaction | null;
+      toast(paid ? { text: `${paid.merchant} recorded. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good' } : { text: 'That payment was already recorded.' });
+    },
+    [commit, toast],
+  );
 
   // ---------- social ----------
   const addPerson = useCallback(
@@ -1675,6 +1718,7 @@ function useStoreImpl() {
     deleteCard,
     saveDebt,
     payDebt,
+    paySubscription,
     deleteDebt,
   };
 }

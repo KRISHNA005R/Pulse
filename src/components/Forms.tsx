@@ -302,8 +302,17 @@ export function SubscriptionForm({ subId, preset, kind: kind0, onDone }: { subId
   const [auto, setAuto] = useState(ex?.autoDebit !== false);
   const [confirm, setConfirm] = useState(false);
   const valid = name.trim() && parseFloat(amount) > 0;
+  const overdue = !!ex && ex.autoDebit === false && ex.nextDate < state.today && (ex.status === 'active' || ex.status === 'unknown');
   return (
     <div className="flex flex-col gap-4">
+      {overdue && state.mode === 'personal' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sunk/70 p-4 text-[13.5px]" role="status">
+          <p className="min-w-0 flex-1 text-ink2">{`${rupees(ex.amount)} was due ${fmtDate(ex.nextDate)}. Mark it once you've paid.`}</p>
+          <button type="button" className="btn-accent min-h-[40px] px-4 text-[14px]" onClick={() => { store.paySubscription(ex.id); onDone(); }}>
+            Mark as paid
+          </button>
+        </div>
+      )}
       <Segmented label="Type" value={kind} onChange={setKind} options={[{ value: 'subscription', label: 'Subscription' }, { value: 'bill', label: 'Bill' }]} />
       <Field label="Name" htmlFor="sub-name">
         <input id="sub-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'bill' ? 'Rent, electricity, Wi-Fi…' : 'Spotify, Netflix, gym…'} />
@@ -337,7 +346,7 @@ export function SubscriptionForm({ subId, preset, kind: kind0, onDone }: { subId
           ))}
         </select>
       </Field>
-      <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub={auto ? 'On the date PULSE records the payment and takes it from this account' : 'Off: PULSE only reminds you, and you log the payment yourself'} />
+      <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub={auto ? 'On the date PULSE records the payment and takes it from this account' : 'Off: PULSE reminds you, and it stays due until you tap “Mark as paid”'} />
       {ex && (
         <div>
           <p className="mb-2 text-[13px] font-semibold text-ink2">Status</p>
@@ -733,7 +742,7 @@ export function CardForm({ cardId, onDone }: { cardId?: string; onDone: () => vo
         </Field>
       </div>
       <Segmented label="Payment status" size="sm" value={status} onChange={setStatus} options={[{ value: 'not-generated', label: 'No bill yet' }, { value: 'due', label: 'Due' }, { value: 'paid', label: 'Paid' }]} />
-      <p className="text-[12.5px] text-ink3">When a bill is due before payday, the minimum due is set aside in safe-to-spend.</p>
+      <p className="text-[12.5px] text-ink3">The balance (everything you owe on this card) comes off safe-to-spend. Bring it down when you pay the card.</p>
       <button
         type="button"
         disabled={!name.trim() || !(num(limit) > 0)}

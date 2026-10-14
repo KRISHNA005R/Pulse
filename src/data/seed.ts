@@ -54,7 +54,7 @@ export const CATEGORIES: Category[] = [
 ];
 
 const accounts: Account[] = [
-  { id: 'hdfc', name: 'HDFC Savings', institution: 'HDFC Bank · UPI', type: 'bank', balance: 7180, spendable: true },
+  { id: 'hdfc', name: 'HDFC Savings', institution: 'HDFC Bank · UPI', type: 'bank', balance: 22870, spendable: true },
   { id: 'cash', name: 'Cash', institution: 'Wallet', type: 'cash', balance: 1240, spendable: true },
   { id: 'groww', name: 'Mutual funds', institution: 'Groww', type: 'investment', balance: 84200, spendable: false },
   { id: 'zerodha', name: 'Stocks', institution: 'Zerodha', type: 'investment', balance: 31800, spendable: false },

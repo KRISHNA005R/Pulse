@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.netlify.json && vite build",
     "build:artifact": "vite build --mode artifact",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.netlify.json",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
@@ -36,6 +37,7 @@
     "typescript": "^5.6.3",
     "vite": "^5.4.11",
     "vite-plugin-pwa": "^0.21.1",
-    "vite-plugin-singlefile": "^2.0.3"
+    "vite-plugin-singlefile": "^2.0.3",
+    "vitest": "^2.1.9"
   }
 }
