@@ -18,6 +18,7 @@ import { fromB64Url, toB64Url, utf8 } from './codec';
 import { roundMoney } from './currency';
 import { daysBetween, rupees } from './format';
 import { okFace, okGif } from './photo';
+import { cleanVpa, okVpa } from './upi';
 
 // ---------------------------------------------------------------------------------------------
 // Invites
@@ -115,6 +116,8 @@ export interface Box {
   face?: string;
   /** The id of the writer's GIF, when their photo is one. */
   gif?: string;
+  /** The writer's UPI ID, so friends can pay them in one tap. '' = they have none. */
+  upi?: string;
   items: BoxItem[];
 }
 
@@ -170,17 +173,22 @@ export function buildBox(s: State, personId: string): Box {
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
 /** My photo for friends (and its GIF, if it is one). An empty one says "I have none", so it comes off their phones too. */
-const myFace = (s: State) => ({ face: okFace(s.user.face) ? s.user.face : '', gif: okFace(s.user.face) && okGif(s.user.gif) ? s.user.gif : '' });
+const myFace = (s: State) => ({ face: okFace(s.user.face) ? s.user.face : '', gif: okFace(s.user.face) && okGif(s.user.gif) ? s.user.gif : '', upi: okVpa(s.user.upi) ? s.user.upi : '' });
 /**
  * A friend's photo follows what their own PULSE says: shown when they have one, gone when they take
  * it off. A box that says nothing about a photo was written by an older PULSE (say, their other
  * phone that hasn't updated yet): it changes nothing.
  */
-function setFace(p: Person, box: { face?: unknown; gif?: unknown }) {
+function setFace(p: Person, box: { face?: unknown; gif?: unknown; upi?: unknown }) {
   if (okFace(box.face)) p.photo = box.face;
   else if (box.face === '') delete p.photo;
   if (okGif(box.gif)) p.gif = box.gif;
   else if (box.gif === '' || box.face === '') delete p.gif;
+  // Their own UPI ID wins over one typed here; taking theirs off removes only the one they shared.
+  if (okVpa(box.upi)) {
+    p.upi = cleanVpa(box.upi);
+    delete p.upiTyped;
+  } else if (box.upi === '' && !p.upiTyped) delete p.upi;
 }
 const myShort = (s: State) => (s.user.name || myName(s).split(' ')[0]).trim().slice(0, 24);
 
@@ -654,6 +662,8 @@ export interface GroupBox {
   face?: string;
   /** The id of the writer's GIF, when their photo is one. */
   gif?: string;
+  /** The writer's UPI ID, so members can pay them in one tap. '' = they have none. */
+  upi?: string;
   /** The group's title. The one from the person who made the group is used. */
   g: { name: string; emoji: string };
   /** A hand-typed name (a ref) that is really me. */

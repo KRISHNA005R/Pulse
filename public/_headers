@@ -31,7 +31,3 @@
 /stats/*
   Cache-Control: no-cache
   X-Robots-Tag: noindex, nofollow
-
-/preview/*
-  Cache-Control: no-cache
-  X-Robots-Tag: noindex, nofollow

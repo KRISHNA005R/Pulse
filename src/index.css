@@ -229,3 +229,13 @@ body {
 /* Brand sign-off at the end of Home, the You tab and the About page. */
 .brand-sig { text-align: center; }
 .brand-sig-mark { display: block; width: 100%; height: auto; margin-top: 28px; fill: rgb(var(--ink) / .085); user-select: none; }
+
+/* Pay a friend (components/UpiPay.tsx): the UPI apps' real icons. */
+.upi-logo { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: #fff; border: 1px solid #ECE9E3; overflow: hidden; }
+.upi-logo svg { display: block; }
+.upi-logo-gpay svg { width: 30px; height: 30px; }
+.upi-logo-phonepe { border: 0; background: transparent; }
+.upi-logo-phonepe svg { width: 44px; height: 44px; }
+.upi-logo-paytm svg { width: 36px; height: 36px; }
+.upi-chip { display: inline-grid; place-items: center; background: #fff; border-radius: 8px; padding: 2px 6px; height: 26px; }
+.upi-chip svg { width: 44px; height: 22px; display: block; }

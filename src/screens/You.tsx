@@ -4,6 +4,7 @@ import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { INSURANCE_ON } from '../lib/features';
 import { remindersSummary } from './Reminders';
+import { cleanVpa, okVpa } from '../lib/upi';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
@@ -806,6 +807,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
   const signedIn = !!useAuth().session && state.mode === 'personal';
   const [buffer, setBuffer] = useState(String(s.buffer));
   const [nm, setNm] = useState(state.user.fullName);
+  const [myUpi, setMyUpi] = useState(state.user.upi ?? '');
 
   const titles: Record<typeof section, string> = {
     notifications: 'Money moments',
@@ -927,6 +929,30 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
             <input id="profile-name" className="field" value={nm} onChange={(e) => setNm(e.target.value)} onBlur={() => nm.trim() && store.updateUser({ fullName: nm.trim(), name: nm.trim().split(' ')[0] })} />
           </Field>
           <p className="text-[13.5px] text-ink3">Your first name is used in the greeting.</p>
+          {state.mode === 'personal' && (
+            <Field label="Your UPI ID" htmlFor="profile-upi" hint="Friends connected on PULSE and people in your shared groups get it, so they can pay you in one tap from Settle up. Leave it empty to keep it to yourself.">
+              <input
+                id="profile-upi"
+                className="field"
+                inputMode="email"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                placeholder="yourname@okaxis"
+                value={myUpi}
+                onChange={(e) => setMyUpi(e.target.value)}
+                onBlur={() => {
+                  const v = cleanVpa(myUpi);
+                  if (v && !okVpa(v)) return store.toast({ text: 'That doesn’t look like a UPI ID. It looks like name@bank.' });
+                  setMyUpi(v);
+                  if (v !== (state.user.upi ?? '')) {
+                    store.updateUser({ upi: v || undefined });
+                    store.toast({ text: v ? 'Saved. Your friends on PULSE can now pay you in one tap.' : 'UPI ID removed.', tone: 'good' });
+                  }
+                }}
+              />
+            </Field>
+          )}
         </div>
       )}
       {section === 'export' && (

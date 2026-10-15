@@ -44,6 +44,8 @@ export interface User {
   face?: string;
   /** When the photo is a GIF: its id on PULSE's server (lib/photo.ts). `photo` and `face` are then its first frame. */
   gif?: string;
+  /** My UPI ID, so connected friends can pay me in one tap (lib/upi.ts). */
+  upi?: string;
 }
 
 /** A personal link. The key only ever travels inside the link itself. */
@@ -230,6 +232,10 @@ export interface Person {
   photo?: string;
   /** When their photo is a GIF: its id on PULSE's server. `photo` is then its first frame. */
   gif?: string;
+  /** Their UPI ID, for Pay in Settle up. Shared by them on PULSE, or typed here. */
+  upi?: string;
+  /** `upi` was typed on this phone (not shared by them), so their PULSE doesn't remove it. */
+  upiTyped?: boolean;
 }
 
 /** The private channel shared with one friend. The key only ever travels inside the invite link. */

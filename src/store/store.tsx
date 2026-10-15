@@ -758,6 +758,21 @@ function useStoreImpl() {
     [commit],
   );
 
+  /** A friend's UPI ID typed in Settle up ('' removes it). */
+  const setPersonUpi = useCallback(
+    (personId: string, upi: string) =>
+      commit((s) => {
+        const p = s.people.find((x) => x.id === personId);
+        if (!p) return;
+        if (upi) Object.assign(p, { upi, upiTyped: true });
+        else {
+          delete p.upi;
+          delete p.upiTyped;
+        }
+      }),
+    [commit],
+  );
+
   // ---------- friends on PULSE (lib/friends.ts) ----------
   /** Connect a person to a shared channel. With no id, a new person is made with that name. */
   const linkPerson = useCallback(
@@ -1658,6 +1673,7 @@ function useStoreImpl() {
     setSubStatus,
     deleteSubscription,
     addPerson,
+    setPersonUpi,
     linkPerson,
     applyFriendBox,
     markFriendJoined,

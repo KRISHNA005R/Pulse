@@ -1,3 +1,5 @@
+import { UpiPay } from './UpiPay';
+import { phoneKind } from '../lib/upi';
 import { useAuth } from '../store/auth';
 import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
@@ -460,6 +462,9 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
     return out;
   }, [state, groupId, personId, bal]);
   const all = parts.length > 0 && Math.abs(n - Math.abs(bal)) < 0.01;
+  // Opened the UPI app: "I paid" becomes the next step.
+  const [paying, setPaying] = useState(false);
+  const canPay = iPay && n > 0 && phoneKind() !== 'other' && (state.settings.currency ?? 'INR') === 'INR';
   const groupsToo = all ? parts.filter((x) => x.name).map((x) => x.name as string) : [];
   return (
     <div className="flex flex-col items-center text-center">
@@ -470,12 +475,12 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
       </div>
       <p className="mt-2 text-[15px] text-ink2">{bal === 0 ? `Nothing to settle with ${person.short}.` : iPay ? `You owe ${person.short} ${rupees(-bal)}` : `${person.short} owes you ${rupees(bal)}`}</p>
       <MoneyInput value={amount} onChange={setAmount} label="Settlement amount" autoFocus id="settle-amount" />
-      <p className="text-[13px] text-ink3">Record a payment made outside PULSE, like a UPI transfer or cash.</p>
+      {canPay ? <UpiPay person={person} amount={roundMoney(n)} onOpened={() => setPaying(true)} /> : <p className="text-[13px] text-ink3">Record a payment made outside PULSE, like a UPI transfer or cash.</p>}
       {groupsToo.length > 0 && <p className="mt-2 rounded-xl bg-sunk px-3 py-2 text-[13px] text-ink2">This also settles {groupsToo.join(', ')}.</p>}
       <button
         type="button"
         disabled={!n}
-        className="btn-accent mt-5 w-full disabled:opacity-40"
+        className={`${canPay && !paying ? 'btn-quiet' : 'btn-accent'} mt-5 w-full disabled:opacity-40`}
         onClick={() => {
           if (all)
             store.recordSettlement(parts.map((x) => ({ group: x.group, from: x.v < 0 ? 'me' : personId, to: x.v < 0 ? personId : 'me', amount: roundMoney(Math.abs(x.v)) })));
@@ -483,7 +488,7 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
           onDone();
         }}
       >
-        {iPay ? `I paid ${person.short} ${n ? rupees(n) : ''}` : `${person.short} paid me ${n ? rupees(n) : ''}`}
+        {iPay ? (canPay ? `I’ve paid · mark as settled` : `I paid ${person.short} ${n ? rupees(n) : ''}`) : `${person.short} paid me ${n ? rupees(n) : ''}`}
       </button>
     </div>
   );
