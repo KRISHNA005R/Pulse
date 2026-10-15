@@ -85,7 +85,7 @@ export default defineConfig(({ mode }) => {
                 ],
               },
               workbox: {
-                globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,jpg,webmanifest}'],
+                globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,jpg,webmanifest,mp3}'],
                 globIgnores: ['stats/**', 'founder/**', 'email/**', 'screenshots/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
                 // Reminders: the push and notification-tap handlers live in public/push-sw.js.
                 importScripts: ['/push-sw.js'],

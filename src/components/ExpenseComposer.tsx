@@ -1,5 +1,5 @@
-import { playSfx, sfxFor } from '../lib/sfx';
-import { useMemo, useState } from 'react';
+import { playSfx, preloadSfx, sfxFor } from '../lib/sfx';
+import { useEffect, useMemo, useState } from 'react';
 import { RECEIPT_SCAN_ON } from '../lib/features';
 import { hasCents, scaled, sym } from '../lib/currency';
 import type { CategoryId, SplitMode, TxType } from '../types';
@@ -127,6 +127,12 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     setPanel((cur) => (cur === p ? null : p));
   };
 
+  // Sounds on: have the clips ready before the swipe, so the first one isn't late.
+  useEffect(() => {
+    if (state.settings.sounds) preloadSfx();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const save = () => {
     if (!effAmount || err) return;
     // Create any new people typed in the description
@@ -147,7 +153,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     }
     if (preset?.replaceTx) store.deleteTransaction(preset.replaceTx, { quiet: true });
     // Sounds: played straight from the swipe, so phones allow it. Asked about once, after a first log.
-    const kind = sfxFor(effType, effAmount, scaled(2000));
+    const kind = sfxFor(effType, effAmount, scaled(2000), scaled(10000));
     if (state.settings.sounds) playSfx(kind, true);
     else if (state.settings.sounds === undefined && !state.settings.soundsAsked && state.mode === 'personal') {
       store.updateSettings({ soundsAsked: true });

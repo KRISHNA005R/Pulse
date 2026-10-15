@@ -4,10 +4,21 @@
 // plays; otherwise a short sound made right here in code plays, so there's always something.
 // Files must be short (under 2 s) and small (mp3 or m4a, a few KB).
 
-export type Sfx = 'expense' | 'big' | 'income' | 'move';
+export type Sfx = 'expense' | 'big' | 'huge' | 'income' | 'move';
 
 /** Sound files in public/sfx/, by moment. Empty = use the built-in sound. */
-const FILES: Partial<Record<Sfx, string>> = {};
+const FILES: Partial<Record<Sfx, string>> = {
+  expense: 'expense.mp3', // vine boom
+  big: 'big.mp3', // FAAAH (₹2,000+)
+  huge: 'huge.mp3', // dun dun dunnn (₹10,000+)
+  income: 'income.mp3', // anime "wow"
+  move: 'move.mp3', // punch
+};
+
+/** Load the clips ahead of time, so the first one plays without a delay. */
+export function preloadSfx() {
+  for (const f of Object.values(FILES)) if (f) clip(`/sfx/${f}`);
+}
 
 let ctx: AudioContext | null = null;
 const audio = (): AudioContext | null => {
@@ -23,13 +34,17 @@ const audio = (): AudioContext | null => {
 };
 
 const cache = new Map<string, HTMLAudioElement>();
-function playFile(src: string) {
+function clip(src: string) {
   let a = cache.get(src);
   if (!a) {
     a = new Audio(src);
     a.preload = 'auto';
     cache.set(src, a);
   }
+  return a;
+}
+function playFile(src: string) {
+  const a = clip(src);
   a.currentTime = 0;
   a.volume = 0.9;
   void a.play().catch(() => {});
@@ -81,6 +96,7 @@ const BUILT_IN: Record<Sfx, (c: AudioContext, t: number) => void> = {
     tone(c, t, 220, 0.25, 0.18, 'triangle', 60);
     noise(c, t, 0.12, 0.25, 900, 200);
   },
+  huge: (c, t) => BUILT_IN.big(c, t),
   // Cha-ching: a brushed "cha", then a bright bell.
   income: (c, t) => {
     noise(c, t, 0.09, 0.35, 5000, 3000);
@@ -96,7 +112,7 @@ const BUILT_IN: Record<Sfx, (c: AudioContext, t: number) => void> = {
 export function playSfx(kind: Sfx, on: boolean | undefined) {
   if (!on) return;
   try {
-    if (navigator.vibrate) navigator.vibrate(kind === 'big' ? [18, 40, 28] : 14);
+    if (navigator.vibrate) navigator.vibrate(kind === 'huge' ? [20, 50, 20, 50, 40] : kind === 'big' ? [18, 40, 28] : 14);
   } catch {
     /* no vibration on this device */
   }
@@ -106,5 +122,6 @@ export function playSfx(kind: Sfx, on: boolean | undefined) {
   if (c) BUILT_IN[kind](c, c.currentTime + 0.01);
 }
 
-/** Which sound a logged entry gets. Big = at least `big` (₹2,000 by default). */
-export const sfxFor = (type: 'expense' | 'income' | 'transfer', amount: number, big: number): Sfx => (type === 'income' ? 'income' : type === 'transfer' ? 'move' : amount >= big ? 'big' : 'expense');
+/** Which sound a logged entry gets: big from ₹2,000, huge from ₹10,000 (scaled for other currencies). */
+export const sfxFor = (type: 'expense' | 'income' | 'transfer', amount: number, big: number, huge: number): Sfx =>
+  type === 'income' ? 'income' : type === 'transfer' ? 'move' : amount >= huge ? 'huge' : amount >= big ? 'big' : 'expense';
