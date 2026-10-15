@@ -8,7 +8,7 @@ import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
 /** A QR code as crisp SVG squares, in the page's ink colour. */
-export function QR({ text, size = 176 }: { text: string; size?: number }) {
+export function QR({ text, size = 176, label = 'QR code with your sync link' }: { text: string; size?: number; label?: string }) {
   const cells = useMemo(() => {
     const q = qrcode(0, 'M');
     q.addData(text);
@@ -19,7 +19,7 @@ export function QR({ text, size = 176 }: { text: string; size?: number }) {
     return { n, d };
   }, [text]);
   return (
-    <svg viewBox={`-2 -2 ${cells.n + 4} ${cells.n + 4}`} width={size} height={size} role="img" aria-label="QR code with your sync link" className="rounded-xl bg-white p-1" shapeRendering="crispEdges">
+    <svg viewBox={`-2 -2 ${cells.n + 4} ${cells.n + 4}`} width={size} height={size} role="img" aria-label={label} className="rounded-xl bg-white p-1" shapeRendering="crispEdges">
       <path d={cells.d} fill="#17140F" />
     </svg>
   );

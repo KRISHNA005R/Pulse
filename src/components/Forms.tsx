@@ -464,7 +464,7 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
   const all = parts.length > 0 && Math.abs(n - Math.abs(bal)) < 0.01;
   // Opened the UPI app: "I paid" becomes the next step.
   const [paying, setPaying] = useState(false);
-  const canPay = iPay && n > 0 && phoneKind() !== 'other' && (state.settings.currency ?? 'INR') === 'INR';
+  const canPay = iPay && n > 0 && (state.settings.currency ?? 'INR') === 'INR';
   const groupsToo = all ? parts.filter((x) => x.name).map((x) => x.name as string) : [];
   return (
     <div className="flex flex-col items-center text-center">
@@ -480,7 +480,7 @@ export function SettleForm({ personId, groupId, onDone }: { personId: string; gr
       <button
         type="button"
         disabled={!n}
-        className={`${canPay && !paying ? 'btn-quiet' : 'btn-accent'} mt-5 w-full disabled:opacity-40`}
+        className={`${canPay && !paying && phoneKind() !== 'other' ? 'btn-quiet' : 'btn-accent'} mt-5 w-full disabled:opacity-40`}
         onClick={() => {
           if (all)
             store.recordSettlement(parts.map((x) => ({ group: x.group, from: x.v < 0 ? 'me' : personId, to: x.v < 0 ? personId : 'me', amount: roundMoney(Math.abs(x.v)) })));

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Person } from '../types';
 import { useStore } from '../store/store';
 import { rupees } from '../lib/format';
+import { QR } from '../screens/Sync';
 import { UPI_APPS, UPI_ICONS, cleanVpa, okVpa, phoneKind, upiAppLink, upiLink, type UpiApp } from '../lib/upi';
 
 const Logo = ({ id }: { id: UpiApp }) => (
@@ -10,7 +11,7 @@ const Logo = ({ id }: { id: UpiApp }) => (
 
 /**
  * Settle up, when I owe someone: open my UPI app with their UPI ID and the amount filled in.
- * Shown on phones only (computers have no UPI apps). Recording the payment stays a separate tap
+ * On a computer (no UPI apps) it shows a UPI QR code to scan with the phone. Recording the payment stays a separate tap
  * ("I paid"), since PULSE can't see whether the payment went through.
  */
 export function UpiPay({ person, amount, onOpened }: { person: Person; amount: number; onOpened: () => void }) {
@@ -31,7 +32,7 @@ export function UpiPay({ person, amount, onOpened }: { person: Person; amount: n
     };
   }, []);
 
-  if (phone === 'other' || amount <= 0) return null;
+  if (amount <= 0) return null;
   const vpa = person.upi ?? '';
   const pay = { vpa, name: person.name, amount, note: 'Settle up via PULSE' };
 
@@ -60,9 +61,9 @@ export function UpiPay({ person, amount, onOpened }: { person: Person; amount: n
     return (
       <div className="mt-4 w-full rounded-2xl border border-line bg-surface p-4 text-left">
         <label htmlFor="settle-upi" className="text-[14px] font-semibold">
-          Pay {person.short} from your UPI app
+          Pay {person.short} {phone === 'other' ? 'by UPI' : 'from your UPI app'}
         </label>
-        <p className="mt-0.5 text-[13px] text-ink3">Add {person.short}’s UPI ID once. PULSE remembers it.</p>
+        <p className="mt-0.5 text-[13px] text-ink3">Add {person.short}’s UPI ID once. PULSE remembers it.{phone === 'other' ? ' You’ll get a QR code to scan with your phone.' : ''}</p>
         <div className="mt-3 flex gap-2">
           <input
             id="settle-upi"
@@ -80,6 +81,22 @@ export function UpiPay({ person, amount, onOpened }: { person: Person; amount: n
             Save
           </button>
         </div>
+      </div>
+    );
+
+  // Computers have no UPI apps: a QR code with the amount filled in, for any UPI app on the phone.
+  if (phone === 'other')
+    return (
+      <div className="mt-4 flex w-full flex-col items-center rounded-2xl border border-line bg-surface p-4">
+        <QR text={upiLink(pay)} size={184} label={`UPI QR code to pay ${person.short} ${rupees(amount)}`} />
+        <p className="mt-3 text-[15px] font-semibold">Scan to pay {person.short} {rupees(amount)}</p>
+        <p className="mt-0.5 text-[13px] text-ink3">With GPay, PhonePe, Paytm or any UPI app on your phone. The amount is filled in.</p>
+        <p className="mt-3 text-[12.5px] text-ink3">
+          To {vpa} ·{' '}
+          <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => setEditing(true)}>
+            Change
+          </button>
+        </p>
       </div>
     );
 
