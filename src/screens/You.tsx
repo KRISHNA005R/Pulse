@@ -5,6 +5,7 @@ import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { INSURANCE_ON } from '../lib/features';
 import { remindersSummary } from './Reminders';
 import { cleanVpa, okVpa } from '../lib/upi';
+import { playSfx } from '../lib/sfx';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
@@ -891,6 +892,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
         </div>
       )}
       {section === 'appearance' && (
+        <div className="flex flex-col gap-5">
         <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-2">
           {(['system', 'light', 'dark'] as const).map((t) => (
             <button key={t} type="button" role="radio" aria-checked={s.theme === t} onClick={() => updateSettings({ theme: t })} className={`tap flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 text-left ${s.theme === t ? 'border-ink' : 'border-line'} bg-surface`}>
@@ -899,6 +901,16 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
               {s.theme === t && <Icon name="check" size={18} className="text-accent-ink" />}
             </button>
           ))}
+        </div>
+        <Toggle
+          checked={!!s.sounds}
+          onChange={(on) => {
+            updateSettings({ sounds: on, soundsAsked: true });
+            if (on) playSfx('income', true);
+          }}
+          label="Sounds"
+          sub="A little sound when you log money out, money in or a move. Your phone's silent mode may mute it."
+        />
         </div>
       )}
       {section === 'currency' && <CurrencyPicker />}

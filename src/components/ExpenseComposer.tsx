@@ -1,6 +1,7 @@
+import { playSfx, sfxFor } from '../lib/sfx';
 import { useMemo, useState } from 'react';
 import { RECEIPT_SCAN_ON } from '../lib/features';
-import { hasCents, sym } from '../lib/currency';
+import { hasCents, scaled, sym } from '../lib/currency';
 import type { CategoryId, SplitMode, TxType } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -145,6 +146,27 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined });
     }
     if (preset?.replaceTx) store.deleteTransaction(preset.replaceTx, { quiet: true });
+    // Sounds: played straight from the swipe, so phones allow it. Asked about once, after a first log.
+    const kind = sfxFor(effType, effAmount, scaled(2000));
+    if (state.settings.sounds) playSfx(kind, true);
+    else if (state.settings.sounds === undefined && !state.settings.soundsAsked && state.mode === 'personal') {
+      store.updateSettings({ soundsAsked: true });
+      window.setTimeout(
+        () =>
+          store.toast({
+            text: 'Want a sound every time you log? 🔊',
+            emoji: '🔊',
+            action: {
+              label: 'Turn on',
+              run: () => {
+                store.updateSettings({ sounds: true });
+                playSfx(kind, true);
+              },
+            },
+          }),
+        1500,
+      );
+    }
     setSaved(true);
     window.setTimeout(onDone, 650);
   };
