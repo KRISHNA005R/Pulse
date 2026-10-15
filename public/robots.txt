@@ -4,5 +4,6 @@ Allow: /
 Disallow: /migrate.html
 Disallow: /sw-migrate.js
 Disallow: /stats/
+Disallow: /preview/
 
 Sitemap: https://pulsemoney.in/sitemap.xml
