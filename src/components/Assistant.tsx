@@ -11,6 +11,7 @@ import { burstFrom } from '../lib/celebrate';
 import { canIAfford, type AffordResult } from '../lib/afford';
 import { addDays, daysBetween, fmtDate, rupees, uid } from '../lib/format';
 import { Icon } from './ui/Icon';
+import { useVoice } from '../lib/voice';
 import { Bars } from './money';
 import { MoneyInput, ProgressBar } from './ui/bits';
 
@@ -229,6 +230,26 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
       ];
       cta = a.budgetId ? 'Update' : 'Set budget';
       break;
+    case 'undo-last':
+      title = 'Remove last entry';
+      icon = 'trash';
+      rows = [
+        { label: 'Entry', value: a.merchant },
+        { label: 'Amount', value: rupees(a.amount) },
+        { label: 'Date', value: dayLabel(a.date) },
+      ];
+      cta = 'Remove';
+      break;
+    case 'fix-last':
+      title = 'Change last entry';
+      icon = 'pencil';
+      rows = [
+        { label: 'Entry', value: a.merchant },
+        { label: 'Amount', value: `${rupees(a.from)} → ${rupees(a.amount)}` },
+        { label: 'Date', value: dayLabel(a.date) },
+      ];
+      cta = 'Change';
+      break;
     case 'settle':
       title = 'Settle up';
       icon = 'users';
@@ -282,6 +303,16 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
         store.recordSettlement({ from: a.from, to: a.to, amount: a.amount });
         update({ status: 'done', note: 'Settlement recorded.' });
         return;
+      case 'undo-last':
+        if (!state.transactions.some((t) => t.id === a.txId)) return update({ status: 'done', note: 'That entry is already gone.' });
+        store.deleteTransaction(a.txId);
+        update({ status: 'done', note: `Removed ${a.merchant}.` });
+        return;
+      case 'fix-last':
+        if (!state.transactions.some((t) => t.id === a.txId)) return update({ status: 'done', note: 'That entry is gone, so there’s nothing to change.' });
+        store.updateTransaction(a.txId, { amount: a.amount });
+        update({ status: 'done', note: `Changed to ${rupees(a.amount)}. Safe to spend is updated.` });
+        return;
     }
   };
 
@@ -304,6 +335,9 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
         return ui.openSheet({ type: 'budget-form', budgetId: a.budgetId, category: a.category });
       case 'settle':
         return ui.openSheet({ type: 'settle', personId: a.personId });
+      case 'undo-last':
+      case 'fix-last':
+        return ui.openSheet({ type: 'tx', id: a.txId });
     }
   };
 
@@ -519,6 +553,10 @@ function LinkButton({ label, to }: { label: string; to: AILink }) {
           ui.openSheet(to.sheet as SheetSpec);
           return;
         }
+        if (to.kind === 'url') {
+          window.open(to.href, '_blank', 'noopener');
+          return;
+        }
         ui.closeAllSheets();
         ui.resetTo(to.tab, to.route as Route | undefined);
       }}
@@ -616,11 +654,24 @@ export function AIMessage({ id, role, text, answer, onFollow, typing }: { id?: s
   );
 }
 
+const EMOJI = /^(\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictographic}\uFE0F?)*)\s*/u;
+/** A quick question's leading emoji, shown as its icon. */
+const lead = (q: string) => q.match(EMOJI)?.[1] ?? '';
+const rest = (q: string) => q.replace(EMOJI, '');
+
 export function AIChat({ compact }: { compact?: boolean }) {
   const { state } = useStore();
   const ui = useUI();
   const [q, setQ] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const store = useStore();
+  const voice = useVoice(
+    (heard, final) => {
+      setQ(heard);
+      if (final && heard) ask(heard);
+    },
+    (msg) => store.toast({ text: msg }),
+  );
 
   const ask = (question: string) => {
     const text = question.trim();
@@ -632,7 +683,7 @@ export function AIChat({ compact }: { compact?: boolean }) {
     if (state.mode === 'personal') track('ai');
     const answer = askPulse(state, text);
     const aiId = uid('m');
-    ui.setChat((c) => [...c, { id: uid('m'), role: 'user', text }, { id: aiId, role: 'ai', text: '', typing: true }]);
+    ui.setChat((c) => [...c, { id: uid('m'), role: 'user', text: rest(text) || text }, { id: aiId, role: 'ai', text: '', typing: true }]);
     setQ('');
     // A short "typing" beat before the answer lands, so it reads like a reply.
     const wait = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.min(900, 380 + answer.text.length * 2);
@@ -651,8 +702,9 @@ export function AIChat({ compact }: { compact?: boolean }) {
             <p className="text-[15px] text-ink2">Ask about your money. Answers come from your own transactions, plans and bills.</p>
             <div className="mt-4 flex flex-col gap-2">
               {starterQuestions(state).slice(0, compact ? 5 : 8).map((s) => (
-                <button key={s} type="button" onClick={() => ask(s)} className="tap flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[14.5px] hover:border-ink3/40">
-                  <Icon name="spark" size={15} className="shrink-0 text-accent-ink" /> {s}
+                <button key={s} type="button" onClick={() => ask(s)} className="tap flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[14.5px] hover:border-ink3/40">
+                  {lead(s) ? <span className="w-5 shrink-0 text-center text-[16px]" aria-hidden="true">{lead(s)}</span> : <Icon name="spark" size={15} className="shrink-0 text-accent-ink" />}
+                  {rest(s)}
                 </button>
               ))}
             </div>
@@ -676,7 +728,19 @@ export function AIChat({ compact }: { compact?: boolean }) {
         <label htmlFor={compact ? 'ai-input-panel' : 'ai-input'} className="sr-only">
           Ask PULSE AI
         </label>
-        <input id={compact ? 'ai-input-panel' : 'ai-input'} className="min-w-0 flex-1 bg-transparent text-[15px] placeholder:text-ink3 focus:outline-none" placeholder="Ask about your money…" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+        <input id={compact ? 'ai-input-panel' : 'ai-input'} className="min-w-0 flex-1 bg-transparent text-[15px] placeholder:text-ink3 focus:outline-none" placeholder={voice.listening ? 'Listening… say it in English or Hinglish' : 'Ask about your money…'} value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+        {voice.supported && (
+          <button
+            type="button"
+            onClick={voice.listening ? voice.stop : voice.start}
+            className={`tap relative grid h-10 w-10 shrink-0 place-items-center rounded-full ${voice.listening ? 'bg-ink text-bg' : 'text-ink2 hover:bg-sunk'}`}
+            aria-label={voice.listening ? 'Stop listening' : 'Ask by voice'}
+            aria-pressed={voice.listening}
+          >
+            {voice.listening && <span className="absolute inset-0 animate-ping rounded-full bg-accent/30 motion-reduce:hidden" aria-hidden="true" />}
+            <Icon name="mic" size={18} />
+          </button>
+        )}
         <button type="submit" className="tap grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-on-accent disabled:opacity-40" disabled={!q.trim()} aria-label="Ask">
           <Icon name="send" size={17} />
         </button>

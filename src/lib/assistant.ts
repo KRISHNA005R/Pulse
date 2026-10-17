@@ -28,6 +28,7 @@ import { guessCategory } from './parse';
 import { monthIn, parseAction, type AIAction } from './aiActions';
 import { buildRecap } from './insights';
 import { yearSummary } from './history';
+import { actionFromHinglish, askMore, fromHinglish, quickQuestions } from './assistantPlus';
 
 // PULSE AI: answers are computed from the app's own data, not generated text.
 
@@ -44,7 +45,8 @@ export type AIBlock =
 /** Where a link button in an answer goes. */
 export type AILink =
   | { kind: 'route'; tab: 'home' | 'activity' | 'plans' | 'you'; route?: { name: string; [k: string]: unknown } }
-  | { kind: 'sheet'; sheet: { type: string; [k: string]: unknown } };
+  | { kind: 'sheet'; sheet: { type: string; [k: string]: unknown } }
+  | { kind: 'url'; href: string };
 
 export interface AIAnswer {
   text: string;
@@ -54,6 +56,11 @@ export interface AIAnswer {
 
 /** Starter questions that fit this person's data. */
 export function starterQuestions(s: State): string[] {
+  return quickQuestions(s);
+}
+
+/** The older, plain-English starter list (kept for reference). */
+export function plainStarters(s: State): string[] {
   const plan = s.plans.find((p) => p.status === 'active');
   const q = [
     `Add ${ex(450)} dinner`,
@@ -74,15 +81,15 @@ export function starterQuestions(s: State): string[] {
 }
 
 export const starterDefaults = (): string[] => [
-  `Add ${ex(450)} dinner`,
-  'Show my monthly report',
-  'How much did I spend on food this month?',
-  `Can I afford a ${ex(5000)} dinner?`,
-  'When will I reach my Goa goal?',
+  '💸 Kitna bacha hai?',
+  '⏳ Paisa kab tak chalega?',
+  `🤔 Can I afford ${ex(3000)} shoes?`,
+  '🏆 Biggest expenses this month?',
+  '🔥 No-spend days this month?',
+  '📊 Show my monthly report',
   'What subscriptions do I have?',
   'Why is this month more expensive?',
   'How much can I spend this weekend?',
-  'What changed from last month?',
   'What are my biggest recurring expenses?',
 ];
 
@@ -99,8 +106,10 @@ const CAT_WORDS: [CategoryId, RegExp][] = [
   ['education', /\b(education|courses?|learning)\b/],
 ];
 
-export function askPulse(s: State, question: string): AIAnswer {
-  const q = question.toLowerCase().trim();
+export function askPulse(s: State, asked: string): AIAnswer {
+  // Quick questions start with an emoji; it isn't part of the question.
+  const question = asked.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '').trim();
+  const q = fromHinglish(question);
   const today = s.today;
   const [mStart] = monthRange(today);
   const [pStart, pEnd] = monthRange(prevMonth(today));
@@ -171,8 +180,12 @@ export function askPulse(s: State, question: string): AIAnswer {
     if (hit) return { text: `Here you go.`, blocks: [{ type: 'link', label: `Open ${hit[1]}`, to: hit[2] }] };
   }
 
+  // --- The newer questions (lib/assistantPlus.ts) ---
+  const more = askMore(s, q);
+  if (more) return more;
+
   // --- Do something: add an expense, income, bill, SIP, plan, budget or settle up ---
-  const action = parseAction(s, question);
+  const action = parseAction(s, actionFromHinglish(question));
   if (action) {
     const text =
       action.kind === 'split'
@@ -335,6 +348,16 @@ export function askPulse(s: State, question: string): AIAnswer {
     const prev = spendBetween(s, pStart, pEnd, [catHit]);
     const name = categoryName(s, catHit).toLowerCase();
     const diff = now - prev;
+    if (catHit === 'delivery' && now > 0) {
+      const apps = new Map<string, number>();
+      for (const t of s.transactions) if (t.type === 'expense' && t.category === 'delivery' && t.date >= mStart && t.date <= today) apps.set(t.merchant.split(' · ')[0], (apps.get(t.merchant.split(' · ')[0]) ?? 0) + t.amount);
+      const rows = [...apps.entries()].sort((a, b) => b[1] - a[1]);
+      return {
+        text: `You've spent ${rupees(now)} on delivery apps this month${prev ? `, ${rupees(Math.abs(diff))} ${diff >= 0 ? 'more' : 'less'} than ${lastM}` : ''}. Most of it on ${rows[0][0]}.`,
+        blocks: [{ type: 'compare', rows: rows.slice(0, 5).map(([label, value]) => ({ label, value })) }],
+        followups: [`Skip ${rows[0][0]} for a week, how much will I save?`, 'How long will my money last?'],
+      };
+    }
     const text = lastMonth
       ? `You spent ${rupees(prev)} on ${name} in ${lastM}.`
       : `You've spent ${rupees(now)} on ${name} this month${prev ? `, ${rupees(Math.abs(diff))} ${diff >= 0 ? 'more' : 'less'} than ${lastM}` : ''}.`;
@@ -368,9 +391,11 @@ export function askPulse(s: State, question: string): AIAnswer {
 
   // --- Bills / upcoming ---
   if (/bill|due|upcoming|coming up|this week/.test(q)) {
-    const items = upcoming(s, addDays(today, 14));
+    const week = /this week/.test(q);
+    const items = upcoming(s, addDays(today, week ? 7 : 14));
+    if (!items.length) return { text: `Nothing is due in the next ${week ? 'week' : 'two weeks'}.`, followups: ['How much can I spend today?'] };
     return {
-      text: `${items.length} payments are due in the next two weeks, ${rupees(items.reduce((a, i) => a + i.amount, 0))} in total. The ones before payday are already set aside.`,
+      text: `${items.length} ${items.length === 1 ? 'payment is' : 'payments are'} due in the next ${week ? '7 days' : 'two weeks'}, ${rupees(items.reduce((a, i) => a + i.amount, 0))} in total. The ones before payday are already set aside.`,
       blocks: [{ type: 'list', rows: items.map((i) => ({ label: i.name, value: rupees(i.amount), sub: relDay(i.date, today) })) }],
     };
   }
@@ -398,7 +423,7 @@ export function askPulse(s: State, question: string): AIAnswer {
   }
 
   return {
-    text: `I can answer questions about your money and do things for you: add expenses and income ("${ex(450)} dinner", "got salary ${ex(40000)}"), add bills ("Netflix ${ex(199)} monthly"), start a SIP, put money into a plan, set a budget, or show your monthly report.`,
+    text: `I didn't get that one. Try asking like a friend, in English or Hinglish: "kitna bacha hai?", "paisa kab tak chalega?", "Zomato pe kitna uda diya?", or log something: "${ex(450)} dinner", "salary aa gayi ${ex(40000)}", "Netflix ${ex(199)} monthly". You can also tap the mic and just say it.`,
     followups: starterDefaults().slice(0, 4),
   };
 }

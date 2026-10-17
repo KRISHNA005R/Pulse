@@ -1,5 +1,6 @@
 import {
   Activity,
+  Mic,
   ChartColumnIncreasing,
   ArrowDownLeft,
   ArrowLeftRight,
@@ -136,6 +137,7 @@ const MAP: Record<string, LucideIcon> = {
   zap: Zap,
   at: AtSign,
   image: ImageIcon,
+  mic: Mic,
   'arrow-right': ArrowRight,
 };
 

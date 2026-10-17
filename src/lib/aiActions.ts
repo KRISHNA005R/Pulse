@@ -16,7 +16,9 @@ export type AIAction =
   | { kind: 'bill'; name: string; amount: number; cycle: Subscription['cycle']; nextDate: ISODate; category: CategoryId; subKind: Subscription['kind'] }
   | { kind: 'sip'; name: string; amount: number; nextDate: ISODate; fundType?: FundType; stepUp?: number; rate: number }
   | { kind: 'budget'; category: CategoryId; amount: number; period: BudgetPeriod; budgetId?: string }
-  | { kind: 'settle'; personId: string; personName: string; from: string; to: string; amount: number };
+  | { kind: 'settle'; personId: string; personName: string; from: string; to: string; amount: number }
+  | { kind: 'undo-last'; txId: string; merchant: string; amount: number; date: ISODate }
+  | { kind: 'fix-last'; txId: string; merchant: string; from: number; amount: number; date: ISODate };
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 const MONTH_RE = /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b(?:\s+(20\d\d))?/;
