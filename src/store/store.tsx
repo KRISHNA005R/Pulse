@@ -32,7 +32,9 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { notePayday, JAIL_DAYS, nextCoin, gullakFull } from '../lib/fun';
+import { currentRound, pickWinner, inBowl, pot } from '../lib/bhisi';
+import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
 // (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
@@ -356,6 +358,7 @@ export function refresh(input: State): State {
         // Auto-add: record the payday as money in (same id on every synced device).
         const id = `pay-${i.id}-${i.nextDate}`;
         if (i.autoCredit && i.expected > 0 && !s.transactions.some((t) => t.id === id)) {
+          if (i === mainIncome(s)) notePayday(s, i.nextDate);
           const tx: Transaction = { id, merchant: i.kind === 'salary' && !/^salary$/i.test(i.name.trim()) ? `Salary · ${i.name}` : i.name, amount: i.expected, type: 'income', category: incomeCategory(i.kind), date: i.nextDate, account: defaultAccount(s), recurring: true, status: 'completed', incomeId: i.id, notes: 'Added automatically on payday' };
           s.transactions.unshift(tx);
           applyMoney(s, tx, 1);
@@ -542,6 +545,8 @@ function useStoreImpl() {
       const before = streak(ref.current);
       if (ref.current.mode === 'personal' && !opts.quiet) track(tx.type === 'income' ? 'income' : 'expense');
       const next = commit((s) => {
+        // Salary landing: remember what was left just before it ("survived payday").
+        if (tx.type === 'income' && tx.category === 'salary' && tx.date <= s.today && s.mode === 'personal') notePayday(s, tx.date);
         s.transactions.unshift(tx);
         applyMoney(s, tx, 1);
         if (tx.recurring && tx.type === 'expense' && !s.subscriptions.some((x) => x.name.toLowerCase() === tx.merchant.toLowerCase())) {
@@ -709,6 +714,176 @@ function useStoreImpl() {
         p.reserveEvery = roundMoney(Math.max(0, every));
         p.reserveFor = nextPayday(s);
         p.cycleReserve = roundMoney(Math.min(p.reserveEvery, Math.max(0, p.target - p.saved)));
+      }),
+    [commit],
+  );
+
+  // ---------- bhisi ----------
+  const createBhisi = useCallback(
+    (b: { name: string; emoji: string; amount: number; members: string[]; start: ISODate }) => {
+      const id = uid('bh');
+      commit((s) => {
+        s.bhisis ??= [];
+        s.bhisis.unshift({ id, name: b.name, emoji: b.emoji, amount: roundMoney(b.amount), members: b.members, createdAt: s.today, rounds: b.members.map((_, i) => ({ date: addMonths(b.start, i), paid: [] })) });
+      });
+      burst({ kind: 'mini', power: 1.2 });
+      toast({ text: `${b.name} is on. ${b.members.length} chits in the matka.`, tone: 'good', emoji: b.emoji });
+      return id;
+    },
+    [commit, toast],
+  );
+  /** Tick (or untick) who has paid this round. My own payment is recorded as money out. */
+  const toggleBhisiPaid = useCallback(
+    (id: string, round: number, person: string) =>
+      commit((s) => {
+        const b = s.bhisis?.find((x) => x.id === id);
+        const r = b?.rounds[round];
+        if (!b || !r) return;
+        const was = r.paid.includes(person);
+        r.paid = was ? r.paid.filter((p) => p !== person) : [...r.paid, person];
+        if (person !== 'me') return;
+        if (was && r.myTx) {
+          const tx = s.transactions.find((t) => t.id === r.myTx);
+          if (tx) {
+            applyMoney(s, tx, -1);
+            s.transactions = s.transactions.filter((t) => t.id !== tx.id);
+          }
+          delete r.myTx;
+        } else if (!was) {
+          const tx: Transaction = { id: uid('t'), merchant: `Bhisi · ${b.name}`, amount: b.amount, type: 'transfer', direction: 'out', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${round + 1} of ${b.rounds.length}` };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+          r.myTx = tx.id;
+        }
+      }),
+    [commit],
+  );
+  /** Draw the lucky chit for the current round. Returns the winner's person id. */
+  const drawBhisi = useCallback(
+    (id: string): string | undefined => {
+      const b0 = ref.current.bhisis?.find((x) => x.id === id);
+      if (!b0) return;
+      const i = currentRound(b0);
+      const bowl = inBowl(b0);
+      if (i === undefined || !bowl.length) return;
+      const winner = pickWinner(bowl);
+      commit((s) => {
+        const b = s.bhisis!.find((x) => x.id === id)!;
+        const r = b.rounds[i];
+        r.winner = winner;
+        r.drawnAt = s.today;
+        if (winner === 'me') {
+          const tx: Transaction = { id: uid('t'), merchant: `Bhisi won · ${b.name}`, amount: pot(b), type: 'transfer', direction: 'in', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${i + 1} of ${b.rounds.length}` };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+          r.wonTx = tx.id;
+        }
+      });
+      return winner;
+    },
+    [commit],
+  );
+  const deleteBhisi = useCallback(
+    (id: string) => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
+      if (b) toast({ text: `${b.name} deleted. Money already recorded stays in Activity.` });
+    },
+    [commit, toast],
+  );
+
+  // ---------- cart jail ----------
+  const jailAdd = useCallback(
+    (name: string, amount: number, emoji: string) => {
+      commit((s) => {
+        s.jail ??= [];
+        s.jail.unshift({ id: uid('j'), name: name.trim().slice(0, 40), amount: roundMoney(amount), emoji, addedAt: s.today, releaseAt: addDays(s.today, JAIL_DAYS), status: 'jailed' });
+      });
+      haptic(14);
+      toast({ text: `${name.trim()} is in cart jail. Come back in ${JAIL_DAYS} days and see if you still want it.`, emoji: '🔒' });
+    },
+    [commit, toast],
+  );
+  const jailDecide = useCallback(
+    (id: string, how: 'bought' | 'freed') => {
+      const j = ref.current.jail?.find((x) => x.id === id);
+      if (!j) return;
+      commit((s) => {
+        const x = s.jail!.find((y) => y.id === id)!;
+        x.status = how;
+        x.decidedAt = s.today;
+      });
+      if (how === 'freed') {
+        burst({ kind: 'coins', power: 1.1 });
+        toast({ text: `Let it go. ${rupees(j.amount)} stays with you.`, tone: 'good', emoji: '🕊️' });
+      } else {
+        addTransaction({ merchant: j.name, amount: j.amount, type: 'expense', category: 'shopping', date: ref.current.today, account: defaultAccount(ref.current), recurring: false, notes: 'Out of cart jail' } as NewTx, { quiet: true });
+        toast({ text: `Bought it, guilt-free. You waited ${daysBetween(j.addedAt, ref.current.today)} days, that's the whole point.` });
+      }
+    },
+    [commit, toast, addTransaction],
+  );
+  const jailMoved = useCallback(
+    (id: string, amount: number) =>
+      commit((s) => {
+        const x = s.jail?.find((y) => y.id === id);
+        if (x) x.moved = roundMoney((x.moved ?? 0) + amount);
+      }),
+    [commit],
+  );
+  const jailRemove = useCallback((id: string) => commit((s) => void (s.jail = (s.jail ?? []).filter((x) => x.id !== id))), [commit]);
+
+  // ---------- gullak ----------
+  const startGullak = useCallback(
+    (g: { name: string; mode: 'fixed' | 'rising'; step: number; days: number; target: number }) => {
+      const id = uid('plan');
+      commit((s) => {
+        s.plans.unshift({ id, name: g.name, icon: '🏺', kind: 'goal', target: g.target, saved: 0, startDate: s.today, targetDate: addDays(s.today, g.days), status: 'active', categories: [], cycleReserve: 0, contributions: [], gullak: { mode: g.mode, step: g.step, days: g.days, drops: [] } });
+      });
+      burst({ kind: 'mini', power: 1.2 });
+      toast({ text: `${g.name} is ready. Drop your first coin today.`, tone: 'good', emoji: '🏺' });
+      return id;
+    },
+    [commit, toast],
+  );
+  /** Drop today's coin into a gullak: money moves from the account into the gullak plan. */
+  const dropCoin = useCallback(
+    (planId: string) => {
+      const p0 = ref.current.plans.find((p) => p.id === planId);
+      const g = p0?.gullak;
+      if (!p0 || !g || g.drops.includes(ref.current.today) || gullakFull(g)) return;
+      const coin = nextCoin(g);
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId)!;
+        const tx: Transaction = { id: uid('t'), merchant: `Coin in ${p.name}`, amount: coin, type: 'transfer', direction: 'out', toAccount: `pot:${p.id}`, category: 'transfer', date: s.today, account: defaultAccount(s), plan: p.id, recurring: false, status: 'completed' };
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+        p.contributions.push({ date: s.today, amount: coin });
+        p.gullak!.drops.push(s.today);
+      });
+      haptic(16);
+      return coin;
+    },
+    [commit],
+  );
+  const breakGullak = useCallback(
+    (planId: string) =>
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId);
+        if (!p?.gullak) return;
+        p.gullak.broken = true;
+        p.status = 'done';
+      }),
+    [commit],
+  );
+
+  // ---------- guess the bill ----------
+  const saveGuess = useCallback(
+    (g: { week: ISODate; cat: string; guess: number; actual: number }) =>
+      commit((s) => {
+        s.guesses ??= [];
+        if (!s.guesses.some((x) => x.week === g.week)) s.guesses.push(g);
+        if (s.guesses.length > 60) s.guesses.splice(0, s.guesses.length - 60);
       }),
     [commit],
   );
@@ -1724,6 +1899,18 @@ function useStoreImpl() {
     deleteSubscription,
     addPerson,
     withdrawFromPlan,
+    createBhisi,
+    toggleBhisiPaid,
+    drawBhisi,
+    deleteBhisi,
+    jailAdd,
+    jailDecide,
+    jailMoved,
+    jailRemove,
+    startGullak,
+    dropCoin,
+    breakGullak,
+    saveGuess,
     setPlanAutoSave,
     setPersonUpi,
     linkPerson,

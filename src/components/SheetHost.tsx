@@ -1,6 +1,10 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
+import { BhisiDraw, BhisiForm, DrawReplaySheet } from './Bhisi';
+import { JailForm } from './CartJail';
+import { AuraSheet } from './Fun';
+import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
 import { Sheet } from './ui/Sheet';
@@ -91,6 +95,42 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Edit group" onClose={close} z={z}>
           <GroupPeople groupId={spec.groupId} onDone={close} />
+        </Sheet>
+      );
+    case 'aura':
+      return (
+        <Sheet title="Money aura" onClose={close} z={z}>
+          <AuraSheet />
+        </Sheet>
+      );
+    case 'jail-form':
+      return (
+        <Sheet title="Cart jail" onClose={close} size="sm" z={z}>
+          <JailForm onDone={close} />
+        </Sheet>
+      );
+    case 'gullak-form':
+      return (
+        <Sheet title="New gullak" onClose={close} z={z}>
+          <GullakForm onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-form':
+      return (
+        <Sheet title="New bhisi" onClose={close} z={z}>
+          <BhisiForm onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-draw':
+      return (
+        <Sheet title="Lucky draw" onClose={close} z={z}>
+          <BhisiDraw bhisiId={spec.bhisiId} onDone={close} />
+        </Sheet>
+      );
+    case 'draw-replay':
+      return (
+        <Sheet title="Bhisi draw" onClose={close} z={z}>
+          <DrawReplaySheet replay={spec.replay} onDone={close} />
         </Sheet>
       );
     case 'group-form':

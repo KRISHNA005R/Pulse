@@ -24,6 +24,8 @@ import { InsuranceScreen } from './screens/Insurance';
 import { useInstallNudge } from './components/InstallPrompt';
 import { useFriends } from './components/Friends';
 import { RemindersScreen } from './screens/Reminders';
+import { BhisiDetail } from './components/Bhisi';
+import { takeReplay } from './lib/bhisi';
 import { syncReminders } from './lib/reminders';
 import { FeedbackScreen } from './screens/Feedback';
 import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
@@ -35,6 +37,8 @@ function Screen() {
     switch (r.name) {
       case 'plan':
         return <PlanDetail id={r.id} />;
+      case 'bhisi':
+        return <BhisiDetail id={r.id} />;
       case 'group':
         return <GroupDetail id={r.id} />;
       case 'person':
@@ -205,6 +209,19 @@ function Shell() {
     return () => window.removeEventListener('hashchange', check);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.onboarding.done, store.sync.enabled]);
+
+  // A shared bhisi draw (#draw=…): replay the same chit coming out.
+  useEffect(() => {
+    if (!state.onboarding.done) return;
+    const check = () => {
+      const d = takeReplay();
+      if (d) ui.openSheet({ type: 'draw-replay', replay: d });
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.onboarding.done]);
 
   // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback, /?tab=plans|splits|activity|you
   useEffect(() => {

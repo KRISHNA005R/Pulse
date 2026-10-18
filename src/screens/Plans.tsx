@@ -9,25 +9,28 @@ import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '
 import { EmptyState, MoneyStat, PersonAvatar, Ring, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 import { GROUP_EMOJI } from '../components/Forms';
+import { BhisiList } from '../components/Bhisi';
+import { CartJailCard, ChallengeTiles } from '../components/CartJail';
+import { GullakCard, GullakHero } from '../components/Gullak';
 import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Friends';
 
 export function PlansScreen() {
   const ui = useUI();
   const seg = ui.plansSegment;
-  const add = seg === 'plans' ? () => ui.openSheet({ type: 'plan-form' }) : seg === 'splits' ? () => ui.openSheet({ type: 'group-form' }) : () => ui.openSheet({ type: 'budget-form' });
+  const add = seg === 'plans' ? () => ui.openSheet({ type: 'plan-form' }) : seg === 'splits' ? () => ui.openSheet({ type: 'group-form' }) : seg === 'bhisi' ? () => ui.openSheet({ type: 'bhisi-form' }) : () => ui.openSheet({ type: 'budget-form' });
   return (
     <div>
       <TopNavigation
         title="Plans"
-        sub="What you're saving for, who you split with, and your budgets."
+        sub="What you're saving for, who you split with, your bhisi and budgets."
         right={
           <button type="button" onClick={add} className="btn-primary min-h-[40px] px-4 text-[14px]">
-            <Icon name="plus" size={16} /> {seg === 'plans' ? 'Plan' : seg === 'splits' ? 'Group' : 'Budget'}
+            <Icon name="plus" size={16} /> {seg === 'plans' ? 'Plan' : seg === 'splits' ? 'Group' : seg === 'bhisi' ? 'Bhisi' : 'Budget'}
           </button>
         }
       />
-      <Segmented label="Section" value={seg} onChange={ui.setPlansSegment} options={[{ value: 'plans', label: 'Plans' }, { value: 'splits', label: 'Splits' }, { value: 'budgets', label: 'Budgets' }]} />
-      <div key={seg} className="mt-6 animate-toast">{seg === 'plans' ? <PlansList /> : seg === 'splits' ? <SplitsView /> : <BudgetsView />}</div>
+      <Segmented label="Section" value={seg} onChange={ui.setPlansSegment} options={[{ value: 'plans', label: 'Plans' }, { value: 'splits', label: 'Splits' }, { value: 'bhisi', label: 'Bhisi' }, { value: 'budgets', label: 'Budgets' }]} />
+      <div key={seg} className="mt-6 animate-toast">{seg === 'plans' ? <PlansList /> : seg === 'splits' ? <SplitsView /> : seg === 'bhisi' ? <BhisiList /> : <BudgetsView />}</div>
     </div>
   );
 }
@@ -36,13 +39,33 @@ function PlansList() {
   const { state } = useStore();
   const ui = useUI();
   const active = state.plans.filter((p) => p.status === 'active' && p.kind === 'plan');
-  const goals = state.plans.filter((p) => p.kind === 'goal' && p.status !== 'paused');
-  const done = state.plans.filter((p) => p.status === 'done' && p.kind === 'plan');
+  const gullaks = state.plans.filter((p) => p.gullak && (!p.gullak.broken || p.status !== 'done' || p.saved > 0));
+  const goals = state.plans.filter((p) => p.kind === 'goal' && p.status !== 'paused' && !p.gullak);
+  const done = state.plans.filter((p) => p.status === 'done' && p.kind === 'plan' && !p.gullak);
   const paused = state.plans.filter((p) => p.status === 'paused');
-  if (!state.plans.length) return <EmptyState icon="target" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />;
+  if (!state.plans.length)
+    return (
+      <div className="flex flex-col gap-6">
+        <EmptyState icon="target" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
+        <ChallengeTiles />
+        <CartJailCard />
+      </div>
+    );
   const open = (id: string) => ui.push({ name: 'plan', id });
   return (
     <div className="flex flex-col gap-8">
+      <ChallengeTiles />
+      <CartJailCard />
+      {gullaks.length > 0 && (
+        <section aria-labelledby="gullak-h">
+          <SectionHeader id="gullak-h" title="Gullak" />
+          <div className="flex flex-col gap-3">
+            {gullaks.map((p) => (
+              <GullakCard key={p.id} plan={p} />
+            ))}
+          </div>
+        </section>
+      )}
       {active.length > 0 && (
         <section className="flex flex-col gap-3" aria-label="Active plans">
           {active.map((p) => (
@@ -262,6 +285,16 @@ export function PlanDetail({ id }: { id: string }) {
           </button>
         }
       />
+      {plan.gullak ? (
+        <>
+          <GullakHero plan={plan} />
+          {plan.saved > 0 && (
+            <button type="button" className="btn-quiet mt-3 w-full" onClick={() => ui.openSheet({ type: 'withdraw', planId: plan.id })}>
+              Take money out
+            </button>
+          )}
+        </>
+      ) : (
       <section className="rounded-3xl border border-line bg-surface p-5 md:p-6" aria-label="Progress">
         <div className="flex items-center gap-5">
           <Ring value={m.progress} size={116} stroke={11} label={`${pct}% funded`}>
@@ -339,6 +372,7 @@ export function PlanDetail({ id }: { id: string }) {
           </button>
         </div>
       </section>
+      )}
 
       <section className="mt-4 rounded-3xl border border-line bg-surface p-5" aria-labelledby="pm-h">
         <h2 id="pm-h" className="text-[13px] font-semibold text-ink3">
@@ -360,7 +394,7 @@ export function PlanDetail({ id }: { id: string }) {
         </ol>
       </section>
 
-      {live && (
+      {live && !plan.gullak && (
         <section className="mt-4 rounded-3xl border border-line bg-surface p-5" aria-labelledby="pa-h">
           <div className="flex items-start gap-3">
             <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${every ? 'bg-accent-soft text-accent-ink' : 'bg-sunk text-ink3'}`} aria-hidden="true">

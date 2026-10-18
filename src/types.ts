@@ -127,6 +127,8 @@ export interface Plan {
   categories: CategoryId[];
   /** Planned contribution still to move before next payday (reserved in safe-to-spend). */
   cycleReserve: number;
+  /** A gullak challenge: a coin a day, the plan fills like a clay piggy bank (lib/fun.ts). */
+  gullak?: Gullak;
   /** Kept aside every payday: cycleReserve refills to this when a new pay cycle starts. */
   reserveEvery?: number;
   /** The payday the current cycleReserve is counting towards (so it refills once per cycle). */
@@ -384,6 +386,10 @@ export interface Settings {
   soundsAsked?: boolean;
   /** Things the person said during setup they don't have, e.g. 'bills' (lib/setup.ts). */
   setupSkipped?: string[];
+  /** Money aura card already opened for this month key (YYYY-MM). */
+  auraSeen?: string;
+  /** "Survived payday" card closed for this payday. */
+  paydaySeen?: string;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
   reminders?: ReminderPrefs;
 }
@@ -436,4 +442,58 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
+  /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
+  bhisis?: Bhisi[];
+  /** Cart jail: things you wanted to buy, held for a couple of days first. */
+  jail?: JailItem[];
+  /** Money left just before each main payday ("survived payday"). */
+  paydays?: { date: ISODate; left: number }[];
+  /** "Guess the bill" answers, one per week. */
+  guesses?: { week: ISODate; cat: string; guess: number; actual: number }[];
+}
+
+export interface Gullak {
+  /** 'fixed': the same coin every day. 'rising': day 1 = step, day 2 = 2 × step, and so on. */
+  mode: 'fixed' | 'rising';
+  step: number;
+  days: number;
+  /** Days a coin went in. */
+  drops: ISODate[];
+  broken?: boolean;
+}
+
+export interface Bhisi {
+  id: string;
+  name: string;
+  emoji: string;
+  /** Each person puts in this much every round. */
+  amount: number;
+  /** Person ids, including 'me'. */
+  members: string[];
+  /** One round a month: the pot goes to one person each round, drawn by lucky chit. */
+  rounds: BhisiRound[];
+  createdAt: ISODate;
+}
+
+export interface BhisiRound {
+  date: ISODate;
+  paid: string[];
+  winner?: string;
+  drawnAt?: ISODate;
+  /** The transfer recorded when I paid this round / when I won it. */
+  myTx?: string;
+  wonTx?: string;
+}
+
+export interface JailItem {
+  id: string;
+  name: string;
+  amount: number;
+  emoji: string;
+  addedAt: ISODate;
+  releaseAt: ISODate;
+  status: 'jailed' | 'bought' | 'freed';
+  decidedAt?: ISODate;
+  /** Money from letting it go that was moved to a plan. */
+  moved?: number;
 }

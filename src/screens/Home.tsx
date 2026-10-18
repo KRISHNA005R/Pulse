@@ -1,3 +1,5 @@
+import { CartJailCard } from '../components/CartJail';
+import { AuraTeaser, GuessCard, PaydayWin } from '../components/Fun';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
@@ -25,7 +27,7 @@ export function HomeScreen() {
     const soon = addDays(state.today, 3);
     return all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.kind === 'insurance' || u.amount >= scaled(5000)).slice(0, 5);
   }, [state]);
-  const plans = state.plans.filter((p) => p.status === 'active').slice(0, 3);
+  const plans = state.plans.filter((p) => p.status === 'active' && !p.gullak).slice(0, 3);
   const recent = useMemo(() => [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4), [state.transactions]);
   const insight = useMemo(() => buildInsights(state).find((i) => !i.id.startsWith('plan-')), [state]);
   const social = useMemo(() => socialTotals(state), [state]);
@@ -36,6 +38,7 @@ export function HomeScreen() {
   return (
     <div className="stagger flex flex-col gap-8">
       <PaydayCard />
+      <PaydayWin />
       <InstallBanner />
       <ReminderCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />
@@ -45,7 +48,7 @@ export function HomeScreen() {
         <ul className="flex flex-col">
           {next.map((u) => (
             <li key={u.id}>
-              <button type="button" className="row-btn" onClick={() => (u.kind === 'income' ? ui.push({ name: 'income' }, 'you') : u.kind === 'investment' ? ui.push({ name: 'investments' }, 'you') : u.kind === 'insurance' ? ui.push({ name: 'insurance' }, 'you') : u.kind === 'card' ? ui.push({ name: 'cards' }, 'you') : ui.openSheet({ type: 'sub-form', subId: u.ref }))}>
+              <button type="button" className="row-btn" onClick={() => (u.kind === 'bhisi' && u.ref ? ui.push({ name: 'bhisi', id: u.ref }) : u.kind === 'income' ? ui.push({ name: 'income' }, 'you') : u.kind === 'investment' ? ui.push({ name: 'investments' }, 'you') : u.kind === 'insurance' ? ui.push({ name: 'insurance' }, 'you') : u.kind === 'card' ? ui.push({ name: 'cards' }, 'you') : ui.openSheet({ type: 'sub-form', subId: u.ref }))}>
                 <CategoryMark state={state} category={u.kind === 'income' ? 'salary' : u.kind === 'investment' ? 'investments' : u.kind === 'insurance' ? 'insurance' : u.kind === 'subscription' ? 'subscriptions' : 'bills'} size={40} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{u.name}</span>
@@ -84,6 +87,9 @@ export function HomeScreen() {
       </section>
 
       <FriendNewsCard />
+      <CartJailCard home />
+      <AuraTeaser />
+      <GuessCard />
 
       {askFeedback && (
         <section aria-label="Feedback" className="-mt-2 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
