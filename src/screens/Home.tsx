@@ -1,4 +1,3 @@
-import { CartJailCard } from '../components/CartJail';
 import { AuraTeaser, GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
@@ -88,7 +87,6 @@ export function HomeScreen() {
       </section>
 
       <FriendNewsCard />
-      <CartJailCard home />
       <AuraTeaser />
       <GuessCard />
 

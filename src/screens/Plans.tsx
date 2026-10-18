@@ -10,8 +10,7 @@ import { EmptyState, MoneyStat, PersonAvatar, Ring, SectionHeader, Segmented, St
 import { Icon } from '../components/ui/Icon';
 import { GROUP_EMOJI } from '../components/Forms';
 import { BhisiList } from '../components/Bhisi';
-import { CartJailCard, ChallengeTiles } from '../components/CartJail';
-import { GullakCard, GullakHero } from '../components/Gullak';
+import { GullakBanner, GullakCard, GullakHero } from '../components/Gullak';
 import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Friends';
 
 export function PlansScreen() {
@@ -47,15 +46,13 @@ function PlansList() {
     return (
       <div className="flex flex-col gap-6">
         <EmptyState icon="target" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
-        <ChallengeTiles />
-        <CartJailCard />
+        <GullakBanner />
       </div>
     );
   const open = (id: string) => ui.push({ name: 'plan', id });
   return (
     <div className="flex flex-col gap-8">
-      <ChallengeTiles />
-      <CartJailCard />
+      {!gullaks.some((g) => !g.gullak?.broken) && <GullakBanner />}
       {gullaks.length > 0 && (
         <section aria-labelledby="gullak-h">
           <SectionHeader id="gullak-h" title="Gullak" />

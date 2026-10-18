@@ -1,11 +1,11 @@
-import type { Gullak, ISODate, JailItem, State, Transaction } from '../types';
+import type { Gullak, ISODate, State, Transaction } from '../types';
 import { isAuto } from './auto';
 import { roundMoney, scaled } from './currency';
 import { addDays, endOfMonth, parseDate, startOfWeek } from './format';
 import { planMetrics, safeToSpend } from './finance';
 import { streak } from './streak';
 
-// The small fun bits: money aura, guess the bill, survived payday, roast or toast, cart jail, gullak.
+// The small fun bits: money aura, guess the bill, survived payday, roast or toast, gullak.
 // All worked out on the phone from what's logged. Friendly, never mean.
 
 const FIXED = new Set(['rent', 'bills', 'subscriptions', 'insurance', 'emi', 'investments', 'transfer', 'fees', 'tax']);
@@ -196,14 +196,8 @@ export function toastMe(s: State): string {
 }
 
 // ------------------------------------------------------------------
-// Cart jail and gullak
+// Gullak
 // ------------------------------------------------------------------
-export const JAIL_DAYS = 2;
-export const jailReady = (j: JailItem, today: ISODate) => j.status === 'jailed' && j.releaseAt <= today;
-export function jailFreedTotal(s: State) {
-  return roundMoney((s.jail ?? []).filter((j) => j.status === 'freed').reduce((a, j) => a + j.amount, 0));
-}
-
 export const gullakTarget = (g: Pick<Gullak, 'mode' | 'step' | 'days'>) => roundMoney(g.mode === 'fixed' ? g.step * g.days : (g.step * g.days * (g.days + 1)) / 2);
 export const nextCoin = (g: Gullak) => roundMoney(g.mode === 'fixed' ? g.step : g.step * (g.drops.length + 1));
 export const gullakFull = (g: Gullak) => g.drops.length >= g.days;

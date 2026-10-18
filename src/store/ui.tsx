@@ -43,8 +43,9 @@ export type SheetSpec =
   | { type: 'group-form' }
   | { type: 'bhisi-form' }
   | { type: 'bhisi-draw'; bhisiId: string }
+  | { type: 'bhisi-watch'; bhisiId: string; round: number }
+  | { type: 'bhisi-join'; invite: import('../lib/bhisiShare').BhisiInvite }
   | { type: 'draw-replay'; replay: import('../lib/bhisi').DrawReplay }
-  | { type: 'jail-form' }
   | { type: 'gullak-form' }
   | { type: 'aura' }
   | { type: 'group-people'; groupId: string }

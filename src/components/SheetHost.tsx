@@ -1,8 +1,7 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
-import { BhisiDraw, BhisiForm, DrawReplaySheet } from './Bhisi';
-import { JailForm } from './CartJail';
+import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './Bhisi';
 import { AuraSheet } from './Fun';
 import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
@@ -103,12 +102,6 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
           <AuraSheet />
         </Sheet>
       );
-    case 'jail-form':
-      return (
-        <Sheet title="Cart jail" onClose={close} size="sm" z={z}>
-          <JailForm onDone={close} />
-        </Sheet>
-      );
     case 'gullak-form':
       return (
         <Sheet title="New gullak" onClose={close} z={z}>
@@ -125,6 +118,18 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Lucky draw" onClose={close} z={z}>
           <BhisiDraw bhisiId={spec.bhisiId} onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-watch':
+      return (
+        <Sheet title="The chit for this round" onClose={close} z={z}>
+          <BhisiWatch bhisiId={spec.bhisiId} round={spec.round} onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-join':
+      return (
+        <Sheet title="Bhisi invite" onClose={close} size="sm" z={z}>
+          <BhisiJoin invite={spec.invite} onDone={close} />
         </Sheet>
       );
     case 'draw-replay':

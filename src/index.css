@@ -286,3 +286,30 @@ body {
   .matka-idle, .chit, .rays { animation: none; }
   .matka-shaking { animation-duration: .4s; }
 }
+
+/* ---------- Matka v2 ---------- */
+@keyframes scroll-rise {
+  0% { transform: translate(-50%, 0) rotate(0) scale(1); }
+  60% { transform: translate(-50%, -112px) rotate(380deg) scale(1.35); }
+  100% { transform: translate(-50%, -96px) rotate(360deg) scale(1.4); }
+}
+@keyframes scroll-hover { 0%, 100% { transform: translate(-50%, -96px) rotate(-6deg) scale(1.4); } 50% { transform: translate(-50%, -104px) rotate(6deg) scale(1.46); } }
+@keyframes scroll-unroll {
+  0% { transform: translate(-50%, -50%) scaleX(.07) rotate(0); opacity: 1; }
+  55% { transform: translate(-50%, -50%) scaleX(1.04) rotate(-2deg); }
+  100% { transform: translate(-50%, -50%) scaleX(1) rotate(-1.5deg); opacity: 1; }
+}
+@keyframes puff { 0% { transform: translate(0, 0) scale(.4); opacity: .55; } 100% { transform: translate(var(--px), -26px) scale(1.5); opacity: 0; } }
+@keyframes halo { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: .9; } 50% { transform: translate(-50%, -50%) scale(1.06); opacity: 1; } }
+@keyframes twinkle { 0%, 100% { opacity: .15; transform: scale(.7); } 50% { opacity: 1; transform: scale(1.1); } }
+@keyframes dots { 0%, 20% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
+.scroll-rise { animation: scroll-rise .85s cubic-bezier(.2,.8,.3,1.1) forwards; }
+.scroll-hover { animation: scroll-hover .5s ease-in-out infinite; }
+.scroll-unroll { animation: scroll-unroll .75s cubic-bezier(.2,.9,.3,1.05) forwards; transform-origin: 50% 50%; }
+.puff { animation: puff .7s ease-out infinite; }
+.halo { animation: halo 3s ease-in-out infinite; }
+.twinkle { animation: twinkle 1.8s ease-in-out infinite; }
+.dot-anim span { animation: dots 1.2s infinite; }
+.dot-anim span:nth-child(2) { animation-delay: .2s; }
+.dot-anim span:nth-child(3) { animation-delay: .4s; }
+@media (prefers-reduced-motion: reduce) { .halo, .twinkle, .puff, .scroll-hover { animation: none; } }

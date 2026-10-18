@@ -446,8 +446,6 @@ export interface State {
   dismissedDetections: string[];
   /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
   bhisis?: Bhisi[];
-  /** Cart jail: things you wanted to buy, held for a couple of days first. */
-  jail?: JailItem[];
   /** Money left just before each main payday ("survived payday"). */
   paydays?: { date: ISODate; left: number }[];
   /** "Guess the bill" answers, one per week. */
@@ -475,6 +473,28 @@ export interface Bhisi {
   /** One round a month: the pot goes to one person each round, drawn by lucky chit. */
   rounds: BhisiRound[];
   createdAt: ISODate;
+  /** Date of the first draw; then the same date each month. */
+  start?: ISODate;
+  /** Shared with the members through an invite link; the draw then happens on PULSE's server. */
+  share?: BhisiShare;
+}
+
+export interface BhisiShare {
+  bid: string;
+  /** Seals what members publish. Only ever travels inside the invite link. */
+  key: string;
+  /** This phone's seat. */
+  mid: string;
+  token: string;
+  owner?: boolean;
+  /** Seat id (member id, or an organiser's name-only seat) → person id here ('me' for mine). */
+  seats: Record<string, string>;
+  /** Organiser: people added by name, until they join with the link. */
+  ghosts?: { id: string; name: string; pid: string }[];
+  /** Organiser: rounds marked paid for other people, by seat id. */
+  marks?: Record<string, number[]>;
+  /** The server's seat list is locked (the draws have started). */
+  locked?: boolean;
 }
 
 export interface BhisiRound {
@@ -482,20 +502,10 @@ export interface BhisiRound {
   paid: string[];
   winner?: string;
   drawnAt?: ISODate;
+  /** I watched this round's chit come out (or drew it myself). */
+  seen?: boolean;
   /** The transfer recorded when I paid this round / when I won it. */
   myTx?: string;
   wonTx?: string;
 }
 
-export interface JailItem {
-  id: string;
-  name: string;
-  amount: number;
-  emoji: string;
-  addedAt: ISODate;
-  releaseAt: ISODate;
-  status: 'jailed' | 'bought' | 'freed';
-  decidedAt?: ISODate;
-  /** Money from letting it go that was moved to a plan. */
-  moved?: number;
-}

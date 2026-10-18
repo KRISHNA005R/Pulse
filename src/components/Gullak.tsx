@@ -7,6 +7,7 @@ import { addDays, haptic, rupees } from '../lib/format';
 import { playSfx } from '../lib/sfx';
 import { gullakFull, gullakTarget, nextCoin } from '../lib/fun';
 import { Segmented } from './ui/bits';
+import { Icon } from './ui/Icon';
 
 const INK = '#17140F';
 const PAPER = '#FFFBF4';
@@ -147,6 +148,17 @@ export function GullakHero({ plan }: { plan: Plan }) {
   const coin = nextCoin(g);
   const level = plan.target ? plan.saved / plan.target : 0;
   const days = Array.from({ length: g.days }, (_, i) => i);
+  // Days in a row, ending today or yesterday.
+  const run = (() => {
+    const set = new Set(g.drops);
+    let d = set.has(state.today) ? state.today : addDays(state.today, -1);
+    let n = 0;
+    while (set.has(d) && n < 400) {
+      n++;
+      d = addDays(d, -1);
+    }
+    return n;
+  })();
 
   const dropIt = () => {
     const c = store.dropCoin(plan.id);
@@ -191,6 +203,7 @@ export function GullakHero({ plan }: { plan: Plan }) {
         </div>
       </div>
       <div className="mt-2 text-center">
+        {run > 1 && !g.broken && <p className="pop-in mx-auto mb-2 w-fit rounded-full bg-accent-soft px-3 py-1 text-[12.5px] font-bold text-accent-ink">🔥 {run} days in a row</p>}
         <p className="num-hero text-[36px] leading-none">{rupees(plan.saved)}</p>
         <p className="num mt-1 text-[14px] text-ink3">
           of {rupees(plan.target)} · day {Math.min(g.drops.length, g.days)} of {g.days}
@@ -200,7 +213,9 @@ export function GullakHero({ plan }: { plan: Plan }) {
       {/* One dot per day */}
       <div className="mx-auto mt-4 grid max-w-[340px] gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(10, g.days)}, minmax(0, 1fr))` }} aria-label={`${g.drops.length} of ${g.days} coins in`}>
         {days.map((i) => (
-          <span key={i} className={`aspect-square rounded-full ${i < g.drops.length ? 'bg-accent' : i === g.drops.length && !today && !full ? 'border-2 border-dashed border-accent' : 'bg-sunk'}`} />
+          <span key={i} className={`grid aspect-square place-items-center rounded-full text-[10px] font-bold ${i < g.drops.length ? 'bg-accent text-[#17140F] shadow-[inset_0_-2px_0_rgba(23,20,15,.25)]' : i === g.drops.length && !today && !full ? 'border-2 border-dashed border-accent text-accent-ink' : 'bg-sunk text-ink3/50'}`}>
+            {i < g.drops.length ? '₹' : i + 1}
+          </span>
         ))}
       </div>
 
@@ -272,5 +287,25 @@ export function GullakCard({ plan }: { plan: Plan }) {
           </button>
         ))}
     </div>
+  );
+}
+
+/** Plans tab: start a gullak. */
+export function GullakBanner() {
+  const ui = useUI();
+  return (
+    <button type="button" onClick={() => ui.openSheet({ type: 'gullak-form' })} className="tap relative flex w-full items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 text-left">
+      <span className="shrink-0">
+        <GullakArt level={0.55} size={78} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11.5px] font-bold tracking-[.16em] text-accent-ink">CHALLENGE</span>
+        <span className="display block text-[18px] leading-tight">Gullak</span>
+        <span className="mt-0.5 block text-[13px] text-ink2">A coin a day: ₹10, ₹20, ₹30… Break it at the end 🔨</span>
+      </span>
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-[#17140F]" aria-hidden="true">
+        <Icon name="plus" size={18} />
+      </span>
+    </button>
   );
 }

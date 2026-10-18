@@ -32,7 +32,9 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { notePayday, JAIL_DAYS, nextCoin, gullakFull } from '../lib/fun';
+import { notePayday, nextCoin, gullakFull } from '../lib/fun';
+import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { reminderDeviceId } from '../lib/reminders';
 import { currentRound, pickWinner, inBowl, pot } from '../lib/bhisi';
 import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
@@ -722,12 +724,20 @@ function useStoreImpl() {
   const createBhisi = useCallback(
     (b: { name: string; emoji: string; amount: number; members: string[]; start: ISODate }) => {
       const id = uid('bh');
-      commit((s) => {
+      const next = commit((s) => {
         s.bhisis ??= [];
-        s.bhisis.unshift({ id, name: b.name, emoji: b.emoji, amount: roundMoney(b.amount), members: b.members, createdAt: s.today, rounds: b.members.map((_, i) => ({ date: addMonths(b.start, i), paid: [] })) });
+        // On a real account it's shared: friends picked here hold a seat by name until they join with the link.
+        const share = s.mode === 'personal' ? newBhisiShare(true) : undefined;
+        if (share) {
+          share.ghosts = b.members.filter((m) => m !== 'me').map((pid) => ({ id: newGhostId(), name: s.people.find((p) => p.id === pid)?.name ?? 'Friend', pid }));
+          share.seats = { [share.mid]: 'me', ...Object.fromEntries(share.ghosts.map((g) => [g.id, g.pid])) };
+        }
+        s.bhisis.unshift({ id, name: b.name, emoji: b.emoji, amount: roundMoney(b.amount), members: b.members, createdAt: s.today, start: b.start, rounds: b.members.map((_, i) => ({ date: addMonths(b.start, i), paid: [] })), ...(share ? { share } : {}) });
       });
+      const made = next.bhisis?.find((x) => x.id === id);
+      if (made?.share) void createBhisiChannel(made, reminderDeviceId());
       burst({ kind: 'mini', power: 1.2 });
-      toast({ text: `${b.name} is on. ${b.members.length} chits in the matka.`, tone: 'good', emoji: b.emoji });
+      toast({ text: `${b.name} is on. Send the invite link so everyone can join.`, tone: 'good', emoji: b.emoji });
       return id;
     },
     [commit, toast],
@@ -740,6 +750,16 @@ function useStoreImpl() {
         const r = b?.rounds[round];
         if (!b || !r) return;
         const was = r.paid.includes(person);
+        const sh = b.share;
+        if (sh && person !== 'me') {
+          // Shared: only the organiser marks other people, and it travels as their marks.
+          if (!sh.owner) return;
+          const seat = Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+          if (!seat) return;
+          sh.marks ??= {};
+          const cur = sh.marks[seat] ?? [];
+          sh.marks[seat] = was ? cur.filter((x) => x !== round) : [...cur, round];
+        }
         r.paid = was ? r.paid.filter((p) => p !== person) : [...r.paid, person];
         if (person !== 'me') return;
         if (was && r.myTx) {
@@ -783,55 +803,90 @@ function useStoreImpl() {
     },
     [commit],
   );
-  const deleteBhisi = useCallback(
-    (id: string) => {
+  /** Shared bhisi: the server draws the chit. Resolves with the winner here, or why it didn't happen. */
+  const drawBhisiShared = useCallback(
+    async (id: string): Promise<{ winner?: string; error?: string }> => {
       const b = ref.current.bhisis?.find((x) => x.id === id);
-      commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
-      if (b) toast({ text: `${b.name} deleted. Money already recorded stays in Activity.` });
+      const round = b ? b.rounds.findIndex((r) => !r.winner) : -1;
+      if (!b?.share || round < 0) return { error: 'Nothing to draw.' };
+      const res = await drawShared(ref.current, b, round, reminderDeviceId());
+      if (!res.ok) return { error: res.error };
+      let winner: string | undefined;
+      commit((s) => {
+        applyBhisiIn(s, id, res.view);
+        const bb = s.bhisis!.find((x) => x.id === id)!;
+        winner = bb.share!.seats[res.winner];
+        bb.rounds[round].seen = true;
+      });
+      return { winner };
+    },
+    [commit],
+  );
+  const applyBhisiView = useCallback(
+    (id: string, view: BhisiView) => {
+      let out: { news: BhisiNews[]; ghosts?: string[] } = { news: [] };
+      commit((s) => void (out = applyBhisiIn(s, id, view)));
+      return out;
+    },
+    [commit],
+  );
+  const bhisiGone = useCallback(
+    (id: string, why: string) => {
+      commit((s) => {
+        const b = s.bhisis?.find((x) => x.id === id);
+        if (b) delete b.share;
+      });
+      toast({ text: why });
     },
     [commit, toast],
   );
-
-  // ---------- cart jail ----------
-  const jailAdd = useCallback(
-    (name: string, amount: number, emoji: string) => {
-      commit((s) => {
-        s.jail ??= [];
-        s.jail.unshift({ id: uid('j'), name: name.trim().slice(0, 40), amount: roundMoney(amount), emoji, addedAt: s.today, releaseAt: addDays(s.today, JAIL_DAYS), status: 'jailed' });
-      });
-      haptic(14);
-      toast({ text: `${name.trim()} is in cart jail. Come back in ${JAIL_DAYS} days and see if you still want it.`, emoji: '🔒' });
+  const bhisiNews = useCallback(
+    (id: string, news: BhisiNews[]) => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      if (!b) return;
+      const last = news[news.length - 1];
+      const who = last.winner === 'me' ? 'You' : ref.current.people.find((p) => p.id === last.winner)?.short ?? 'Someone';
+      if (last.winner === 'me') {
+        burst({ kind: 'confetti', power: 1.8 });
+        toast({ text: `Your chit came out! You won round ${last.round + 1} of ${b.name}.`, tone: 'good', emoji: '🎉' });
+      } else toast({ text: `${who} won round ${last.round + 1} of ${b.name}. Tap the bhisi to watch the chit.`, emoji: '🏺' });
     },
-    [commit, toast],
+    [toast],
   );
-  const jailDecide = useCallback(
-    (id: string, how: 'bought' | 'freed') => {
-      const j = ref.current.jail?.find((x) => x.id === id);
-      if (!j) return;
+  const markRoundSeen = useCallback(
+    (id: string, round: number) =>
       commit((s) => {
-        const x = s.jail!.find((y) => y.id === id)!;
-        x.status = how;
-        x.decidedAt = s.today;
-      });
-      if (how === 'freed') {
-        burst({ kind: 'coins', power: 1.1 });
-        toast({ text: `Let it go. ${rupees(j.amount)} stays with you.`, tone: 'good', emoji: '🕊️' });
-      } else {
-        addTransaction({ merchant: j.name, amount: j.amount, type: 'expense', category: 'shopping', date: ref.current.today, account: defaultAccount(ref.current), recurring: false, notes: 'Out of cart jail' } as NewTx, { quiet: true });
-        toast({ text: `Bought it, guilt-free. You waited ${daysBetween(j.addedAt, ref.current.today)} days, that's the whole point.` });
-      }
-    },
-    [commit, toast, addTransaction],
-  );
-  const jailMoved = useCallback(
-    (id: string, amount: number) =>
-      commit((s) => {
-        const x = s.jail?.find((y) => y.id === id);
-        if (x) x.moved = roundMoney((x.moved ?? 0) + amount);
+        const r = s.bhisis?.find((x) => x.id === id)?.rounds[round];
+        if (r) r.seen = true;
       }),
     [commit],
   );
-  const jailRemove = useCallback((id: string) => commit((s) => void (s.jail = (s.jail ?? []).filter((x) => x.id !== id))), [commit]);
+  /** Opened someone's bhisi link: take a seat. The rest arrives with the next sync. */
+  const joinBhisi = useCallback(
+    async (inv: BhisiInvite): Promise<{ id?: string; error?: string }> => {
+      const have = ref.current.bhisis?.find((x) => x.share?.bid === inv.bid);
+      if (have) return { id: have.id };
+      const res = await joinBhisiChannel(inv, reminderDeviceId());
+      if (!res.ok) return { error: res.error };
+      const id = uid('bh');
+      commit((s) => {
+        s.bhisis ??= [];
+        s.bhisis.unshift({ id, name: inv.name || 'Bhisi', emoji: '🏺', amount: 0, members: ['me'], createdAt: s.today, rounds: [], share: res.share });
+      });
+      toast({ text: `You’re in ${inv.name || 'the bhisi'}. Your chit is in the matka 🤞`, tone: 'good' });
+      return { id };
+    },
+    [commit, toast],
+  );
+  const deleteBhisi = useCallback(
+    (id: string) => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      if (b?.share) void deleteBhisiChannel(b.share);
+      commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
+      if (b) toast({ text: b.share && !b.share.owner ? `You left ${b.name}. Money already recorded stays in Activity.` : `${b.name} deleted. Money already recorded stays in Activity.` });
+    },
+    [commit, toast],
+  );
 
   // ---------- gullak ----------
   const startGullak = useCallback(
@@ -1902,11 +1957,13 @@ function useStoreImpl() {
     createBhisi,
     toggleBhisiPaid,
     drawBhisi,
+    drawBhisiShared,
+    applyBhisiView,
+    bhisiGone,
+    bhisiNews,
+    markRoundSeen,
+    joinBhisi,
     deleteBhisi,
-    jailAdd,
-    jailDecide,
-    jailMoved,
-    jailRemove,
     startGullak,
     dropCoin,
     breakGullak,

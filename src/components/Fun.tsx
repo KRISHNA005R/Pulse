@@ -243,6 +243,13 @@ export function GuessCard() {
           <div className="mt-3 rounded-2xl bg-sunk">
             <MoneyInput value={guess} onChange={setGuess} label="Your guess" size="md" id="guess-amount" />
           </div>
+          <div className="mt-2 flex gap-2">
+            {[500, 1000, 2000, 5000].map((v) => (
+              <button key={v} type="button" className="chip flex-1 justify-center px-1 text-[13px]" aria-pressed={g === v} onClick={() => setGuess(String(v))}>
+                {rupees(v)}
+              </button>
+            ))}
+          </div>
           <button type="button" className="btn-accent mt-3 w-full disabled:opacity-40" disabled={!g} onClick={reveal}>
             Lock my guess
           </button>
@@ -323,7 +330,6 @@ export function NewStuffCard() {
   const items: { emoji: string; label: string; run: () => void }[] = [
     { emoji: '🏺', label: 'Bhisi', run: () => { ui.setPlansSegment('bhisi'); ui.resetTo('plans'); } },
     { emoji: '🪙', label: 'Gullak', run: () => ui.openSheet({ type: 'gullak-form' }) },
-    { emoji: '🔒', label: 'Cart jail', run: () => ui.openSheet({ type: 'jail-form' }) },
     { emoji: '✨', label: 'Money aura', run: () => ui.openSheet({ type: 'aura' }) },
     { emoji: '🔥', label: 'Roast me', run: () => ui.openSheet({ type: 'ai', ask: 'Roast me' }) },
   ];
