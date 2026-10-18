@@ -674,6 +674,7 @@ export function AIChat({ compact, initial }: { compact?: boolean; initial?: stri
   );
 
   const ask = (question: string) => {
+    if (/\broast\b/i.test(question)) store.markTried('roast');
     const text = question.trim();
     if (!text) return;
     if (/weekend budget card|share.*budget/i.test(text)) {

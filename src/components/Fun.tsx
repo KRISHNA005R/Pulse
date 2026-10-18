@@ -131,6 +131,7 @@ export function AuraSheet() {
   const { state } = store;
   const aura = useMemo(() => moneyAura(state), [state]);
   const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => void store.markTried('aura'), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (aura && state.settings.auraSeen !== aura.key) {
       store.updateSettings({ auraSeen: aura.key });
@@ -322,35 +323,52 @@ export function PaydayWin() {
 // ------------------------------------------------------------------
 // Beta: one card on Home that points to everything new
 // ------------------------------------------------------------------
+export const NEW_STUFF = ['bhisi', 'gullak', 'aura', 'roast'] as const;
+
 export function NewStuffCard() {
   const store = useStore();
   const ui = useUI();
-  if (store.state.settings.newStuffSeen) return null;
-  const go = (f: () => void) => () => f();
-  const items: { emoji: string; label: string; run: () => void }[] = [
-    { emoji: '🏺', label: 'Bhisi', run: () => { ui.setPlansSegment('bhisi'); ui.resetTo('plans'); } },
-    { emoji: '🪙', label: 'Gullak', run: () => ui.openSheet({ type: 'gullak-form' }) },
-    { emoji: '✨', label: 'Money aura', run: () => ui.openSheet({ type: 'aura' }) },
-    { emoji: '🔥', label: 'Roast me', run: () => ui.openSheet({ type: 'ai', ask: 'Roast me' }) },
+  const tried = store.state.settings.newTried ?? [];
+  if (store.state.settings.newStuffSeen || NEW_STUFF.every((k) => tried.includes(k))) return null;
+  const items: { key: (typeof NEW_STUFF)[number]; emoji: string; label: string; sub: string; run: () => void }[] = [
+    { key: 'bhisi', emoji: '🏺', label: 'Bhisi', sub: 'Lucky chit', run: () => { ui.setPlansSegment('bhisi'); ui.resetTo('plans'); } },
+    { key: 'gullak', emoji: '🪙', label: 'Gullak', sub: 'Coin a day', run: () => ui.openSheet({ type: 'gullak-form' }) },
+    { key: 'aura', emoji: '✨', label: 'Aura', sub: 'Your vibe', run: () => ui.openSheet({ type: 'aura' }) },
+    { key: 'roast', emoji: '🔥', label: 'Roast me', sub: 'If you dare', run: () => ui.openSheet({ type: 'ai', ask: 'Roast me' }) },
   ];
+  const left = items.filter((x) => !tried.includes(x.key)).length;
   return (
     <section aria-label="New in PULSE" className="rounded-3xl border border-line bg-surface p-4">
-      <div className="flex items-center justify-between">
-        <p className="display text-[17px]">New in PULSE ✨</p>
-        <button type="button" className="tap -mr-1 grid h-8 w-8 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Hide" onClick={() => store.updateSettings({ newStuffSeen: true })}>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="display text-[17px] leading-tight">New in PULSE ✨</p>
+          <p className="mt-0.5 text-[13px] text-ink3">{left === items.length ? 'Fresh drops. Tap one to try it.' : `${left} left to try. Nice going.`}</p>
+        </div>
+        <button type="button" className="tap -mr-1 -mt-1 grid h-8 w-8 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Hide" onClick={() => store.updateSettings({ newStuffSeen: true })}>
           <Icon name="x" size={15} />
         </button>
       </div>
-      <p className="mt-0.5 text-[13px] text-ink3">Fresh drops. Tap one to try it.</p>
-      <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
-        {items.map((x) => (
-          <button key={x.label} type="button" onClick={go(x.run)} className="tap flex w-[84px] shrink-0 flex-col items-center gap-1.5 rounded-2xl bg-sunk px-2 py-3 text-[12.5px] font-semibold">
-            <span className="text-[26px]" aria-hidden="true">
-              {x.emoji}
-            </span>
-            {x.label}
-          </button>
-        ))}
+      <div className="mt-3 grid grid-cols-4 gap-2">
+        {items.map((x) => {
+          const done = tried.includes(x.key);
+          return (
+            <button
+              key={x.key}
+              type="button"
+              onClick={() => {
+                store.markTried(x.key);
+                x.run();
+              }}
+              className={`tap relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-3 ${done ? 'bg-sunk/50 opacity-60' : 'bg-sunk'}`}
+            >
+              <span className="text-[24px] leading-none" aria-hidden="true">
+                {x.emoji}
+              </span>
+              <span className="w-full truncate text-center text-[12.5px] font-semibold">{x.label}</span>
+              <span className="w-full truncate text-center text-[10.5px] text-ink3">{done ? 'Tried ✓' : x.sub}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );

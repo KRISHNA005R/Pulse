@@ -55,7 +55,7 @@ function PlansList() {
       {!gullaks.some((g) => !g.gullak?.broken) && <GullakBanner />}
       {gullaks.length > 0 && (
         <section aria-labelledby="gullak-h">
-          <SectionHeader id="gullak-h" title="Gullak" />
+          <SectionHeader id="gullak-h" title="Gullak" action={{ label: '+ New gullak', onClick: () => ui.openSheet({ type: 'gullak-form' }) }} />
           <div className="flex flex-col gap-3">
             {gullaks.map((p) => (
               <GullakCard key={p.id} plan={p} />

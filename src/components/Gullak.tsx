@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Plan } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -74,6 +74,7 @@ const DAYS = [7, 30, 52, 100];
 export function GullakForm({ onDone }: { onDone: () => void }) {
   const store = useStore();
   const ui = useUI();
+  useEffect(() => void store.markTried('gullak'), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [mode, setMode] = useState<'fixed' | 'rising'>('rising');
   const [step, setStep] = useState('10');
   const [days, setDays] = useState(30);

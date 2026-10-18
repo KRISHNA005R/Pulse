@@ -390,6 +390,8 @@ export interface Settings {
   auraSeen?: string;
   /** The "New in PULSE" card on Home was closed. */
   newStuffSeen?: boolean;
+  /** New features already tried (the card hides once they all are). */
+  newTried?: string[];
   /** "Survived payday" card closed for this payday. */
   paydaySeen?: string;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */

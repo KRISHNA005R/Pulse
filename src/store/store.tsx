@@ -888,6 +888,16 @@ function useStoreImpl() {
     [commit, toast],
   );
 
+  /** A new feature was tried: the "New in PULSE" card counts it. */
+  const markTried = useCallback(
+    (key: string) =>
+      commit((s) => {
+        const t = s.settings.newTried ?? [];
+        if (!t.includes(key)) s.settings.newTried = [...t, key];
+      }),
+    [commit],
+  );
+
   // ---------- gullak ----------
   const startGullak = useCallback(
     (g: { name: string; mode: 'fixed' | 'rising'; step: number; days: number; target: number }) => {
@@ -1965,6 +1975,7 @@ function useStoreImpl() {
     joinBhisi,
     deleteBhisi,
     startGullak,
+    markTried,
     dropCoin,
     breakGullak,
     saveGuess,

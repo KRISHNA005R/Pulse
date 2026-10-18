@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Bhisi } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -57,9 +57,10 @@ async function shareLink(text: string, url: string, toast: (t: { text: string })
 // Plans → Bhisi
 // ------------------------------------------------------------------
 export function BhisiList() {
-  const { state } = useStore();
+  const { state, markTried } = useStore();
   const ui = useUI();
   const list = state.bhisis ?? [];
+  useEffect(() => void markTried('bhisi'), []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!list.length)
     return (
       <section className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 pb-6 pt-4 text-center">
@@ -182,12 +183,12 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
           <p className="text-[12.5px] text-ink3">You + {people.length}</p>
         </div>
         {groups.length > 0 && (
-          <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+          <div className="mb-3 flex flex-wrap gap-2">
             {groups.map((g) => {
               const others = g.members.filter((m) => m !== 'me');
               const all = others.every((m) => people.includes(m));
               return (
-                <button key={g.id} type="button" aria-pressed={all} onClick={() => setPeople((xs) => (all ? xs.filter((x) => !others.includes(x)) : [...new Set([...xs, ...others])]))} className={`tap flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-left ${all ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
+                <button key={g.id} type="button" aria-pressed={all} onClick={() => setPeople((xs) => (all ? xs.filter((x) => !others.includes(x)) : [...new Set([...xs, ...others])]))} className={`tap flex min-w-0 max-w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left ${all ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
                   <span className="text-[18px]" aria-hidden="true">
                     {g.emoji}
                   </span>
@@ -300,12 +301,16 @@ export function BhisiDetail({ id }: { id: string }) {
 
       {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl border border-white/10 p-5 text-[#FFFBF4]" style={{ background: INK }} aria-label="This round">
-        <div className="pointer-events-none absolute -right-8 -top-3 opacity-95">
-          <Pot size={150} />
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-semibold uppercase tracking-[.16em] text-[#FFFBF4]/60">{r ? `Round ${(i ?? 0) + 1} of ${b.rounds.length}` : 'Complete'}</p>
+            <p className="num-hero mt-2 break-all text-[clamp(28px,9vw,40px)] leading-none">{b.amount ? rupees(pot(b)) : '—'}</p>
+            <p className="mt-1.5 text-[14px] text-[#FFFBF4]/75">{r ? (g.open ? 'in the pot. The draw is open!' : `in the pot · draw ${relDay(r.date, state.today).toLowerCase()}`) : 'Everyone got their turn. Iconic.'}</p>
+          </div>
+          <div className="pointer-events-none -mr-1 -mt-2 shrink-0">
+            <Pot size={92} />
+          </div>
         </div>
-        <p className="text-[12px] font-semibold uppercase tracking-[.16em] text-[#FFFBF4]/60">{r ? `Round ${(i ?? 0) + 1} of ${b.rounds.length}` : 'Complete'}</p>
-        <p className="num-hero mt-2 text-[40px] leading-none">{b.amount ? rupees(pot(b)) : '—'}</p>
-        <p className="mt-1.5 max-w-[60%] text-[14px] text-[#FFFBF4]/75">{r ? (g.open ? 'in the pot. The draw is open!' : `in the pot · draw ${relDay(r.date, state.today).toLowerCase()}`) : 'Everyone got their turn. Iconic.'}</p>
         {r && b.members.length > 1 && (
           <>
             {g.open ? (
@@ -360,14 +365,14 @@ export function BhisiDetail({ id }: { id: string }) {
 
       {/* Rounds strip */}
       <section className="mt-5" aria-label="Rounds">
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <div className="grid grid-cols-5 gap-1.5">
           {b.rounds.map((x, k) => {
             const now = k === i;
             const future = !x.winner && x.date > state.today;
             return (
-              <div key={k} className={`flex w-[70px] shrink-0 flex-col items-center rounded-2xl border px-1 py-2.5 ${now ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
-                <span className="text-[11px] font-semibold uppercase text-ink3">
-                  {month(x.date)} {x.date.slice(8, 10).replace(/^0/, '')}
+              <div key={k} className={`flex min-w-0 flex-col items-center rounded-2xl border px-0.5 py-2 ${now ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
+                <span className="text-[10.5px] font-semibold uppercase text-ink3">
+                  {x.date.slice(8, 10).replace(/^0/, '')} {month(x.date)}
                 </span>
                 <span className="mt-1.5">
                   {x.winner ? (
@@ -376,7 +381,7 @@ export function BhisiDetail({ id }: { id: string }) {
                     <span className={`grid h-[34px] w-[34px] place-items-center rounded-full text-[14px] font-bold ${now && !future ? 'animate-ring bg-accent text-[#17140F]' : 'border border-dashed border-line text-ink3'}`}>{future ? '🔒' : '?'}</span>
                   )}
                 </span>
-                <span className="mt-1 max-w-full truncate text-[11.5px] font-semibold">{x.winner ? name(x.winner) : now ? (future ? 'Next' : 'Now!') : `#${k + 1}`}</span>
+                <span className="mt-1 w-full truncate px-0.5 text-center text-[11px] font-semibold">{x.winner ? name(x.winner) : now ? (future ? 'Next' : 'Now!') : `#${k + 1}`}</span>
               </div>
             );
           })}
