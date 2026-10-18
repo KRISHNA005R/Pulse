@@ -445,65 +445,291 @@ export function PlanDetail({ id }: { id: string }) {
 // ------------------------------------------------------------------
 // Group detail
 // ------------------------------------------------------------------
+/** Overlapping faces for the top of a group. */
+function Faces({ ids, max = 5 }: { ids: string[]; max?: number }) {
+  const { state } = useStore();
+  const shown = ids.slice(0, max);
+  return (
+    <span className="flex items-center">
+      {shown.map((pid, i) => (
+        <span key={pid} className={`relative rounded-full bg-surface p-[2.5px] ${i ? '-ml-2' : ''}`} style={{ zIndex: max - i }}>
+          <PersonAvatar person={state.people.find((p) => p.id === pid)} me={pid === 'me'} size={32} />
+        </span>
+      ))}
+      {ids.length > max && (
+        <span className="-ml-2 rounded-full bg-surface p-[2.5px]">
+          <span className="grid h-8 min-w-8 place-items-center rounded-full bg-sunk px-1.5 text-[12px] font-semibold">+{ids.length - max}</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+type GroupTab = 'expenses' | 'balances' | 'settled';
+
 export function GroupDetail({ id }: { id: string }) {
-  const store = useStore();
-  const { state } = store;
+  const { state } = useStore();
   const ui = useUI();
-  const [friend, setFriend] = useState('');
+  const [tab, setTab] = useState<GroupTab>('expenses');
   const group = state.groups.find((g) => g.id === id);
   if (!group) return <TopNavigation title="Group" onBack={ui.pop} />;
   const g = groupSummary(state, id);
   const plan = group.plan ? state.plans.find((p) => p.id === group.plan) : undefined;
-  const settlements = state.settlements.filter((s) => s.group === id);
+  const settlements = state.settlements.filter((s) => s.group === id).sort((a, b) => b.date.localeCompare(a.date));
   const name = (pid: string) => (pid === 'me' ? 'You' : state.people.find((p) => p.id === pid)?.short ?? '?');
   const others = group.members.filter((m) => m !== 'me');
+  const open = others.filter((pid) => (g.balances.get(pid) ?? 0) !== 0);
   // With three or more people, "who owes me" isn't the whole picture: show where everyone stands.
   const net = others.length > 1 ? [...groupNet(state, id)].filter(([, v]) => v !== 0).sort((a, b) => b[1] - a[1]) : [];
+  // One number up top: overall, in this group. The split by person is under Balances.
+  const overall = g.owedToYou - g.youOwe;
+  const head = overall > 0 ? `You get back ${rupees(overall)}` : overall < 0 ? `You owe ${rupees(-overall)}` : g.youOwe ? 'You’re even overall' : 'All square';
+  const vibe =
+    g.youOwe && g.owedToYou
+      ? `You owe ${rupees(g.youOwe)}, and you’re owed ${rupees(g.owedToYou)}.`
+      : g.youOwe
+        ? 'Pay back whenever you’re ready.'
+        : g.owedToYou
+          ? 'Your friends will sort it. Or settle it here.'
+          : g.expenses.length
+            ? 'Nobody owes anybody. Love that.'
+            : 'Add the first expense to get going.';
+  const settle = () => (open.length === 1 ? ui.openSheet({ type: 'settle', personId: open[0], groupId: id }) : setTab('balances'));
+  const expenses = g.expenses.slice().sort((a, b) => b.date.localeCompare(a.date));
+
   return (
     <div>
-      <TopNavigation title={`${group.name} ${group.emoji}`} onBack={ui.pop} sub={`${group.members.length} ${group.members.length === 1 ? 'person' : 'people'}${group.shared ? ' · shared' : ''}${plan ? ` · linked to ${plan.name}` : ''}`} />
-      <div className="grid grid-cols-3 gap-3 rounded-2xl border border-line bg-surface p-4">
-        <MoneyStat label="Total spent" value={g.total} />
-        <MoneyStat label="You owe" value={g.youOwe} />
-        <MoneyStat label="You are owed" value={g.owedToYou} tone={g.owedToYou ? 'pos' : undefined} />
-      </div>
-      {others.length ? (
-        <button type="button" className="btn-accent mt-4 w-full" onClick={() => ui.openSheet({ type: 'group-expense', groupId: id })}>
-          <Icon name="plus" size={17} /> Add expense
-        </button>
-      ) : (
-        <p className="mt-4 rounded-2xl bg-sunk px-4 py-3 text-[14px] text-ink2">It's just you here so far. Share the group link below, or add someone by name, then add the first expense.</p>
-      )}
-      <GroupShareCard group={group} />
+      <TopNavigation
+        title={`${group.name} ${group.emoji}`}
+        onBack={ui.pop}
+        right={
+          <button type="button" className="tap grid h-10 w-10 place-items-center rounded-full hover:bg-sunk" aria-label="People and settings" onClick={() => ui.openSheet({ type: 'group-people', groupId: id })}>
+            <Icon name="user-plus" size={18} />
+          </button>
+        }
+      />
 
-      <section className="mt-8" aria-labelledby="gb-h">
-        <SectionHeader id="gb-h" title="Balances" />
-        <ul className="flex flex-col">
-          {others.map((pid) => {
-            const v = g.balances.get(pid) ?? 0;
-            const p = state.people.find((x) => x.id === pid);
-            return (
-              <li key={pid} className="flex items-center gap-3 px-2 py-2">
-                <PersonAvatar person={p} size={36} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px]">{v === 0 ? `${p?.short} · settled` : v < 0 ? `You owe ${p?.short} ${rupees(-v)}` : `${p?.short} owes you ${rupees(v)}`}</span>
-                  {group.shared && <span className="block text-[12.5px] text-ink3">{{ on: 'Joined on PULSE', left: 'Left the group', name: 'Added by name · not joined yet' }[groupSeat(group, pid)]}</span>}
-                </span>
-                {v !== 0 && (
-                  <button type="button" className="btn-quiet min-h-[36px] px-3.5 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: pid, groupId: id })}>
-                    Settle
-                  </button>
+      <section className="rounded-3xl border border-line bg-surface p-5" aria-label="Where you stand">
+        <button type="button" className="tap -m-1 flex items-center gap-2.5 rounded-full p-1 text-left" onClick={() => ui.openSheet({ type: 'group-people', groupId: id })} aria-label={`${group.members.length} people. Manage`}>
+          <Faces ids={['me', ...others]} />
+          <span className="text-[13px] text-ink3">
+            {group.members.length} {group.members.length === 1 ? 'person' : 'people'}
+            {plan ? ` · ${plan.name}` : ''}
+          </span>
+        </button>
+        <p className={`display mt-4 text-[26px] leading-tight ${overall > 0 ? 'text-pos' : ''}`}>{head}</p>
+        <p className="mt-1 text-[14px] text-ink2">{vibe}</p>
+        <p className="num mt-3 text-[13px] text-ink3">
+          {rupees(g.total)} spent together · {g.expenses.length} {g.expenses.length === 1 ? 'expense' : 'expenses'}
+        </p>
+        {others.length > 0 ? (
+          <div className="mt-4 flex gap-2">
+            <button type="button" className="btn-accent flex-1 whitespace-nowrap" onClick={() => ui.openSheet({ type: 'group-expense', groupId: id })}>
+              <Icon name="plus" size={17} className="shrink-0" /> Add expense
+            </button>
+            {open.length > 0 && (
+              <button type="button" className="btn-quiet whitespace-nowrap" onClick={settle}>
+                Settle up
+              </button>
+            )}
+          </div>
+        ) : (
+          <button type="button" className="btn-accent mt-4 w-full" onClick={() => ui.openSheet({ type: 'group-people', groupId: id })}>
+            <Icon name="user-plus" size={17} className="shrink-0" /> Add your people
+          </button>
+        )}
+      </section>
+
+      {others.length > 0 && (
+        <>
+          <div className="mt-5">
+            <Segmented
+              label="Show"
+              value={tab}
+              onChange={setTab}
+              options={[
+                { value: 'expenses', label: `Expenses${g.expenses.length ? ` · ${g.expenses.length}` : ''}` },
+                { value: 'balances', label: 'Balances' },
+                ...(settlements.length ? [{ value: 'settled' as const, label: `Paid · ${settlements.length}` }] : []),
+              ]}
+            />
+          </div>
+
+          <div key={tab} className="mt-3 animate-toast">
+            {tab === 'expenses' &&
+              (expenses.length ? (
+                <ul className="flex flex-col divide-y divide-line rounded-3xl border border-line bg-surface px-1">
+                  {expenses.map((s) => {
+                    const mine = s.shares.find((x) => x.person === 'me')?.amount ?? 0;
+                    const lent = s.paidBy === 'me' ? s.amount - mine : 0;
+                    const by = s.remote ? authorOf(state, group, s.id)?.short : undefined;
+                    return (
+                      <li key={s.id} className="flex items-center gap-3 px-3 py-3">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sunk text-center leading-none">
+                          <span>
+                            <span className="num block text-[15px] font-semibold">{fmtDate(s.date).split(' ')[0]}</span>
+                            <span className="block text-[9.5px] font-semibold uppercase text-ink3">{fmtDate(s.date).split(' ')[1]}</span>
+                          </span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold">{s.description}</span>
+                          <span className="block truncate text-[12.5px] text-ink3">
+                            {name(s.paidBy)} paid {rupees(s.amount)}
+                            {by && by !== name(s.paidBy) ? ` · by ${by}` : ''}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          {s.paidBy === 'me' ? (
+                            <>
+                              <span className="num block text-[14.5px] font-semibold text-pos">+{rupees(lent)}</span>
+                              <span className="block text-[11.5px] text-ink3">you lent</span>
+                            </>
+                          ) : mine ? (
+                            <>
+                              <span className="num block text-[14.5px] font-semibold">{rupees(mine)}</span>
+                              <span className="block text-[11.5px] text-ink3">your share</span>
+                            </>
+                          ) : (
+                            <span className="text-[12px] text-ink3">not in it</span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <EmptyState icon="users" title="No expenses yet." body="Add the first one. Split it equally, by exact amounts, percentages or shares." />
+              ))}
+
+            {tab === 'balances' && (
+              <>
+                <ul className="flex flex-col divide-y divide-line rounded-3xl border border-line bg-surface px-1">
+                  {others.map((pid) => {
+                    const v = g.balances.get(pid) ?? 0;
+                    const p = state.people.find((x) => x.id === pid);
+                    const seat = group.shared ? groupSeat(group, pid) : 'on';
+                    return (
+                      <li key={pid} className="flex items-center gap-3 px-3 py-2.5">
+                        <PersonAvatar person={p} size={36} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-semibold">{p?.short}</span>
+                          <span className={`block text-[13px] ${v > 0 ? 'text-pos' : v < 0 ? 'text-ink2' : 'text-ink3'}`}>
+                            {v === 0 ? 'Settled' : v < 0 ? `You owe ${rupees(-v)}` : `Owes you ${rupees(v)}`}
+                            {seat === 'name' ? ' · not on PULSE yet' : seat === 'left' ? ' · left' : ''}
+                          </span>
+                        </span>
+                        {v !== 0 ? (
+                          <button type="button" className="btn-quiet min-h-[36px] px-3.5 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: pid, groupId: id })}>
+                            Settle
+                          </button>
+                        ) : (
+                          <Icon name="check" size={18} className="text-ink3" />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                {net.length > 0 && (
+                  <div className="mt-3 rounded-3xl bg-sunk px-4 py-3">
+                    <p className="text-[12.5px] font-semibold text-ink3">Whole group</p>
+                    <ul className="mt-1 flex flex-col">
+                      {net.map(([pid, v]) => (
+                        <li key={pid} className="flex items-center justify-between py-1 text-[14px] text-ink2">
+                          <span>{pid === 'me' ? (v > 0 ? 'You get back' : 'You owe in total') : `${name(pid)} ${v > 0 ? 'gets back' : 'owes'}`}</span>
+                          <span className={`num font-semibold ${v > 0 ? 'text-pos' : 'text-ink'}`}>{rupees(Math.abs(v))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
+              </>
+            )}
+
+            {tab === 'settled' && (
+              <ul className="flex flex-col divide-y divide-line rounded-3xl border border-line bg-surface px-1">
+                {settlements.map((s) => (
+                  <li key={s.id} className="flex items-center gap-3 px-3 py-2.5 text-[14px]">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">
+                        {name(s.from)} → {name(s.to)}
+                      </span>
+                      <span className="block text-[12.5px] text-ink3">{relDay(s.date, state.today)}</span>
+                    </span>
+                    <span className="num font-semibold">{rupees(s.amount)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Sheet: who's in the group, the invite link, adding by name, and deleting the group. */
+export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () => void }) {
+  const store = useStore();
+  const { state } = store;
+  const ui = useUI();
+  const [friend, setFriend] = useState('');
+  const group = state.groups.find((g) => g.id === groupId);
+  if (!group) return null;
+  const g = groupSummary(state, groupId);
+  // People added by name (not joined on PULSE). Joined people are listed in the share card.
+  const byName = group.members.filter((m) => m !== 'me' && (!group.shared || groupSeat(group, m) !== 'on'));
+  const joined = group.shared ? group.members.filter((m) => m !== 'me' && groupSeat(group, m) === 'on') : [];
+  const del = () => {
+    const n = g.expenses.length;
+    const open = g.owedToYou || g.youOwe ? ` Not settled yet: ${[g.owedToYou ? `you're owed ${rupees(g.owedToYou)}` : '', g.youOwe ? `you owe ${rupees(g.youOwe)}` : ''].filter(Boolean).join(' and ')}. That is removed too.` : '';
+    const shared = !group.shared || state.mode !== 'personal' ? '' : group.shared.owner ? ' Sharing stops for everyone; the others keep their own copy of the history.' : ' You leave the group; the others keep it, with what you added.';
+    onDone();
+    ui.openSheet({
+      type: 'confirm',
+      title: `Delete ${group.name}?`,
+      body: `The group${n ? `, its ${n} ${n === 1 ? 'expense' : 'expenses'}` : ''} and who owes what in it are removed.${open}${shared} Money already recorded in your accounts stays in Activity. This can't be undone.`,
+      confirm: 'Delete group',
+      run: () => {
+        store.deleteGroup(groupId);
+        ui.pop();
+      },
+    });
+  };
+  return (
+    <div className={state.mode === 'personal' ? '-mt-4' : ''}>
+      <GroupShareCard group={group} />
+      {joined.length > 0 && !group.shared?.owner && (
+        <div className="mt-4">
+          <p className="mb-1 px-1 text-[12.5px] font-semibold text-ink3">On PULSE</p>
+          <ul className="flex flex-col">
+            {joined.map((pid) => (
+              <li key={pid} className="flex items-center gap-3 px-1 py-1.5">
+                <PersonAvatar person={state.people.find((p) => p.id === pid)} size={28} />
+                <span className="text-[14.5px]">{state.people.find((p) => p.id === pid)?.name}</span>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="mt-5">
+        <p className="mb-1 px-1 text-[12.5px] font-semibold text-ink3">{group.shared ? 'Added by name' : 'In this group'}</p>
+        {byName.length > 0 && (
+          <ul className="mb-2 flex flex-col">
+            {byName.map((pid) => (
+              <li key={pid} className="flex items-center gap-3 px-1 py-1.5">
+                <PersonAvatar person={state.people.find((p) => p.id === pid)} size={28} />
+                <span className="min-w-0 flex-1 truncate text-[14.5px]">{state.people.find((p) => p.id === pid)?.name}</span>
+                {group.shared && groupSeat(group, pid) === 'left' && <span className="text-[12.5px] text-ink3">left</span>}
+              </li>
+            ))}
+          </ul>
+        )}
         <form
-          className="mt-2 flex gap-2"
+          className="flex gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (!friend.trim()) return;
-            store.addGroupMember(id, friend);
+            store.addGroupMember(groupId, friend);
             setFriend('');
           }}
         >
@@ -515,103 +741,9 @@ export function GroupDetail({ id }: { id: string }) {
             <Icon name="user-plus" size={16} /> Add
           </button>
         </form>
-      </section>
-
-      {net.length > 0 && (
-        <section className="mt-8" aria-labelledby="gn-h">
-          <SectionHeader id="gn-h" title="Whole group" />
-          <ul className="flex flex-col gap-1 px-2">
-            {net.map(([pid, v]) => (
-              <li key={pid} className="flex items-center justify-between py-1.5 text-[14px] text-ink2">
-                <span>{pid === 'me' ? (v > 0 ? 'You get back' : 'You owe in total') : `${name(pid)} ${v > 0 ? 'gets back' : 'owes'}`}</span>
-                <span className={`num font-semibold ${v > 0 ? 'text-pos' : 'text-ink'}`}>{rupees(Math.abs(v))}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section className="mt-8" aria-labelledby="ge-h">
-        <SectionHeader id="ge-h" title="Expenses" />
-        {g.expenses.length ? (
-          <ul className="flex flex-col">
-            {g.expenses
-              .slice()
-              .sort((a, b) => b.date.localeCompare(a.date))
-              .map((s) => {
-                const mine = s.shares.find((x) => x.person === 'me')?.amount ?? 0;
-                const lent = s.paidBy === 'me' ? s.amount - mine : 0;
-                return (
-                  <li key={s.id} className="flex items-center gap-3 px-2 py-2.5">
-                    <span className="w-10 shrink-0 text-center">
-                      <span className="block text-[11px] font-semibold uppercase text-ink3">{fmtDate(s.date).split(' ')[1]}</span>
-                      <span className="num block text-[17px] font-semibold leading-none">{fmtDate(s.date).split(' ')[0]}</span>
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold">{s.description}</span>
-                      <span className="block text-[13px] text-ink3">
-                        {name(s.paidBy)} paid {rupees(s.amount)} · {s.remote ? `added by ${authorOf(state, group, s.id)?.short ?? 'a member'}` : s.mode === 'equal' ? 'split equally' : s.mode === 'exact' ? 'exact amounts' : s.mode === 'percent' ? 'by %' : 'by shares'}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      {s.paidBy === 'me' ? (
-                        <>
-                          <span className="num block text-[14.5px] font-semibold text-pos">{rupees(lent)}</span>
-                          <span className="block text-[12px] text-ink3">you lent</span>
-                        </>
-                      ) : mine ? (
-                        <>
-                          <span className="num block text-[14.5px] font-semibold">{rupees(mine)}</span>
-                          <span className="block text-[12px] text-ink3">your share</span>
-                        </>
-                      ) : (
-                        <span className="text-[12.5px] text-ink3">not involved</span>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-          </ul>
-        ) : (
-          <EmptyState icon="users" title="No expenses yet." body="Add the first one. Split it equally, by exact amounts, percentages or shares." />
-        )}
-      </section>
-
-      {settlements.length > 0 && (
-        <section className="mt-8" aria-labelledby="gs-h">
-          <SectionHeader id="gs-h" title="Settlements" />
-          <ul className="flex flex-col gap-1 px-2">
-            {settlements.map((s) => (
-              <li key={s.id} className="flex items-center justify-between py-1.5 text-[14px] text-ink2">
-                <span>
-                  {name(s.from)} paid {name(s.to)} · {relDay(s.date, state.today)}
-                </span>
-                <span className="num font-semibold text-ink">{rupees(s.amount)}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <button
-        type="button"
-        className="btn-quiet mt-10 w-full text-neg"
-        onClick={() => {
-          const n = g.expenses.length;
-          const open = g.owedToYou || g.youOwe ? ` Not settled yet: ${[g.owedToYou ? `you're owed ${rupees(g.owedToYou)}` : '', g.youOwe ? `you owe ${rupees(g.youOwe)}` : ''].filter(Boolean).join(' and ')}. That is removed too.` : '';
-          const shared = !group.shared || state.mode !== 'personal' ? '' : group.shared.owner ? ' Sharing stops for everyone; the others keep their own copy of the history.' : ' You leave the group; the others keep it, with what you added.';
-          ui.openSheet({
-            type: 'confirm',
-            title: `Delete ${group.name}?`,
-            body: `The group${n ? `, its ${n} ${n === 1 ? 'expense' : 'expenses'}` : ''} and who owes what in it are removed.${open}${shared} Money already recorded in your accounts stays in Activity. This can't be undone.`,
-            confirm: 'Delete group',
-            run: () => {
-              store.deleteGroup(id);
-              ui.pop();
-            },
-          });
-        }}
-      >
+        <p className="mt-1.5 px-1 text-[12.5px] text-ink3">For friends who aren’t on PULSE. You track their share for them.</p>
+      </div>
+      <button type="button" className="btn-ghost mt-6 w-full text-neg" onClick={del}>
         <Icon name="trash" size={16} /> Delete group
       </button>
     </div>

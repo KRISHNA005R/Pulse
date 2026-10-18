@@ -1,5 +1,6 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
+import { GroupPeople } from '../screens/Plans';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
 import { Sheet } from './ui/Sheet';
@@ -84,6 +85,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title={spec.subId ? 'Recurring payment' : 'Add recurring payment'} onClose={close} size="sm" z={z}>
           <SubscriptionForm subId={spec.subId} preset={spec.preset} kind={spec.kind} onDone={close} />
+        </Sheet>
+      );
+    case 'group-people':
+      return (
+        <Sheet title="People" onClose={close} z={z}>
+          <GroupPeople groupId={spec.groupId} onDone={close} />
         </Sheet>
       );
     case 'group-form':

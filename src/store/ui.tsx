@@ -40,6 +40,7 @@ export type SheetSpec =
   | { type: 'budget-form'; budgetId?: string; category?: string }
   | { type: 'sub-form'; subId?: string; preset?: { name: string; amount: number; category: string }; kind?: 'bill' | 'subscription' }
   | { type: 'group-form' }
+  | { type: 'group-people'; groupId: string }
   | { type: 'group-expense'; groupId?: string; personId?: string }
   | { type: 'settle'; personId: string; groupId?: string }
   | { type: 'friend-invite' }
