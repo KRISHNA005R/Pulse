@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../src/data/seed';
-import { applyMoney, nextPayday, planMetrics, refillReserves, safeToSpend } from '../src/lib/finance';
+import { applyMoney, monthsBetween, nextPayday, perMonth, planMetrics, refillReserves, safeToSpend } from '../src/lib/finance';
 import { addDays } from '../src/lib/format';
 import type { Plan, State, Transaction } from '../src/types';
 
@@ -90,5 +90,22 @@ describe('plan status', () => {
   it('a new empty plan says fresh start, not on schedule', () => {
     const s = fresh(plan({ startDate: createSeed().today }));
     expect(planMetrics(s, s.plans[0]).status).toMatch(/^Fresh start/);
+  });
+});
+
+describe('monthly amount', () => {
+  it('₹90,000 over exactly 3 months is ₹30,000 a month', () => {
+    expect(monthsBetween('2026-10-18', '2027-01-18')).toBe(3);
+    expect(perMonth(90000, '2026-10-18', '2027-01-18')).toBe(30000);
+  });
+  it('adds up to the target, give or take a few rupees', () => {
+    const m = perMonth(90000, '2026-10-18', '2027-04-18');
+    expect(m).toBe(15000);
+    expect(perMonth(10000, '2026-10-18', '2027-01-18') * 3).toBeLessThan(10000 + 30);
+  });
+  it('a plan screen shows the same number', () => {
+    const s = fresh(plan({ target: 90000, startDate: '2026-10-18', targetDate: '2027-01-18' }));
+    s.today = '2026-10-18';
+    expect(planMetrics(s, s.plans[0]).monthly).toBe(30000);
   });
 });

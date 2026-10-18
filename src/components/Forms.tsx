@@ -9,8 +9,8 @@ import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
-import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, nextPayday, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { addMonths, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
+import { CYCLE_MONTHS, nextPayday, perMonth, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -56,8 +56,7 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
   const monthly = useMemo(() => {
     const tg = parseFloat(target) || 0;
     const sv = parseFloat(saved) || 0;
-    const months = Math.max(0.5, daysBetween(state.today, date) / 30.44);
-    return Math.max(0, Math.ceil((tg - sv) / months / 50) * 50);
+    return perMonth(tg - sv, state.today, date);
   }, [target, saved, date, state.today]);
 
   if (!tpl)
@@ -138,6 +137,13 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
         </Field>
         <Field label="Target date" htmlFor="plan-date">
           <input id="plan-date" type="date" className="field" value={date} min={state.today} onChange={(e) => setDate(e.target.value)} />
+          <span className="mt-2 flex flex-wrap gap-1.5">
+            {[3, 6, 12].map((n) => (
+              <button key={n} type="button" className="chip min-h-[32px] px-2.5 text-[12.5px]" aria-pressed={date === addMonths(state.today, n)} onClick={() => setDate(addMonths(state.today, n))}>
+                {n === 12 ? '1 yr' : `${n} mo`}
+              </button>
+            ))}
+          </span>
         </Field>
       </div>
       <div className="grid grid-cols-2 gap-3">

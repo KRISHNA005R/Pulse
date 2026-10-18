@@ -344,6 +344,26 @@ export interface PlanMetrics {
   spent: number;
 }
 
+/**
+ * Months between two dates the way people count them: 18 Oct → 18 Jan is exactly 3,
+ * and 18 Oct → 2 Jan is 2 and a half-ish (the spare days as a share of that month).
+ */
+export function monthsBetween(from: ISODate, to: ISODate): number {
+  if (to <= from) return 0;
+  let n = 0;
+  while (n < 1200 && addMonths(from, n + 1) <= to) n++;
+  const a = addMonths(from, n);
+  const b = addMonths(from, n + 1);
+  return n + daysBetween(a, to) / Math.max(1, daysBetween(a, b));
+}
+
+/** Amount to save each month: split evenly, rounded up to the next ₹10 (₹90,000 over 3 months = ₹30,000). */
+export function perMonth(remaining: number, from: ISODate, to: ISODate): number {
+  if (remaining <= 0) return 0;
+  const months = Math.max(monthsBetween(from, to), 0.5);
+  return Math.ceil(roundMoney(remaining / months) / 10) * 10;
+}
+
 export function planMetrics(s: State, p: Plan): PlanMetrics {
   const total = Math.max(1, daysBetween(p.startDate, p.targetDate));
   const elapsed = clamp(daysBetween(p.startDate, s.today), 0, total);
@@ -354,8 +374,7 @@ export function planMetrics(s: State, p: Plan): PlanMetrics {
   const perDay = p.target / total;
   const diff = p.saved - expected;
   const daysAhead = Math.round(diff / perDay);
-  const monthsLeft = Math.max(daysLeft / 30.44, 0.5);
-  const monthly = remaining === 0 ? 0 : Math.ceil(remaining / monthsLeft / 50) * 50;
+  const monthly = perMonth(remaining, s.today, p.targetDate);
   const weekExtra = diff < 0 ? Math.round(-diff / 10) * 10 : 0;
   const pace = elapsed > 0 ? p.saved / elapsed : 0;
   const projectedDate = remaining === 0 ? s.today : pace > 0 ? addDays(s.today, Math.ceil(remaining / pace)) : null;
@@ -694,15 +713,15 @@ export function instalmentDates(start: ISODate, before: ISODate, cycle: Investme
 export function estimateInvested(amount: number, start: ISODate, before: ISODate, cycle: Investment['cycle'], stepUpPct = 0): { count: number; total: number } {
   const dates = instalmentDates(start, before, cycle);
   if (!dates.length) return { count: 0, total: 0 };
-  const lastYear = Math.floor(monthsBetween(start, dates[dates.length - 1]) / 12);
+  const lastYear = Math.floor(wholeMonths(start, dates[dates.length - 1]) / 12);
   const total = dates.reduce((a, d) => {
-    const yearsBack = lastYear - Math.floor(monthsBetween(start, d) / 12);
+    const yearsBack = lastYear - Math.floor(wholeMonths(start, d) / 12);
     return a + amount / Math.pow(1 + stepUpPct / 100, yearsBack);
   }, 0);
   return { count: dates.length, total: Math.round(total) };
 }
 
-function monthsBetween(a: ISODate, b: ISODate): number {
+function wholeMonths(a: ISODate, b: ISODate): number {
   const [ay, am, ad] = a.split('-').map(Number);
   const [by, bm, bd] = b.split('-').map(Number);
   return (by - ay) * 12 + (bm - am) - (bd < ad ? 1 : 0);
