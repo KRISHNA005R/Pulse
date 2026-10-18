@@ -81,3 +81,38 @@ describe('bhisi server', () => {
     expect((await call(c, seat(5), 'b-draw', { round: 0 })).status).toBe(403);
   });
 });
+
+describe('pay early, boost your luck', () => {
+  it('early payers get more tickets, but nobody is guaranteed', async () => {
+    let early = 0;
+    const N = 1500;
+    for (let i = 0; i < N; i++) {
+      const store = memStore();
+      const bid = (i + 7).toString(16).padStart(32, 'b');
+      const c = (iso: string) => ({ store, pushStore: { async get() { return null; } }, send: async () => 0, vapid: async () => ({}), now: new Date(iso) });
+      const a = seat(1), b = seat(2);
+      await handleBhisi({ action: 'b-create', bid, ...a, start: '2026-11-10' }, c('2026-11-01T06:00:00Z') as never);
+      await handleBhisi({ action: 'b-join', bid, ...b }, c('2026-11-01T06:00:00Z') as never);
+      // a pays 9 days early; b never pays
+      const paid = await handleBhisi({ action: 'b-paid', bid, ...a, round: 0, paid: true }, c('2026-11-01T07:00:00Z') as never);
+      if (i === 0) expect(paid.status).toBe(200);
+      const r = await handleBhisi({ action: 'b-draw', bid, ...b, round: 0 }, c('2026-11-10T06:00:00Z') as never);
+      if (i === 0) expect(r.body.draws).toEqual([expect.objectContaining({ odds: { [a.mid]: 6, [b.mid]: 4 } })]);
+      if (r.body.winner === a.mid) early++;
+    }
+    const share = early / N;
+    expect(share).toBeGreaterThan(0.54); // ~60%
+    expect(share).toBeLessThan(0.66);
+  });
+
+  it('only the organiser marks other people, and the server keeps the time', async () => {
+    const store = memStore();
+    const c = ctx(store, new Date('2026-11-01T06:00:00Z'));
+    await call(c, seat(1), 'b-create', { start: '2026-11-10', ghosts: ['g000000000009'] });
+    await call(c, seat(2), 'b-join');
+    expect((await call(c, seat(2), 'b-paid', { round: 0, target: seat(1).mid, paid: true })).status).toBe(403);
+    expect((await call(c, seat(1), 'b-paid', { round: 0, target: 'g000000000009', paid: true })).status).toBe(200);
+    const v = await call(c, seat(2), 'b-get');
+    expect((v.body.paid as Record<string, Record<string, string>>)[0]['g000000000009']).toBe('2026-11-01T06:00:00.000Z');
+  });
+});

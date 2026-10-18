@@ -4,7 +4,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { addMonths, daysBetween, fmtDate, relDay, rupees } from '../lib/format';
 import { roundMoney } from '../lib/currency';
-import { currentRound, inBowl, isDone, myStanding, pot, replayUrl, type DrawReplay } from '../lib/bhisi';
+import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot, replayUrl, ticketLabel, tickets, TICKETS, type DrawReplay } from '../lib/bhisi';
 import { bhisiUrl, type BhisiInvite } from '../lib/bhisiShare';
 import { Icon } from './ui/Icon';
 import { Field, MoneyInput, PersonAvatar, TopNavigation } from './ui/bits';
@@ -288,6 +288,7 @@ export function BhisiDetail({ id }: { id: string }) {
   const r = i === undefined ? undefined : b.rounds[i];
   const bowl = inBowl(b);
   const me = myStanding(b);
+  const odds = i === undefined ? [] : chances(b, i).sort((x, y) => y.pct - x.pct || name(x.id).localeCompare(name(y.id)));
   const canMark = (m: string) => !sh || m === 'me' || sh.owner;
   const seatOf = (pid: string) => (sh ? Object.keys(sh.seats).find((k) => sh.seats[k] === pid) : undefined);
   const byName = (pid: string) => !!sh && (sh.owner ? (sh.ghosts ?? []).some((x) => x.pid === pid) : !!seatOf(pid)?.startsWith('g'));
@@ -417,7 +418,7 @@ export function BhisiDetail({ id }: { id: string }) {
                   </span>
                   {canMark(m) ? (
                     <button type="button" aria-pressed={paid} onClick={() => store.toggleBhisiPaid(b.id, i!, m)} className={`tap min-h-[34px] rounded-full px-3.5 text-[13px] font-semibold ${paid ? 'bg-pos/12 text-pos' : 'border border-line text-ink2'}`}>
-                      {paid ? 'Paid ✓' : m === 'me' ? `I paid ${rupees(b.amount)}` : 'Mark paid'}
+                      {paid ? (r.paidAt?.[m] && tickets(r.paidAt[m], r.date) >= TICKETS.early ? 'Early bird 🐦' : 'Paid ✓') : m === 'me' ? `I paid ${rupees(b.amount)}` : 'Mark paid'}
                     </button>
                   ) : (
                     <span className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold ${paid ? 'bg-pos/12 text-pos' : 'bg-sunk text-ink3'}`}>{paid ? 'Paid ✓' : 'Not yet'}</span>
@@ -434,18 +435,35 @@ export function BhisiDetail({ id }: { id: string }) {
         </section>
       )}
 
-      {bowl.length > 0 && (
+      {r && bowl.length > 0 && (
         <section className="mt-4 rounded-3xl border border-line bg-surface p-4" aria-labelledby="bh-bowl">
-          <h2 id="bh-bowl" className="text-[15px] font-semibold">
-            Still in the matka · {bowl.length}
-          </h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {bowl.map((m) => (
-              <span key={m} className="flex items-center gap-1.5 rounded-full bg-sunk py-1 pl-1 pr-3 text-[13px] font-medium">
-                <PersonAvatar person={state.people.find((p) => p.id === m)} me={m === 'me'} size={24} />
-                {name(m)}
-              </span>
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 id="bh-bowl" className="text-[15px] font-semibold">
+              Who’s in the matka · {bowl.length}
+            </h2>
+            <span className="text-[12px] text-ink3">chance this round</span>
+          </div>
+          <ul className="mt-3 flex flex-col gap-2.5">
+            {odds.map((o) => (
+              <li key={o.id} className="flex items-center gap-3">
+                <PersonAvatar person={state.people.find((p) => p.id === o.id)} me={o.id === 'me'} size={30} />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-[14px] font-medium">
+                      {name(o.id)} <span className="text-[12px] font-normal text-ink3">· {ticketLabel(o.tickets)}</span>
+                    </span>
+                    <span className="num shrink-0 text-[14px] font-bold">{o.pct}%</span>
+                  </span>
+                  <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-sunk">
+                    <span className={`block h-full rounded-full ${o.tickets >= TICKETS.early ? 'bg-accent' : o.tickets >= TICKETS.paid ? 'bg-accent/70' : 'bg-ink3/40'}`} style={{ width: `${o.pct}%` }} />
+                  </span>
+                </span>
+              </li>
             ))}
+          </ul>
+          <div className="mt-3 rounded-2xl bg-accent-soft px-3.5 py-3 text-[13px] leading-snug">
+            <p className="font-semibold">🍀 Pay early, boost your luck</p>
+            <p className="mt-0.5 text-ink2">Paid {EARLY_DAYS}+ days before the draw: 1.5× the chance. Paid before the draw: 1.25×. It’s still a lucky draw: anyone can come out, nobody’s guaranteed.</p>
           </div>
         </section>
       )}
@@ -509,13 +527,14 @@ export function BhisiDraw({ bhisiId, onDone }: { bhisiId: string; onDone: () => 
   const [setup] = useState(() => (b ? { i: currentRound(b) ?? 0, pot: pot(b), rounds: b.rounds.length, name: b.name, emoji: b.emoji, shared: !!b.share } : null));
   const chits = useChits(b, setup?.i ?? 0);
   const [won, setWon] = useState<Chit | null>(null);
+  const [myChance] = useState(() => (b && setup ? chances(b, setup.i).find((c) => c.id === 'me')?.pct : undefined));
   if (!b || !setup) return null;
   if (isDone(b) && !won) return <p className="text-ink3">Everyone has already won in this bhisi.</p>;
   if (!won && b.rounds[setup.i] && b.rounds[setup.i].date > state.today) return <p className="text-ink3">This round opens on {fmtDate(b.rounds[setup.i].date, true)}.</p>;
   const replay: DrawReplay | null = won ? { n: setup.name, e: setup.emoji, r: setup.i + 1, p: setup.pot, w: won.name, c: chits.map((c) => c.name) } : null;
   return (
     <div>
-      <MatkaDraw chits={chits} draw={setup.shared ? () => store.drawBhisiShared(bhisiId) : () => store.drawBhisi(bhisiId)} round={setup.i + 1} rounds={setup.rounds} pot={setup.pot} onRevealed={setWon} />
+      <MatkaDraw chits={chits} draw={setup.shared ? () => store.drawBhisiShared(bhisiId) : () => store.drawBhisi(bhisiId)} round={setup.i + 1} rounds={setup.rounds} pot={setup.pot} onRevealed={setWon} hint={myChance !== undefined ? `Your chance: ${myChance}% 🍀` : undefined} />
       {won && replay && (
         <div className="rise-in mt-2 flex flex-col gap-2" style={{ animationDelay: '.6s' }}>
           <button type="button" className="btn-accent w-full" onClick={() => void shareLink(`🏺 ${setup.name} · round ${replay.r}: ${won.me ? 'I' : won.name} took the ${rupees(setup.pot)} pot! Watch the chit come out:`, replayUrl(replay), store.toast)}>
@@ -544,6 +563,11 @@ export function BhisiWatch({ bhisiId, round, onDone }: { bhisiId: string; round:
       <p className="text-center text-[14px] text-ink2">
         {b.emoji} {b.name} · round {round + 1}. The real result, drawn {r.drawnAt ? fmtDate(r.drawnAt) : 'already'}.
       </p>
+      {r.odds && (
+        <p className="mx-auto mt-2 max-w-[320px] text-center text-[12.5px] text-ink3">
+          Odds at the draw: {chances(b, round).map((c) => `${c.id === 'me' ? 'You' : store.state.people.find((p) => p.id === c.id)?.short ?? 'Someone'} ${c.pct}%`).join(' · ')}
+        </p>
+      )}
       <MatkaDraw
         chits={chits}
         draw={() => r.winner}

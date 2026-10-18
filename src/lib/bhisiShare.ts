@@ -36,7 +36,9 @@ export interface BhisiView {
   seats: string[];
   locked: boolean;
   members: { mid: string; box: MemberBox | null; rev: number; owner: boolean; gone: boolean }[];
-  draws: { r: number; w: string; at: string }[];
+  draws: { r: number; w: string; at: string; by?: string; odds?: Record<string, number> }[];
+  /** When each seat paid each round (server time). */
+  paid: Record<string, Record<string, string>>;
 }
 
 export const newBhisiShare = (owner: boolean): BhisiShare => ({ bid: hex(rand(16)), key: toB64Url(rand(32)), mid: hex(rand(8)), token: toB64Url(rand(24)), owner, seats: {} });
@@ -117,6 +119,7 @@ async function readView(sh: BhisiShare, data: Record<string, unknown>): Promise<
     locked: !!data.locked,
     members,
     draws: (data.draws as BhisiView['draws']) ?? [],
+    paid: (data.paid as BhisiView['paid']) ?? {},
   };
 }
 
@@ -129,6 +132,12 @@ export async function drawShared(s: State, b: Bhisi, round: number, dev?: string
   if (!r) return { ok: false, error: OFFLINE };
   if (r.status !== 200) return { ok: false, error: String(r.data.error ?? 'The draw didn’t go through. Try again.') };
   return { ok: true, view: await readView(sh, r.data), winner: String(r.data.winner) };
+}
+
+/** Tell the server someone paid (or not). Its clock decides "early", so it can't be faked. */
+export async function markPaidShared(sh: BhisiShare, round: number, seat: string, paid: boolean) {
+  const r = await api({ action: 'b-paid', ...cred(sh), round, paid, ...(seat !== sh.mid ? { target: seat } : {}) });
+  return !!r && r.status === 200;
 }
 
 export async function deleteBhisiChannel(sh: BhisiShare) {
@@ -209,6 +218,7 @@ export function applyBhisi(s: State, id: string, v: BhisiView): { news: BhisiNew
     const paidBy = seats
       .filter((seat) => {
         if (seat === sh.mid) return old.paid.includes('me');
+        if (v.paid[i]?.[seat]) return true;
         const box = v.members.find((m) => m.mid === seat)?.box;
         return !!box?.paid?.includes(i) || !!marks[seat]?.includes(i);
       })
@@ -216,7 +226,10 @@ export function applyBhisi(s: State, id: string, v: BhisiView): { news: BhisiNew
     const draw = v.draws.find((d) => d.r === i);
     const winner = draw ? person(draw.w) : undefined;
     if (winner && !old.winner) news.push({ round: i, winner });
-    return { ...old, date: addMonths(start, i), paid: paidBy, winner, drawnAt: draw ? draw.at.slice(0, 10) : undefined };
+    const pool = draw ? seats.length - v.draws.filter((d) => d.r < i).length : undefined;
+    const paidAt = Object.fromEntries(Object.entries(v.paid[i] ?? {}).map(([seat, t]) => [person(seat), t]));
+    const odds = draw?.odds ? Object.fromEntries(Object.entries(draw.odds).map(([seat, n]) => [person(seat), n])) : undefined;
+    return { ...old, date: addMonths(start, i), paid: paidBy, winner, drawnAt: draw ? draw.at.slice(0, 10) : undefined, at: draw?.at, drawnBy: draw?.by ? person(draw.by) : undefined, pool, paidAt, ...(odds ? { odds } : {}) };
   });
 
   // My win, recorded as money in (once).
@@ -278,6 +291,29 @@ export async function syncBhisi(host: BhisiHost, id: string, dev?: string): Prom
   }
   if (r.status !== 200) return true;
   const view = await readView(sh, r.data);
+  // Ticks made here that the server hasn't heard about yet (made offline): send them now.
+  {
+    const here = host.state()?.bhisis?.find((x) => x.id === id);
+    const round = here ? here.rounds.findIndex((x) => !x.winner) : -1;
+    if (here && round >= 0 && !view.draws.some((d) => d.r === round)) {
+      const server = view.paid[round] ?? {};
+      const mine = here.rounds[round].paid.includes('me');
+      if (mine !== !!server[sh.mid] && (await markPaidShared(sh, round, sh.mid, mine))) {
+        if (mine) server[sh.mid] = new Date().toISOString();
+        else delete server[sh.mid];
+        view.paid[round] = server;
+      }
+      if (sh.owner)
+        for (const [seat, rounds] of Object.entries(sh.marks ?? {})) {
+          const want = rounds.includes(round);
+          if (want !== !!server[seat] && (await markPaidShared(sh, round, seat, want))) {
+            if (want) server[seat] = new Date().toISOString();
+            else delete server[seat];
+            view.paid[round] = server;
+          }
+        }
+    }
+  }
   const res = host.applyBhisi(id, view);
   if (res.news.length) host.bhisiNews(id, res.news);
   if (res.ghosts) await api({ action: 'b-setup', ...cred(sh), ghosts: res.ghosts });

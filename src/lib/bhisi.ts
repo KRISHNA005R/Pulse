@@ -20,9 +20,50 @@ export const isDone = (b: Bhisi) => currentRound(b) === undefined;
 
 /** Fair pick: the browser's crypto random, never Math.random. */
 export function pickWinner(names: string[]): string {
+  // Rejection sampling: no name is even slightly more likely than another.
+  const n = names.length;
+  const limit = Math.floor(0x1_0000_0000 / n) * n;
   const a = new Uint32Array(1);
-  crypto.getRandomValues(a);
-  return names[a[0] % names.length];
+  do crypto.getRandomValues(a);
+  while (a[0] >= limit);
+  return names[a[0] % n];
+}
+
+// ---- Luck, not a fix ----------------------------------------------------------------------
+// Same rule as PULSE's server (netlify/lib/bhisi.ts): not paid 4 tickets, paid before the draw 5,
+// paid 3+ days before the draw date 6. The most anyone gets is 1.5× someone who hasn't paid.
+export const TICKETS = { unpaid: 4, paid: 5, early: 6 };
+export const EARLY_DAYS = 3;
+const istDay = (iso: string) => new Date(new Date(iso).getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
+const dayGap = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
+export function tickets(paidAt: string | undefined, roundDate: string): number {
+  if (!paidAt) return TICKETS.unpaid;
+  return dayGap(istDay(paidAt), roundDate) >= EARLY_DAYS ? TICKETS.early : TICKETS.paid;
+}
+export const ticketLabel = (t: number) => (t >= TICKETS.early ? 'Early bird 🐦' : t >= TICKETS.paid ? 'Paid ✓' : 'Not paid yet');
+
+/** Everyone's chance in one round: who's still in the matka and how many tickets they hold. */
+export function chances(b: Bhisi, round: number): { id: string; tickets: number; pct: number }[] {
+  const r = b.rounds[round];
+  if (!r) return [];
+  const won = new Set(b.rounds.slice(0, round).map((x) => x.winner));
+  const pool = b.members.filter((m) => !won.has(m));
+  const list = pool.map((id) => ({ id, tickets: r.odds?.[id] ?? (r.winner ? TICKETS.unpaid : tickets(r.paidAt?.[id] ?? (r.paid.includes(id) ? r.date + 'T00:00:00+05:30' : undefined), r.date)) }));
+  const total = list.reduce((a, x) => a + x.tickets, 0) || 1;
+  return list.map((x) => ({ ...x, pct: Math.round((x.tickets / total) * 100) }));
+}
+
+/** Weighted pick for a bhisi that isn't shared (the demo): crypto randomness over every ticket. */
+export function pickWeighted(items: { id: string; w: number }[]): string {
+  const total = items.reduce((a, x) => a + x.w, 0);
+  const idx = Array.from({ length: total }, (_, i) => String(i));
+  const n = Number(pickWinner(idx));
+  let acc = 0;
+  for (const x of items) {
+    acc += x.w;
+    if (n < acc) return x.id;
+  }
+  return items[items.length - 1].id;
 }
 
 /** What the bhisi means for me, in one friendly line. */

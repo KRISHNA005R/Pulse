@@ -102,24 +102,26 @@ type DrawFn = () => string | undefined | Promise<{ winner?: string; error?: stri
  * with the winner's name. `draw` decides the winner (PULSE's server, for a shared bhisi) and the
  * animation just shows it: nothing on the phone can change the result.
  */
-export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, autoStart }: { chits: Chit[]; draw: DrawFn; round: number; rounds: number; pot: number; when?: string; onRevealed?: (winner: Chit) => void; autoStart?: boolean }) {
+export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, autoStart, hint }: { chits: Chit[]; draw: DrawFn; round: number; rounds: number; pot: number; when?: string; onRevealed?: (winner: Chit) => void; autoStart?: boolean; hint?: string }) {
   const { state } = useStore();
   const [stage, setStage] = useState<Stage>('idle');
   const [winner, setWinner] = useState<Chit | null>(null);
   const [error, setError] = useState('');
   const busy = useRef(false);
   const timers = useRef<number[]>([]);
-  const peek = useMemo(
-    () =>
-      chits.slice(0, 10).map((c, i, a) => ({
-        c,
-        left: 50 + (i - (a.length - 1) / 2) * 7.2,
-        r: `${((i * 37) % 28) - 14}deg`,
-        delay: `${(i * 0.17) % 0.9}s`,
-        h: 30 + ((i * 13) % 14),
-      })),
-    [chits],
-  );
+  // How the chits sit and jiggle is shuffled every time (just the look: the result comes from draw()).
+  const peek = useMemo(() => {
+    const shown = [...chits].sort(() => Math.random() - 0.5).slice(0, 10);
+    return shown.map((c, i, a) => ({
+      c,
+      left: 50 + (i - (a.length - 1) / 2) * 7.2 + (Math.random() * 3 - 1.5),
+      r: `${Math.round(Math.random() * 30 - 15)}deg`,
+      delay: `${(Math.random() * 0.9).toFixed(2)}s`,
+      h: 28 + Math.round(Math.random() * 16),
+    }));
+  }, [chits]);
+  const [shake] = useState(() => ['matka-shaking', 'matka-shaking-b', 'matka-shaking-c'][Math.floor(Math.random() * 3)]);
+  const [shakeMs] = useState(() => 1500 + Math.round(Math.random() * 700));
   const t = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms));
 
   const start = async () => {
@@ -128,7 +130,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
     setError('');
     setStage('shaking');
     haptic(30);
-    const shook = new Promise<void>((res) => t(1700, res));
+    const shook = new Promise<void>((res) => t(shakeMs, res));
     t(500, () => haptic(18));
     t(1000, () => haptic(18));
     let id: string | undefined;
@@ -203,7 +205,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
         aria-label={stage === 'idle' ? 'Shake the matka and draw a chit' : 'Drawing'}
         className={`relative mt-[96px] outline-none transition-[opacity,transform] duration-500 ${revealed ? 'scale-90 opacity-0' : 'opacity-100'}`}
       >
-        <div className={stage === 'shaking' ? 'matka-shaking' : stage === 'idle' ? 'matka-idle' : ''}>
+        <div className={stage === 'shaking' ? shake : stage === 'idle' ? 'matka-idle' : ''} style={stage === 'shaking' ? { animationDuration: `${shakeMs}ms` } : undefined}>
           <div className="absolute inset-x-0" style={{ top: 24, height: 52 }}>
             {peek.map(({ c, left, r, delay, h }) =>
               flying && winner?.id === c.id ? null : (
@@ -232,6 +234,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
           <p className="mt-1 text-[13.5px] text-ink3">
             {canShake() ? 'or tap the matka' : 'to shake it'} · {chits.length} {chits.length === 1 ? 'chit' : 'chits'} inside
           </p>
+          {hint && <p className="mx-auto mt-3 w-fit rounded-full bg-accent-soft px-3.5 py-1.5 text-[13px] font-semibold text-accent-ink">{hint}</p>}
           {error && <p className="mx-auto mt-3 max-w-[290px] rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">{error}</p>}
         </div>
       )}

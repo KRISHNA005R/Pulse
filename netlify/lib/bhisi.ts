@@ -12,7 +12,12 @@
 // Stored in the 'pulse-friends' blob store:
 //   b/<bid>/meta        { owner, start, ghosts, created }
 //   b/<bid>/m/<mid>     one member's seat and sealed box
-//   b/<bid>/d/<round>   the draw for that round { w, at, by, seats? }  (round 0 also locks the seat list)
+//   b/<bid>/d/<round>   the draw for that round { w, at, by, odds, seats? }  (round 0 also locks the seat list)
+//   b/<bid>/p/<round>   when each seat paid that round (server time, so nobody can back-date it)
+//
+// Luck, not a fix: everyone in the matka has a chance every round. Paying early adds a little:
+//   not paid yet: 4 tickets · paid before the draw: 5 · paid 3+ days before the draw date: 6.
+// So the most an early payer gets is 1.5× the chance of someone who hasn't paid. Still random.
 import type { Payload, Sub } from './push';
 
 async function sha256(s: string) {
@@ -45,6 +50,8 @@ interface Draw {
   w: string;
   at: string;
   by: string;
+  /** Tickets each seat had in this draw (see "Luck" above), so everyone can see the odds. */
+  odds?: Record<string, number>;
   /** Round 0 only: every seat at the moment of the first draw. From then on, nobody new joins. */
   seats?: string[];
 }
@@ -62,6 +69,32 @@ const MAX_DEVS = 6;
 const mkey = (bid: string) => `b/${bid}/meta`;
 const skey = (bid: string, mid: string) => `b/${bid}/m/${mid}`;
 const dkey = (bid: string, r: number) => `b/${bid}/d/${r}`;
+const pkey = (bid: string, r: number) => `b/${bid}/p/${r}`;
+
+export const TICKETS = { unpaid: 4, paid: 5, early: 6 };
+export const EARLY_DAYS = 3;
+
+/** Tickets for one seat: paid 3+ days before the round's date (India time) = early. */
+export function tickets(paidAt: string | undefined, roundDate: string): number {
+  if (!paidAt) return TICKETS.unpaid;
+  const paidDay = todayIST(new Date(paidAt));
+  return paidDay <= addMonthsISO(roundDate, 0) && daysBetweenISO(paidDay, roundDate) >= EARLY_DAYS ? TICKETS.early : TICKETS.paid;
+}
+function daysBetweenISO(a: string, b: string) {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 864e5);
+}
+
+/** A fair weighted pick: crypto randomness over every ticket, rejection-sampled (no bias). */
+export function weightedPick(items: { id: string; w: number }[]): string {
+  const total = items.reduce((a, x) => a + x.w, 0);
+  const n = fairPick(Array.from({ length: total }, (_, i) => i));
+  let acc = 0;
+  for (const x of items) {
+    acc += x.w;
+    if (n < acc) return x.id;
+  }
+  return items[items.length - 1].id;
+}
 const clip = (x: unknown, max: number) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, max) : '');
 const addDev = (devs: string[], dev: unknown) => (typeof dev === 'string' && DEV.test(dev) ? [...devs.filter((d) => d !== dev), dev].slice(-MAX_DEVS) : devs);
 
@@ -107,7 +140,10 @@ async function load(ctx: Ctx, bid: string) {
   seats.sort((a, b) => (a.s.joined < b.s.joined ? -1 : a.s.joined > b.s.joined ? 1 : a.mid < b.mid ? -1 : 1));
   const draws = (await Promise.all(ds.map(async (b) => ({ r: Number(b.key.slice(`b/${bid}/d/`.length)), d: (await ctx.store.get(b.key, { type: 'json' })) as Draw | null })))).filter((x) => x.d && Number.isInteger(x.r)) as { r: number; d: Draw }[];
   draws.sort((a, b) => a.r - b.r);
-  return { meta, seats, draws };
+  const { blobs: ps } = await ctx.store.list({ prefix: `b/${bid}/p/` });
+  const paid: Record<number, Record<string, string>> = {};
+  for (const b of ps) paid[Number(b.key.slice(`b/${bid}/p/`.length))] = ((await ctx.store.get(b.key, { type: 'json' })) as Record<string, string> | null) ?? {};
+  return { meta, seats, draws, paid };
 }
 
 /** Everyone in the matka's list: locked at the first draw, otherwise members who are in plus name-only seats. */
@@ -126,7 +162,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   if (!BID.test(bid) || !MID.test(mid) || !TOKEN.test(token)) return fail(400, 'bad request');
   const action = body.action;
   const th = await sha256(token);
-  const { meta, seats, draws } = await load(ctx, bid);
+  const { meta, seats, draws, paid } = await load(ctx, bid);
   const mine = seats.find((x) => x.mid === mid)?.s;
   const fresh = (extra: Partial<Seat>): Seat => ({ th, box: '', rev: 0, joined: now.toISOString(), devs: addDev([], body.dev), ...extra });
   const ghosts = (x: unknown) => (Array.isArray(x) ? x.filter((g): g is string => typeof g === 'string' && GHOST.test(g)).slice(0, MAX_SEATS) : []);
@@ -169,7 +205,8 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     seats: seatList(meta, seats, draws),
     locked: draws.some((x) => x.r === 0),
     members: seats.filter((x) => !x.s.removed).map((x) => ({ mid: x.mid, box: x.s.box, rev: x.s.rev, owner: !!x.s.owner, gone: !!x.s.gone })),
-    draws: draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at })),
+    draws: draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at, by: x.d.by, odds: x.d.odds })),
+    paid,
   });
 
   if (action === 'b-get') {
@@ -184,6 +221,22 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     const next: Seat = { ...mine, box, rev: mine.rev + 1, devs: addDev(mine.devs ?? [], body.dev), gone: false };
     await store.setJSON(skey(bid, mid), next);
     return { status: 200, body: { ok: true, rev: next.rev } };
+  }
+
+  // Who has paid a round. The time is the server's, so paying "early" can't be faked.
+  // Members mark themselves; the organiser can mark anyone (including people added by name).
+  if (action === 'b-paid') {
+    const r = Number(body.round);
+    const target = typeof body.target === 'string' && body.target ? body.target : mid;
+    if (!Number.isInteger(r) || r < 0 || r >= MAX_SEATS) return fail(400, 'bad round');
+    if (target !== mid && !mine.owner) return fail(403, 'Only the person who made the bhisi can mark other people.');
+    if (!seatList(meta, seats, draws).includes(target)) return fail(400, 'not in this bhisi');
+    if (draws.some((x) => x.r === r)) return fail(409, 'That round has already been drawn.');
+    const cur = { ...(paid[r] ?? {}) };
+    if (body.paid === false) delete cur[target];
+    else if (!cur[target]) cur[target] = now.toISOString();
+    await store.setJSON(pkey(bid, r), cur);
+    return { status: 200, body: { ok: true, paid: cur } };
   }
 
   // Organiser: people added by name, and the first draw date (both only before the draws start).
@@ -210,14 +263,16 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     if (todayIST(now) < date) return fail(403, `This round opens on ${date}.`);
     const won = new Set(draws.map((x) => x.d.w));
     const pool = list.filter((s) => !won.has(s));
-    const winner = fairPick(pool);
-    const rec: Draw = { w: winner, at: now.toISOString(), by: mid, ...(r === 0 ? { seats: list } : {}) };
+    // Luck, not a fix: paying early adds tickets, but anyone in the matka can come out.
+    const odds = Object.fromEntries(pool.map((s) => [s, tickets(paid[r]?.[s], date)]));
+    const winner = weightedPick(pool.map((s) => ({ id: s, w: odds[s] })));
+    const rec: Draw = { w: winner, at: now.toISOString(), by: mid, odds, ...(r === 0 ? { seats: list } : {}) };
     const res = (await store.setJSON(dkey(bid, r), rec, { onlyIfNew: true })) as { modified?: boolean } | undefined;
     if (res && res.modified === false) {
       // Someone else drew this round a moment earlier: theirs stands.
       const theirs = (await store.get(dkey(bid, r), { type: 'json' })) as Draw;
       const again = await load(ctx, bid);
-      return { status: 200, body: { ...view(), draws: again.draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at })), winner: theirs.w, round: r, already: true } };
+      return { status: 200, body: { ...view(), draws: again.draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at, by: x.d.by, odds: x.d.odds })), winner: theirs.w, round: r, already: true } };
     }
     // Tell everyone. Names are sent by the drawing phone (the server can't read them) and not kept.
     const names = (body.names && typeof body.names === 'object' ? body.names : {}) as Record<string, unknown>;
@@ -245,7 +300,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
       /* a draw stands even if a notification fails */
     }
     const after = await load(ctx, bid);
-    return { status: 200, body: { ...view(), draws: after.draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at })), seats: seatList(meta, after.seats, after.draws), locked: true, winner, round: r, notified } };
+    return { status: 200, body: { ...view(), draws: after.draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at, by: x.d.by, odds: x.d.odds })), seats: seatList(meta, after.seats, after.draws), locked: true, winner, round: r, notified } };
   }
 
   if (action === 'b-leave') {
@@ -256,7 +311,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
 
   if (action === 'b-delete') {
     if (!mine.owner) return fail(403, 'Only the person who made the bhisi can delete it.');
-    const keys = [mkey(bid), ...seats.map((x) => skey(bid, x.mid)), ...draws.map((x) => dkey(bid, x.r))];
+    const keys = [mkey(bid), ...seats.map((x) => skey(bid, x.mid)), ...draws.map((x) => dkey(bid, x.r)), ...Object.keys(paid).map((r) => pkey(bid, Number(r)))];
     await Promise.all(keys.map((k) => store.delete(k)));
     return { status: 200, body: { ok: true } };
   }

@@ -33,9 +33,9 @@ import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
-import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
-import { currentRound, pickWinner, inBowl, pot } from '../lib/bhisi';
+import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
 import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
@@ -744,8 +744,8 @@ function useStoreImpl() {
   );
   /** Tick (or untick) who has paid this round. My own payment is recorded as money out. */
   const toggleBhisiPaid = useCallback(
-    (id: string, round: number, person: string) =>
-      commit((s) => {
+    (id: string, round: number, person: string) => {
+      const next = commit((s) => {
         const b = s.bhisis?.find((x) => x.id === id);
         const r = b?.rounds[round];
         if (!b || !r) return;
@@ -761,6 +761,10 @@ function useStoreImpl() {
           sh.marks[seat] = was ? cur.filter((x) => x !== round) : [...cur, round];
         }
         r.paid = was ? r.paid.filter((p) => p !== person) : [...r.paid, person];
+        // When they paid matters a little: paying early adds luck (lib/bhisi.ts → tickets).
+        r.paidAt ??= {};
+        if (was) delete r.paidAt[person];
+        else r.paidAt[person] = new Date().toISOString();
         if (person !== 'me') return;
         if (was && r.myTx) {
           const tx = s.transactions.find((t) => t.id === r.myTx);
@@ -775,7 +779,15 @@ function useStoreImpl() {
           applyMoney(s, tx, 1);
           r.myTx = tx.id;
         }
-      }),
+      });
+      // Shared: the server notes the time (its clock decides "early").
+      const b = next.bhisis?.find((x) => x.id === id);
+      const sh = b?.share;
+      if (sh) {
+        const seat = person === 'me' ? sh.mid : Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+        if (seat && (person === 'me' || sh.owner)) void markPaidShared(sh, round, seat, !!b.rounds[round]?.paid.includes(person));
+      }
+    },
     [commit],
   );
   /** Draw the lucky chit for the current round. Returns the winner's person id. */
@@ -786,12 +798,19 @@ function useStoreImpl() {
       const i = currentRound(b0);
       const bowl = inBowl(b0);
       if (i === undefined || !bowl.length) return;
-      const winner = pickWinner(bowl);
+      // Same luck rule as the server: paying early adds tickets, nobody is guaranteed.
+      const odds = Object.fromEntries(chances(b0, i).map((c) => [c.id, c.tickets]));
+      const winner = pickWeighted(bowl.map((m) => ({ id: m, w: odds[m] ?? 4 })));
       commit((s) => {
         const b = s.bhisis!.find((x) => x.id === id)!;
         const r = b.rounds[i];
         r.winner = winner;
         r.drawnAt = s.today;
+        r.at = new Date().toISOString();
+        r.drawnBy = 'me';
+        r.pool = bowl.length;
+        r.odds = odds;
+        r.seen = true;
         if (winner === 'me') {
           const tx: Transaction = { id: uid('t'), merchant: `Bhisi won · ${b.name}`, amount: pot(b), type: 'transfer', direction: 'in', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${i + 1} of ${b.rounds.length}` };
           s.transactions.unshift(tx);

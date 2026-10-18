@@ -504,6 +504,15 @@ export interface BhisiRound {
   paid: string[];
   winner?: string;
   drawnAt?: ISODate;
+  /** Exact time of the draw, and who pressed draw (person id here). */
+  at?: string;
+  drawnBy?: string;
+  /** How many chits were in the matka for this round. */
+  pool?: number;
+  /** When each person paid this round (person id → time). Paying early adds a little luck. */
+  paidAt?: Record<string, string>;
+  /** Tickets each person had in this round's draw (person id → tickets), once it's drawn. */
+  odds?: Record<string, number>;
   /** I watched this round's chit come out (or drew it myself). */
   seen?: boolean;
   /** The transfer recorded when I paid this round / when I won it. */
