@@ -35,8 +35,7 @@ export type SheetSpec =
   | { type: 'safe' }
   | { type: 'insight'; insight: Insight }
   | { type: 'plan-form'; planId?: string; template?: string }
-  | { type: 'contribute'; planId: string; amount?: number; fromSkip?: boolean }
-  | { type: 'skip'; preset?: string }
+  | { type: 'contribute'; planId: string }
   | { type: 'withdraw'; planId: string }
   | { type: 'budget-form'; budgetId?: string; category?: string }
   | { type: 'sub-form'; subId?: string; preset?: { name: string; amount: number; category: string }; kind?: 'bill' | 'subscription' }

@@ -1,4 +1,3 @@
-import { SkipCard, SkipPromo } from '../components/SkipStreak';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
@@ -85,8 +84,6 @@ export function HomeScreen() {
       </section>
 
       <FriendNewsCard />
-      <SkipCard />
-      <SkipPromo />
 
       {askFeedback && (
         <section aria-label="Feedback" className="-mt-2 flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">

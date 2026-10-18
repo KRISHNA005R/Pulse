@@ -384,8 +384,6 @@ export interface Settings {
   soundsAsked?: boolean;
   /** Things the person said during setup they don't have, e.g. 'bills' (lib/setup.ts). */
   setupSkipped?: string[];
-  /** The "try a skip streak" card on Home was dismissed. */
-  skipPromoHidden?: boolean;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
   reminders?: ReminderPrefs;
 }
@@ -438,19 +436,4 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
-  /** Skip streak (lib/skip.ts). Missing until the person starts one. */
-  skip?: SkipStreak;
-}
-
-export interface SkipStreak {
-  /** Category ids to skip, or ['all'] for no spending at all. */
-  cats: string[];
-  since: ISODate;
-  /** Days the person tapped "Skipped it today". */
-  checkins: ISODate[];
-  /** Money moved to plans from what the streak saved. */
-  moved: { date: ISODate; amount: number }[];
-  best: number;
-  /** Highest level already celebrated (3, 7, 14, 30). */
-  cheered: number;
 }

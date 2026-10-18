@@ -1,7 +1,6 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
-import { SkipSetup } from './SkipStreak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
 import { Sheet } from './ui/Sheet';
@@ -67,13 +66,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
     case 'contribute':
       return (
         <Sheet title={`Add to ${state.plans.find((p) => p.id === spec.planId)?.name ?? 'plan'}`} onClose={close} size="sm" z={z}>
-          <ContributeForm planId={spec.planId} amount={spec.amount} fromSkip={spec.fromSkip} onDone={close} />
-        </Sheet>
-      );
-    case 'skip':
-      return (
-        <Sheet title="Skip streak" onClose={close} z={z}>
-          <SkipSetup preset={spec.preset} onDone={close} />
+          <ContributeForm planId={spec.planId} onDone={close} />
         </Sheet>
       );
     case 'withdraw':
