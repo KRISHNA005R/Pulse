@@ -98,10 +98,11 @@ describe('monthly amount', () => {
     expect(monthsBetween('2026-10-18', '2027-01-18')).toBe(3);
     expect(perMonth(90000, '2026-10-18', '2027-01-18')).toBe(30000);
   });
-  it('adds up to the target, give or take a few rupees', () => {
-    const m = perMonth(90000, '2026-10-18', '2027-04-18');
-    expect(m).toBe(15000);
-    expect(perMonth(10000, '2026-10-18', '2027-01-18') * 3).toBeLessThan(10000 + 30);
+  it('is the exact split, never padded', () => {
+    expect(perMonth(90000, '2026-10-18', '2027-04-18')).toBe(15000);
+    expect(perMonth(91350, '2026-10-18', '2027-01-18')).toBe(30450);
+    expect(perMonth(90000, '2026-10-18', '2026-12-18')).toBe(45000);
+    expect(perMonth(5000, '2026-10-18', '2026-11-01')).toBe(5000); // under a month: all of it
   });
   it('a plan screen shows the same number', () => {
     const s = fresh(plan({ target: 90000, startDate: '2026-10-18', targetDate: '2027-01-18' }));

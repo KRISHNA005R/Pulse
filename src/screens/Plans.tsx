@@ -239,13 +239,13 @@ export function PlanDetail({ id }: { id: string }) {
   const perDay = m.daysLeft > 0 ? m.remaining / m.daysLeft : m.remaining;
   const pace = [
     m.daysLeft >= 45 && { label: 'a month', value: m.monthly },
-    m.daysLeft >= 10 && { label: 'a week', value: Math.ceil((perDay * 7) / 10) * 10 },
-    { label: 'a day', value: Math.ceil(perDay) },
+    m.daysLeft >= 10 && { label: 'a week', value: Math.round(perDay * 7) },
+    { label: 'a day', value: Math.round(perDay) },
   ].filter(Boolean) as { label: string; value: number }[];
   const quick = [100, 500, 1000].filter((v) => v < m.remaining);
   const finish = m.remaining > 0 && m.remaining <= 5000 ? m.remaining : 0;
   const every = plan.reserveEvery ?? plan.cycleReserve;
-  const suggestEvery = m.monthly || Math.ceil(m.remaining / 10) * 10;
+  const suggestEvery = m.monthly || m.remaining;
   const payday = nextPayday(state);
   return (
     <div>

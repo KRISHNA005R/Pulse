@@ -357,11 +357,14 @@ export function monthsBetween(from: ISODate, to: ISODate): number {
   return n + daysBetween(a, to) / Math.max(1, daysBetween(a, b));
 }
 
-/** Amount to save each month: split evenly, rounded up to the next ₹10 (₹90,000 over 3 months = ₹30,000). */
+/**
+ * Amount to save each month: what's left, split exactly over the time left. No padding.
+ * ₹90,000 over 3 months = ₹30,000; over 2½ months = ₹36,000. Under a month, it's all of it.
+ */
 export function perMonth(remaining: number, from: ISODate, to: ISODate): number {
   if (remaining <= 0) return 0;
-  const months = Math.max(monthsBetween(from, to), 0.5);
-  return Math.ceil(roundMoney(remaining / months) / 10) * 10;
+  const months = monthsBetween(from, to);
+  return roundMoney(remaining / Math.max(months, 1));
 }
 
 export function planMetrics(s: State, p: Plan): PlanMetrics {
@@ -375,7 +378,7 @@ export function planMetrics(s: State, p: Plan): PlanMetrics {
   const diff = p.saved - expected;
   const daysAhead = Math.round(diff / perDay);
   const monthly = perMonth(remaining, s.today, p.targetDate);
-  const weekExtra = diff < 0 ? Math.round(-diff / 10) * 10 : 0;
+  const weekExtra = diff < 0 ? roundMoney(-diff) : 0;
   const pace = elapsed > 0 ? p.saved / elapsed : 0;
   const projectedDate = remaining === 0 ? s.today : pace > 0 ? addDays(s.today, Math.ceil(remaining / pace)) : null;
   const spent = s.transactions.filter((t) => t.plan === p.id && t.type === 'expense').reduce((a, t) => a + myCost(s, t), 0);
