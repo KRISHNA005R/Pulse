@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../src/data/seed';
-import { applyMoney, monthsBetween, nextPayday, perMonth, planMetrics, refillReserves, safeToSpend } from '../src/lib/finance';
+import { applyMoney, monthlySaves, monthsBetween, nextPayday, perMonth, planMetrics, refillReserves, safeToSpend } from '../src/lib/finance';
 import { addDays } from '../src/lib/format';
 import type { Plan, State, Transaction } from '../src/types';
 
@@ -103,6 +103,8 @@ describe('monthly amount', () => {
     expect(perMonth(91350, '2026-10-18', '2027-01-18')).toBe(30450);
     expect(perMonth(90000, '2026-10-18', '2026-12-18')).toBe(45000);
     expect(perMonth(5000, '2026-10-18', '2026-11-01')).toBe(5000); // under a month: all of it
+    expect(perMonth(90000, '2026-10-18', '2027-01-16')).toBe(30000); // 3 saves: 18 Oct, 18 Nov, 18 Dec
+    expect(monthlySaves('2026-10-18', '2027-01-16')).toBe(3);
   });
   it('a plan screen shows the same number', () => {
     const s = fresh(plan({ target: 90000, startDate: '2026-10-18', targetDate: '2027-01-18' }));

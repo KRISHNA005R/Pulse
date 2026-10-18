@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
+import { roundMoney } from '../lib/currency';
 import { useUI } from '../store/ui';
-import { budgetState, defaultAccount, nextPayday, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { budgetState, defaultAccount, monthlySaves, nextPayday, weeklySaves, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
 import { authorOf, groupSeat, inGroupOnPulse } from '../lib/friends';
 import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
@@ -237,10 +238,12 @@ export function PlanDetail({ id }: { id: string }) {
   const pct = Math.round(m.progress * 100);
   // What it takes from today, in three sizes.
   const perDay = m.daysLeft > 0 ? m.remaining / m.daysLeft : m.remaining;
+  const months = monthlySaves(state.today, plan.targetDate);
+  const weeks = weeklySaves(state.today, plan.targetDate);
   const pace = [
-    m.daysLeft >= 45 && { label: 'a month', value: m.monthly },
-    m.daysLeft >= 10 && { label: 'a week', value: Math.round(perDay * 7) },
-    { label: 'a day', value: Math.round(perDay) },
+    months >= 2 && { label: `a month × ${months}`, value: m.monthly },
+    weeks >= 2 && { label: `a week × ${weeks}`, value: roundMoney(m.remaining / weeks) },
+    { label: `a day × ${Math.max(1, m.daysLeft)}`, value: roundMoney(perDay) },
   ].filter(Boolean) as { label: string; value: number }[];
   const quick = [100, 500, 1000].filter((v) => v < m.remaining);
   const finish = m.remaining > 0 && m.remaining <= 5000 ? m.remaining : 0;

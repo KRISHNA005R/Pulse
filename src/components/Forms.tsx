@@ -10,7 +10,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, nextPayday, perMonth, monthsBetween, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -61,8 +61,8 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
   /** Whole rupees don't always split evenly (₹10,000 / 3): the last month takes the difference, so it adds up exactly. */
   const lastMonth = useMemo(() => {
     const left = roundMoney((parseFloat(target) || 0) - (parseFloat(saved) || 0));
-    const n = monthsBetween(state.today, date);
-    if (!monthly || n < 2 || !Number.isInteger(n)) return 0;
+    const n = monthlySaves(state.today, date);
+    if (!monthly || n < 2) return 0;
     const last = roundMoney(left - monthly * (n - 1));
     return last !== monthly ? last : 0;
   }, [target, saved, date, state.today, monthly]);

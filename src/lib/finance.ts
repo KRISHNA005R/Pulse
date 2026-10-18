@@ -358,13 +358,26 @@ export function monthsBetween(from: ISODate, to: ISODate): number {
 }
 
 /**
- * Amount to save each month: what's left, split exactly over the time left. No padding.
- * ₹90,000 over 3 months = ₹30,000; over 2½ months = ₹36,000. Under a month, it's all of it.
+ * How many monthly saves fit before the target date: today, then the same date each month.
+ * 18 Oct → 16 Jan: 18 Oct, 18 Nov, 18 Dec = 3. That's how people actually save.
+ */
+export function monthlySaves(from: ISODate, to: ISODate): number {
+  if (to <= from) return 1;
+  return Math.max(1, Math.ceil(monthsBetween(from, to) - 1e-9));
+}
+
+/** Same idea for weekly saves: 90 days = 13 weeks (the last one a little short). */
+export function weeklySaves(from: ISODate, to: ISODate): number {
+  return Math.max(1, Math.ceil(daysBetween(from, to) / 7));
+}
+
+/**
+ * Amount to save each month: what's left, split evenly over the monthly saves. No padding.
+ * ₹90,000 with 3 saves = ₹30,000. If it doesn't split evenly, the last save takes the difference.
  */
 export function perMonth(remaining: number, from: ISODate, to: ISODate): number {
   if (remaining <= 0) return 0;
-  const months = monthsBetween(from, to);
-  return roundMoney(remaining / Math.max(months, 1));
+  return roundMoney(remaining / monthlySaves(from, to));
 }
 
 export function planMetrics(s: State, p: Plan): PlanMetrics {
