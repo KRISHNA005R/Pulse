@@ -260,7 +260,7 @@ export function GuessCard() {
           <p className="text-[13px] text-ink3">You guessed {rupees(g)}. It was…</p>
           <p className="num-hero mt-1 text-[44px] leading-none">{rupees(shown)}</p>
           {verdict && (
-            <div className="pop-in mt-3">
+            <div className="rise-in mt-3">
               <p className="display text-[19px]">
                 {verdict.title} {verdict.emoji}
               </p>

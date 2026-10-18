@@ -199,7 +199,7 @@ export function Sheet({
             <Icon name="x" size={20} />
           </button>
         </div>
-        <div ref={body} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">{children}</div>
+        <div ref={body} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5">{children}</div>
         {footer && <div className="shrink-0 border-t border-line bg-inherit px-5 py-3">{footer}</div>}
       </div>
     </div>

@@ -178,7 +178,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
   const flying = stage === 'rise' || stage === 'hover';
   const revealed = stage === 'unroll' || stage === 'open';
   return (
-    <div className="relative flex select-none flex-col items-center overflow-hidden" style={{ minHeight: 600 }}>
+    <div className="relative flex select-none flex-col items-center overflow-hidden" style={{ minHeight: 620 }}>
       {/* twinkles around */}
       {['8%,12%', '88%,10%', '14%,52%', '86%,46%', '50%,4%'].map((p, i) => (
         <span key={i} className="twinkle pointer-events-none absolute text-[15px]" style={{ left: p.split(',')[0], top: p.split(',')[1], color: PERSIMMON, animationDelay: `${i * 0.35}s` }} aria-hidden="true">
@@ -186,7 +186,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
         </span>
       ))}
       {/* soft halo behind the pot */}
-      {!revealed && <span className="halo pointer-events-none absolute rounded-full" style={{ left: '50%', top: 222, width: 280, height: 280, background: 'rgb(var(--accent) / .12)' }} aria-hidden="true" />}
+      {!revealed && <span className="halo pointer-events-none absolute rounded-full" style={{ left: '50%', top: 228, width: 250, height: 250, background: 'rgb(var(--accent) / .12)' }} aria-hidden="true" />}
       {/* sun rays behind the reveal */}
       {stage === 'open' && (
         <svg className="rays pointer-events-none absolute" style={{ left: '50%', top: 300, width: 560, height: 560 }} viewBox="0 0 200 200" aria-hidden="true">
@@ -227,7 +227,7 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
       </button>
 
       {stage === 'idle' && (
-        <div className="pop-in mt-3 text-center">
+        <div className="rise-in mt-9 text-center">
           <p className="display text-[20px]">{canShake() ? 'Shake your phone' : 'Tap the matka'}</p>
           <p className="mt-1 text-[13.5px] text-ink3">
             {canShake() ? 'or tap the matka' : 'to shake it'} · {chits.length} {chits.length === 1 ? 'chit' : 'chits'} inside
@@ -235,9 +235,9 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
           {error && <p className="mx-auto mt-3 max-w-[290px] rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">{error}</p>}
         </div>
       )}
-      {stage === 'shaking' && <p className="mt-3 text-[15px] font-semibold text-ink2">Shaking the matka… 🫨</p>}
+      {stage === 'shaking' && <p className="mt-9 text-[15px] font-semibold text-ink2">Shaking the matka… 🫨</p>}
       {flying && (
-        <p className="dot-anim mt-3 text-[15px] font-semibold text-ink2">
+        <p className="dot-anim mt-9 text-[15px] font-semibold text-ink2">
           And the chit says<span>.</span>
           <span>.</span>
           <span>.</span>

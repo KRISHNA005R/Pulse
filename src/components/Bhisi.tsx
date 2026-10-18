@@ -517,7 +517,7 @@ export function BhisiDraw({ bhisiId, onDone }: { bhisiId: string; onDone: () => 
     <div>
       <MatkaDraw chits={chits} draw={setup.shared ? () => store.drawBhisiShared(bhisiId) : () => store.drawBhisi(bhisiId)} round={setup.i + 1} rounds={setup.rounds} pot={setup.pot} onRevealed={setWon} />
       {won && replay && (
-        <div className="pop-in -mt-1 flex flex-col gap-2" style={{ animationDelay: '.6s' }}>
+        <div className="rise-in mt-2 flex flex-col gap-2" style={{ animationDelay: '.6s' }}>
           <button type="button" className="btn-accent w-full" onClick={() => void shareLink(`🏺 ${setup.name} · round ${replay.r}: ${won.me ? 'I' : won.name} took the ${rupees(setup.pot)} pot! Watch the chit come out:`, replayUrl(replay), store.toast)}>
             <Icon name="share" size={16} /> Share the chit with the gang
           </button>
@@ -557,7 +557,7 @@ export function BhisiWatch({ bhisiId, round, onDone }: { bhisiId: string; round:
         }}
       />
       {done && (
-        <button type="button" className="btn-quiet pop-in -mt-1 w-full" onClick={onDone}>
+        <button type="button" className="btn-quiet rise-in mt-2 w-full" onClick={onDone}>
           Done
         </button>
       )}
@@ -577,7 +577,7 @@ export function DrawReplaySheet({ replay, onDone }: { replay: DrawReplay; onDone
       </p>
       <MatkaDraw chits={chits} draw={() => winner} round={replay.r} rounds={Math.max(replay.r, chits.length)} pot={replay.p} when="drawn on PULSE" onRevealed={() => setDone(true)} />
       {done && (
-        <button type="button" className="btn-quiet pop-in -mt-1 w-full" onClick={onDone}>
+        <button type="button" className="btn-quiet rise-in mt-2 w-full" onClick={onDone}>
           Done
         </button>
       )}
