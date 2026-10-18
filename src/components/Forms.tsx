@@ -441,6 +441,8 @@ export function SubscriptionForm({ subId, preset, kind: kind0, onDone }: { subId
   );
 }
 
+export const GROUP_EMOJI = ['🍜', '🏝️', '🏠', '🎉', '⚽', '🎬', '🚗', '☕', '🎂', '🏕️'];
+
 export function GroupForm({ onDone }: { onDone: () => void }) {
   const store = useStore();
   const { state } = store;
@@ -452,7 +454,7 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Group icon">
-        {['🍜', '🏝️', '🏠', '🎉', '⚽', '🎬', '🚗', '☕', '🎂', '🏕️'].map((e) => (
+        {GROUP_EMOJI.map((e) => (
           <button key={e} type="button" role="radio" aria-checked={emoji === e} aria-label={e} onClick={() => setEmoji(e)} className={`tap grid h-10 w-10 place-items-center rounded-xl text-[20px] ${emoji === e ? 'bg-ink' : 'bg-sunk'}`}>
             {e}
           </button>

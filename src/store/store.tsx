@@ -954,6 +954,21 @@ function useStoreImpl() {
       }),
     [commit],
   );
+  /** New name or icon for a group. In a shared group, the owner's name reaches everyone on the next sync. */
+  const renameGroup = useCallback(
+    (groupId: string, name: string, emoji: string) => {
+      const clean = name.trim().slice(0, 40);
+      if (!clean) return;
+      commit((s) => {
+        const g = s.groups.find((x) => x.id === groupId);
+        if (!g) return;
+        g.name = clean;
+        g.emoji = emoji;
+      });
+      toast({ text: 'Group updated.', tone: 'good' });
+    },
+    [commit, toast],
+  );
   /** Add someone to a group by name (someone who isn't on PULSE). */
   const addGroupMember = useCallback(
     (groupId: string, name: string) => {
@@ -1725,6 +1740,7 @@ function useStoreImpl() {
     unshareGroup,
     deleteGroup,
     setGroupClosed,
+    renameGroup,
     addGroupMember,
     bankSettlement,
     addGroup,

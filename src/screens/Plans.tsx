@@ -8,6 +8,7 @@ import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
 import { EmptyState, MoneyStat, PersonAvatar, Ring, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
+import { GROUP_EMOJI } from '../components/Forms';
 import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Friends';
 
 export function PlansScreen() {
@@ -503,8 +504,8 @@ export function GroupDetail({ id }: { id: string }) {
         title={`${group.name} ${group.emoji}`}
         onBack={ui.pop}
         right={
-          <button type="button" className="tap grid h-10 w-10 place-items-center rounded-full hover:bg-sunk" aria-label="People and settings" onClick={() => ui.openSheet({ type: 'group-people', groupId: id })}>
-            <Icon name="user-plus" size={18} />
+          <button type="button" className="tap grid h-10 w-10 place-items-center rounded-full hover:bg-sunk" aria-label="Edit group" onClick={() => ui.openSheet({ type: 'group-people', groupId: id })}>
+            <Icon name="pencil" size={18} />
           </button>
         }
       />
@@ -674,8 +675,14 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
   const ui = useUI();
   const [friend, setFriend] = useState('');
   const group = state.groups.find((g) => g.id === groupId);
+  const [title, setTitle] = useState(group?.name ?? '');
+  const [emoji, setEmoji] = useState(group?.emoji ?? '🍜');
   if (!group) return null;
   const g = groupSummary(state, groupId);
+  // In a shared group the name comes from whoever made it, so only they can change it.
+  const canRename = !group.shared || group.shared.owner;
+  const changed = title.trim() !== group.name || emoji !== group.emoji;
+  const icons = GROUP_EMOJI.includes(group.emoji) ? GROUP_EMOJI : [group.emoji, ...GROUP_EMOJI];
   // People added by name (not joined on PULSE). Joined people are listed in the share card.
   const byName = group.members.filter((m) => m !== 'me' && (!group.shared || groupSeat(group, m) !== 'on'));
   const joined = group.shared ? group.members.filter((m) => m !== 'me' && groupSeat(group, m) === 'on') : [];
@@ -696,7 +703,36 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
     });
   };
   return (
-    <div className={state.mode === 'personal' ? '-mt-4' : ''}>
+    <div>
+      {canRename ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!changed || !title.trim()) return;
+            store.renameGroup(groupId, title, emoji);
+          }}
+        >
+          <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Group icon">
+            {icons.map((e) => (
+              <button key={e} type="button" role="radio" aria-checked={emoji === e} aria-label={e} onClick={() => setEmoji(e)} className={`tap grid h-10 w-10 place-items-center rounded-xl text-[20px] ${emoji === e ? 'bg-ink' : 'bg-sunk'}`}>
+                {e}
+              </button>
+            ))}
+          </div>
+          <label htmlFor="group-rename" className="mb-1.5 mt-4 block text-[13px] font-semibold text-ink2">
+            Group name
+          </label>
+          <div className="flex gap-2">
+            <input id="group-rename" className="field min-w-0 flex-1" value={title} maxLength={40} onChange={(e) => setTitle(e.target.value)} autoComplete="off" />
+            <button type="submit" className="btn-primary min-h-[46px] shrink-0 px-4 disabled:opacity-40" disabled={!changed || !title.trim()}>
+              Save
+            </button>
+          </div>
+          {group.shared && <p className="mt-1.5 text-[12.5px] text-ink3">Everyone in the group sees the new name.</p>}
+        </form>
+      ) : (
+        <p className="rounded-2xl bg-sunk px-4 py-3 text-[13.5px] text-ink2">Only the person who made {group.name} can rename it.</p>
+      )}
       <GroupShareCard group={group} />
       {joined.length > 0 && !group.shared?.owner && (
         <div className="mt-4">

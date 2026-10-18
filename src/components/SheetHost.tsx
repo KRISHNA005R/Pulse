@@ -89,7 +89,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       );
     case 'group-people':
       return (
-        <Sheet title="People" onClose={close} z={z}>
+        <Sheet title="Edit group" onClose={close} z={z}>
           <GroupPeople groupId={spec.groupId} onDone={close} />
         </Sheet>
       );
