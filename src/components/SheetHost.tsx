@@ -10,7 +10,7 @@ import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
 import { AuthNudge, MemberCardSheet } from './Auth';
-import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, DebtForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
+import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
 import { ShareCard } from './ShareCard';
 import { CommandBar } from './CommandBar';
 import { MoneyRecap } from './MoneyRecap';
@@ -66,6 +66,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title={`Add to ${state.plans.find((p) => p.id === spec.planId)?.name ?? 'plan'}`} onClose={close} size="sm" z={z}>
           <ContributeForm planId={spec.planId} onDone={close} />
+        </Sheet>
+      );
+    case 'withdraw':
+      return (
+        <Sheet title={`Take from ${state.plans.find((p) => p.id === spec.planId)?.name ?? 'plan'}`} onClose={close} size="sm" z={z}>
+          <WithdrawForm planId={spec.planId} onDone={close} />
         </Sheet>
       );
     case 'budget-form':

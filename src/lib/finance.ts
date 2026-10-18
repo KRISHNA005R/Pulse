@@ -182,12 +182,31 @@ export function applyMoney(s: State, tx: Transaction, sign: 1 | -1) {
     const out = tx.direction !== 'in';
     if (acct) acct.balance += out ? -amt : amt;
     if (tx.toAccount?.startsWith('pot:')) {
+      // Into a plan (out of the account), or taken back out of it (direction 'in').
       const plan = s.plans.find((p) => `pot:${p.id}` === tx.toAccount);
-      if (plan) plan.saved = Math.max(0, plan.saved + amt);
+      if (plan) plan.saved = Math.max(0, plan.saved + (out ? amt : -amt));
     } else if (tx.toAccount) {
       const to = s.accounts.find((a) => a.id === tx.toAccount);
       if (to) to.balance += amt;
     }
+  }
+}
+
+/**
+ * "Keep aside every payday": when a new pay cycle starts, each plan's held amount refills to its
+ * every-payday amount (never more than what's still left to save). Safe to call any time.
+ */
+export function refillReserves(s: State) {
+  const pd = nextPayday(s);
+  for (const p of s.plans) {
+    // Plans from before this existed: a held amount meant "every payday" to most people.
+    if (p.reserveEvery === undefined && p.cycleReserve > 0) {
+      p.reserveEvery = p.cycleReserve;
+      p.reserveFor = pd;
+    }
+    if (!p.reserveEvery || p.status !== 'active' || p.reserveFor === pd) continue;
+    p.cycleReserve = roundMoney(Math.min(p.reserveEvery, Math.max(0, p.target - p.saved)));
+    p.reserveFor = pd;
   }
 }
 
@@ -353,6 +372,11 @@ export function planMetrics(s: State, p: Plan): PlanMetrics {
     tone = 'paused';
     status = 'Paused. Nothing is set aside for this right now.';
     short = 'Paused';
+  } else if (p.saved <= 0 && daysAhead > -2) {
+    // Brand new and empty: "on schedule" would be technically true and sound silly.
+    tone = 'on-track';
+    status = monthly ? `Fresh start. ${rupees(monthly)}/month gets you there.` : 'Fresh start. Add your first bit.';
+    short = 'Just started';
   } else if (daysAhead >= 2) {
     tone = 'ahead';
     status = `You're ${daysAhead} days ahead of schedule.`;

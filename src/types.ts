@@ -127,6 +127,10 @@ export interface Plan {
   categories: CategoryId[];
   /** Planned contribution still to move before next payday (reserved in safe-to-spend). */
   cycleReserve: number;
+  /** Kept aside every payday: cycleReserve refills to this when a new pay cycle starts. */
+  reserveEvery?: number;
+  /** The payday the current cycleReserve is counting towards (so it refills once per cycle). */
+  reserveFor?: ISODate;
   groupId?: ID;
   contributions: { date: ISODate; amount: number }[];
 }

@@ -10,7 +10,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, daysBetween, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { CYCLE_MONTHS, nextPayday, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -41,7 +41,6 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
   const [target, setTarget] = useState(String(existing?.target ?? t?.target ?? ''));
   const [saved, setSaved] = useState(String(existing?.saved ?? ''));
   const [date, setDate] = useState(existing?.targetDate ?? addMonths(state.today, t?.months ?? 6));
-  const [cats, setCats] = useState<CategoryId[]>(existing?.categories ?? t?.categories ?? []);
   const [reserve, setReserve] = useState(String(existing?.cycleReserve ?? ''));
   const [group, setGroup] = useState(existing?.groupId ?? '');
 
@@ -52,7 +51,6 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
     setIcon(x.icon);
     setTarget(x.target ? String(x.target) : '');
     setDate(addMonths(state.today, x.months));
-    setCats(x.categories);
   };
 
   const monthly = useMemo(() => {
@@ -80,6 +78,12 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
     );
 
   const valid = name.trim() && parseFloat(target) > 0 && date > state.today;
+  /** "Keep aside every payday": a changed amount starts counting from the next payday right away. */
+  const keepAside = (every: number, tg: number, sv: number) => {
+    const was = existing ? existing.reserveEvery ?? existing.cycleReserve : 0;
+    if (existing && every === was) return { cycleReserve: Math.min(existing.cycleReserve, Math.max(0, tg - sv)), reserveEvery: every, reserveFor: existing.reserveFor ?? nextPayday(state) };
+    return { cycleReserve: roundMoney(Math.min(every, Math.max(0, tg - sv))), reserveEvery: every, reserveFor: nextPayday(state) };
+  };
   const save = () => {
     if (!valid) return;
     const tg = roundMoney(parseFloat(target));
@@ -94,8 +98,8 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
       startDate: existing?.startDate ?? state.today,
       targetDate: date,
       status: existing ? (sv >= tg ? 'done' : existing.status === 'done' ? 'active' : existing.status) : sv >= tg ? 'done' : 'active',
-      categories: cats,
-      cycleReserve: roundMoney(parseFloat(reserve) || 0),
+      categories: existing?.categories ?? [],
+      ...keepAside(roundMoney(parseFloat(reserve) || 0), tg, sv),
       groupId: group || undefined,
       contributions: existing?.contributions,
     });
@@ -136,19 +140,9 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
           <input id="plan-date" type="date" className="field" value={date} min={state.today} onChange={(e) => setDate(e.target.value)} />
         </Field>
       </div>
-      <div>
-        <p className="mb-2 text-[13px] font-semibold text-ink2">Link categories (optional)</p>
-        <div className="flex flex-wrap gap-2">
-          {state.categories.filter((c) => c.kind === 'expense').map((c) => (
-            <button key={c.id} type="button" className="chip" aria-pressed={cats.includes(c.id)} onClick={() => setCats(cats.includes(c.id) ? cats.filter((x) => x !== c.id) : [...cats, c.id])}>
-              <span aria-hidden="true">{c.emoji}</span> {c.name}
-            </button>
-          ))}
-        </div>
-      </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Set aside before payday" htmlFor="plan-reserve" hint="Held back from safe-to-spend.">
-          <input id="plan-reserve" inputMode="decimal" className="field num" value={reserve} onChange={(e) => setReserve(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`${sym()}0`} />
+        <Field label="Keep aside every payday" htmlFor="plan-reserve" hint="Held back from safe-to-spend each payday.">
+          <input id="plan-reserve" inputMode="decimal" className="field num" value={reserve} onChange={(e) => setReserve(e.target.value.replace(/[^\d.]/g, ''))} placeholder={monthly ? `${sym()}${monthly}` : `${sym()}0`} />
         </Field>
         <Field label="Shared with a group" htmlFor="plan-group">
           <select id="plan-group" className="field" value={group} onChange={(e) => setGroup(e.target.value)}>
@@ -217,6 +211,52 @@ export function ContributeForm({ planId, onDone }: { planId: string; onDone: () 
         }}
       >
         Add {n ? rupees(n) : ''} to {plan.name}
+      </button>
+    </div>
+  );
+}
+
+/** Take money back out of a plan: the trip is here, or life happened. No judgement. */
+export function WithdrawForm({ planId, onDone }: { planId: string; onDone: () => void }) {
+  const store = useStore();
+  const { state } = store;
+  const plan = state.plans.find((p) => p.id === planId)!;
+  const [amount, setAmount] = useState(String(plan.saved || ''));
+  const [to, setTo] = useState(defaultAccount(state));
+  const n = Math.min(parseFloat(amount) || 0, plan.saved);
+  const half = Math.round(plan.saved / 2 / 10) * 10;
+  return (
+    <div>
+      <MoneyInput value={amount} onChange={setAmount} label={`Amount to take from ${plan.name}`} autoFocus id="withdraw-amount" />
+      <div className="flex flex-wrap justify-center gap-2">
+        {[plan.saved, half].filter((v, i, a) => v > 0 && a.indexOf(v) === i).map((v) => (
+          <button key={v} type="button" className="chip" aria-pressed={n === v} onClick={() => setAmount(String(v))}>
+            {v === plan.saved ? `All ${rupees(v)}` : `Half · ${rupees(v)}`}
+          </button>
+        ))}
+      </div>
+      <Field label="Back to" htmlFor="withdraw-to">
+        <select id="withdraw-to" className="field mt-4" value={to} onChange={(e) => setTo(e.target.value)}>
+          {state.accounts.filter((a) => a.type === 'bank' || a.type === 'cash').map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name} · {rupees(a.balance)}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <p className="mt-4 text-center text-[14px] text-ink2">
+        {parseFloat(amount) > plan.saved ? <>Only {rupees(plan.saved)} is in this plan.</> : n > 0 ? <>{plan.name} goes to {rupees(plan.saved - n)}. You can always top it up again.</> : null}
+      </p>
+      <button
+        type="button"
+        disabled={!n}
+        className="btn-primary mt-4 w-full disabled:opacity-40"
+        onClick={() => {
+          store.withdrawFromPlan(planId, n, to);
+          onDone();
+        }}
+      >
+        Take out {n ? rupees(n) : ''}
       </button>
     </div>
   );

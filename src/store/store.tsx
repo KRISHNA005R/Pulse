@@ -32,7 +32,7 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { applyMoney, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
 // (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
@@ -340,6 +340,7 @@ export function refresh(input: State): State {
   });
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
   repairHoldings(s);
+  refillReserves(s);
   if (s.mode !== 'personal') return s;
   const today = realToday();
   if (today <= s.today && s.today === today) return s;
@@ -366,6 +367,7 @@ export function refresh(input: State): State {
   processDueInvestments(s);
   processDueInsurance(s);
   autoMade = [...processDueDebts(s), ...processDueSubscriptions(s)];
+  refillReserves(s);
   return s;
 }
 
@@ -670,12 +672,45 @@ function useStoreImpl() {
       const p2 = next.plans.find((x) => x.id === planId)!;
       const m = planMetrics(next, p2);
       burst({ kind: m.tone === 'done' ? 'confetti' : 'mini', power: m.tone === 'done' ? 1.7 : 0.9 });
+      // A milestone crossed with this top-up gets its own line, once.
+      const mile = [0.75, 0.5, 0.25].find((x) => before.progress < x && m.progress >= x);
       if (m.tone === 'done') toast({ text: `Your ${p2.name} plan is fully funded!`, tone: 'good', emoji: '🎉' });
+      else if (mile) toast({ text: mile === 0.5 ? `Halfway to ${p2.name}. Keep cooking.` : mile === 0.75 ? `75% there. ${p2.name} is so close.` : `A quarter of ${p2.name} done. Solid start.`, tone: 'good', emoji: mile === 0.5 ? '🔥' : mile === 0.75 ? '🚀' : '✨' });
       else if (m.tone === 'ahead') toast({ text: `${rupees(amount)} added. You're ${m.daysAhead} days ahead on ${p2.name}.`, tone: 'good' });
       else if (m.daysAhead > before.daysAhead) toast({ text: `${rupees(amount)} added. ${p2.name} is ${Math.round(m.progress * 100)}% funded.`, tone: 'good' });
       else toast({ text: `${rupees(amount)} added to ${p2.name}.`, tone: 'good' });
     },
     [commit, toast],
+  );
+
+  /** Take money back out of a plan (the trip is here, or something came up). */
+  const withdrawFromPlan = useCallback(
+    (planId: string, amount: number, to: string) => {
+      const plan = ref.current.plans.find((p) => p.id === planId);
+      if (!plan || amount <= 0) return;
+      const amt = roundMoney(Math.min(amount, plan.saved));
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId)!;
+        const tx: Transaction = { id: uid('t'), merchant: `Taken from ${p.name}`, amount: amt, type: 'transfer', direction: 'in', toAccount: `pot:${p.id}`, category: 'transfer', date: s.today, account: to, plan: p.id, recurring: false, status: 'completed' };
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+      });
+      haptic(10);
+      toast({ text: `${rupees(amt)} taken from ${plan.name}. It's back in your safe-to-spend.`, tone: 'neutral' });
+    },
+    [commit, toast],
+  );
+  /** Turn "keep aside every payday" on (amount > 0) or off (0) straight from the plan screen. */
+  const setPlanAutoSave = useCallback(
+    (planId: string, every: number) =>
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId);
+        if (!p) return;
+        p.reserveEvery = roundMoney(Math.max(0, every));
+        p.reserveFor = nextPayday(s);
+        p.cycleReserve = roundMoney(Math.min(p.reserveEvery, Math.max(0, p.target - p.saved)));
+      }),
+    [commit],
   );
 
   // ---------- budgets ----------
@@ -1673,6 +1708,8 @@ function useStoreImpl() {
     setSubStatus,
     deleteSubscription,
     addPerson,
+    withdrawFromPlan,
+    setPlanAutoSave,
     setPersonUpi,
     linkPerson,
     applyFriendBox,

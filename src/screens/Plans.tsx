@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { budgetState, defaultAccount, nextPayday, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
 import { authorOf, groupSeat, inGroupOnPulse } from '../lib/friends';
 import { fmtDate, relDay, rupees } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
-import { EmptyState, MoneyStat, PersonAvatar, ProgressBar, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
+import { EmptyState, MoneyStat, PersonAvatar, Ring, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Friends';
 
@@ -200,6 +200,23 @@ function BudgetsView() {
 // ------------------------------------------------------------------
 // Plan detail
 // ------------------------------------------------------------------
+/** The one big line on a plan: friendly, never shaming. */
+function vibe(m: ReturnType<typeof planMetrics>, saved: number) {
+  if (m.tone === 'done') return 'Fully funded. Go enjoy it.';
+  if (m.tone === 'paused') return 'On pause. No pressure.';
+  if (saved <= 0 && m.tone !== 'behind') return 'Day one. Every big plan starts at ₹0.';
+  if (m.tone === 'ahead') return 'Ahead of schedule. Future you says thanks.';
+  if (m.tone === 'behind') return 'A little behind. Easy to catch up.';
+  return 'Right on track. Keep it steady.';
+}
+
+const MILESTONES = [
+  { at: 0.25, name: 'Started' },
+  { at: 0.5, name: 'Halfway' },
+  { at: 0.75, name: 'Almost' },
+  { at: 1, name: 'Done' },
+];
+
 export function PlanDetail({ id }: { id: string }) {
   const store = useStore();
   const { state } = store;
@@ -216,6 +233,20 @@ export function PlanDetail({ id }: { id: string }) {
   const group = plan.groupId ? state.groups.find((g) => g.id === plan.groupId) : undefined;
   const txs = state.transactions.filter((t) => t.plan === plan.id);
   const groupSplits = group ? state.splits.filter((s) => s.group === group.id && s.paidBy !== 'me') : [];
+  const live = plan.status === 'active' && m.tone !== 'done';
+  const pct = Math.round(m.progress * 100);
+  // What it takes from today, in three sizes.
+  const perDay = m.daysLeft > 0 ? m.remaining / m.daysLeft : m.remaining;
+  const pace = [
+    m.daysLeft >= 45 && { label: 'a month', value: m.monthly },
+    m.daysLeft >= 10 && { label: 'a week', value: Math.ceil((perDay * 7) / 10) * 10 },
+    { label: 'a day', value: Math.ceil(perDay) },
+  ].filter(Boolean) as { label: string; value: number }[];
+  const quick = [100, 500, 1000].filter((v) => v < m.remaining);
+  const finish = m.remaining > 0 && m.remaining <= 5000 ? m.remaining : 0;
+  const every = plan.reserveEvery ?? plan.cycleReserve;
+  const suggestEvery = m.monthly || Math.ceil(m.remaining / 10) * 10;
+  const payday = nextPayday(state);
   return (
     <div>
       <TopNavigation
@@ -228,60 +259,137 @@ export function PlanDetail({ id }: { id: string }) {
         }
       />
       <section className="rounded-3xl border border-line bg-surface p-5 md:p-6" aria-label="Progress">
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="num-hero text-[39px] leading-none">{rupees(plan.saved)}</p>
-            <p className="num mt-1 text-[15px] text-ink3">of {rupees(plan.target)}</p>
+        <div className="flex items-center gap-5">
+          <Ring value={m.progress} size={116} stroke={11} label={`${pct}% funded`}>
+            <span className="text-center leading-none">
+              <span className="num-hero block text-[28px]">{pct}%</span>
+              <span className="mt-1 block text-[11.5px] text-ink3">funded</span>
+            </span>
+          </Ring>
+          <div className="min-w-0 flex-1">
+            <p className="num-hero text-[30px] leading-none sm:text-[36px]">{rupees(plan.saved)}</p>
+            <p className="num mt-1.5 text-[14.5px] text-ink3">of {rupees(plan.target)}</p>
+            {m.remaining > 0 && <p className="num mt-0.5 text-[14.5px] font-semibold text-accent-ink">{rupees(m.remaining)} to go</p>}
           </div>
-          <p className="num-hero text-[33px] leading-none text-accent-ink">{Math.round(m.progress * 100)}%</p>
         </div>
-        <div className="mt-5">
-          <ProgressBar value={m.progress} marker={m.tone !== 'done' && m.tone !== 'paused' ? m.expected / plan.target : undefined} label={`${Math.round(m.progress * 100)}% funded`} height={10} />
-          {m.tone !== 'done' && m.tone !== 'paused' && <p className="mt-2 text-[12.5px] text-ink3">The tick marks where the schedule expects you today.</p>}
-        </div>
-        <p className={`mt-4 text-[16px] font-semibold ${m.tone === 'ahead' || m.tone === 'done' ? 'text-pos' : m.tone === 'behind' ? 'text-warn' : ''}`}>{m.status}</p>
-        <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 sm:grid-cols-4">
-          <div>
-            <dt className="text-[12.5px] text-ink3">Remaining</dt>
-            <dd className="num text-[17px] font-semibold">{rupees(m.remaining)}</dd>
+
+        <p className="display mt-5 text-[18px] leading-snug">{vibe(m, plan.saved)}</p>
+        <p className="mt-1 text-[14px] text-ink2">
+          {m.tone === 'behind' || m.tone === 'ahead' ? `${m.status} ` : ''}
+          {m.tone === 'done' ? `You hit ${rupees(plan.target)}.` : `Target ${fmtDate(plan.targetDate, true)} · ${m.daysLeft} ${m.daysLeft === 1 ? 'day' : 'days'} left.`}
+        </p>
+
+        {live && m.remaining > 0 && (
+          <div className="mt-4 grid rounded-2xl bg-sunk p-3" style={{ gridTemplateColumns: `repeat(${pace.length}, minmax(0, 1fr))` }}>
+            {pace.map((x, i) => (
+              <div key={x.label} className={`px-2 text-center ${i ? 'border-l border-line' : ''}`}>
+                <p className="num text-[16px] font-semibold">{rupees(x.value)}</p>
+                <p className="text-[12px] text-ink3">{x.label}</p>
+              </div>
+            ))}
           </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">Target</dt>
-            <dd className="text-[17px] font-semibold">{fmtDate(plan.targetDate, true)}</dd>
+        )}
+
+        {live && (quick.length > 0 || finish > 0) && (
+          <div className="mt-4">
+            <p className="mb-2 text-[12.5px] font-semibold text-ink3">Quick add</p>
+            <div className="flex flex-wrap gap-2">
+              {quick.map((v) => (
+                <button key={v} type="button" className="chip num" onClick={() => store.contribute(plan.id, v, defaultAccount(state))}>
+                  +{rupees(v)}
+                </button>
+              ))}
+              {finish > 0 && (
+                <button type="button" className="chip num font-semibold" onClick={() => store.contribute(plan.id, finish, defaultAccount(state))}>
+                  Finish it · {rupees(finish)}
+                </button>
+              )}
+            </div>
           </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">Recommended</dt>
-            <dd className="num text-[17px] font-semibold">{m.monthly ? `${rupees(m.monthly)}/mo` : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">Held this cycle</dt>
-            <dd className="num text-[17px] font-semibold">{rupees(plan.cycleReserve)}</dd>
-          </div>
-        </dl>
-        <div className="mt-5 flex flex-wrap gap-2">
+        )}
+
+        <div className="mt-5 flex gap-2">
           {plan.status !== 'done' && (
-            <button type="button" className="btn-accent flex-1" onClick={() => ui.openSheet({ type: 'contribute', planId: plan.id })}>
-              <Icon name="plus" size={17} /> Add money
+            <button type="button" className="btn-accent flex-1 whitespace-nowrap" onClick={() => ui.openSheet({ type: 'contribute', planId: plan.id })}>
+              <Icon name="plus" size={17} className="shrink-0" /> Add money
             </button>
           )}
-          <button type="button" className="btn-quiet" onClick={() => store.savePlan({ ...plan, status: plan.status === 'paused' ? 'active' : 'paused' })} disabled={plan.status === 'done'}>
-            <Icon name={plan.status === 'paused' ? 'play' : 'pause'} size={16} /> {plan.status === 'paused' ? 'Resume' : 'Pause'}
-          </button>
-          <button type="button" className="btn-quiet" onClick={() => ui.openSheet({ type: 'share-card', preset: 'plan' })} aria-label="Share a budget card">
+          {plan.saved > 0 && (
+            <button type="button" className={`btn-quiet whitespace-nowrap ${plan.status === 'done' ? 'flex-1' : ''}`} onClick={() => ui.openSheet({ type: 'withdraw', planId: plan.id })}>
+              Take out
+            </button>
+          )}
+          {plan.status !== 'done' && (
+            <button
+              type="button"
+              className="btn-quiet shrink-0 px-3"
+              aria-label={plan.status === 'paused' ? 'Resume plan' : 'Pause plan'}
+              title={plan.status === 'paused' ? 'Resume' : 'Pause'}
+              onClick={() => store.savePlan({ ...plan, status: plan.status === 'paused' ? 'active' : 'paused' })}
+            >
+              <Icon name={plan.status === 'paused' ? 'play' : 'pause'} size={16} />
+            </button>
+          )}
+          <button type="button" className="btn-quiet shrink-0 px-3" onClick={() => ui.openSheet({ type: 'share-card', preset: 'plan' })} aria-label="Share a card" title="Share">
             <Icon name="share" size={16} />
           </button>
         </div>
       </section>
 
-      {plan.categories.length > 0 && (
-        <p className="mt-5 flex flex-wrap items-center gap-2 px-1 text-[13.5px] text-ink3">
-          Linked categories:
-          {plan.categories.map((c) => (
-            <span key={c} className="rounded-full bg-sunk px-2.5 py-0.5 font-medium text-ink2">
-              {state.categories.find((x) => x.id === c)?.name}
+      <section className="mt-4 rounded-3xl border border-line bg-surface p-5" aria-labelledby="pm-h">
+        <h2 id="pm-h" className="text-[13px] font-semibold text-ink3">
+          Milestones
+        </h2>
+        <ol className="mt-3 grid grid-cols-4 gap-2">
+          {MILESTONES.map((x) => {
+            const hit = m.progress >= x.at;
+            return (
+              <li key={x.at} className={`rounded-2xl px-1 py-2.5 text-center ${hit ? 'bg-accent-soft' : 'bg-sunk'}`}>
+                <span className={`mx-auto grid h-7 w-7 place-items-center rounded-full text-[11px] font-bold ${hit ? 'bg-accent text-[#17140F]' : 'border border-line text-ink3'}`}>
+                  {hit ? <Icon name="check" size={14} /> : `${x.at * 100}`}
+                </span>
+                <p className={`mt-1.5 text-[12.5px] font-semibold ${hit ? '' : 'text-ink3'}`}>{x.name}</p>
+                <p className="num text-[11.5px] text-ink3">{rupees(Math.round(plan.target * x.at))}</p>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
+      {live && (
+        <section className="mt-4 rounded-3xl border border-line bg-surface p-5" aria-labelledby="pa-h">
+          <div className="flex items-start gap-3">
+            <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl ${every ? 'bg-accent-soft text-accent-ink' : 'bg-sunk text-ink3'}`} aria-hidden="true">
+              <Icon name="repeat" size={18} />
             </span>
-          ))}
-        </p>
+            <div className="min-w-0 flex-1">
+              <h2 id="pa-h" className="text-[15.5px] font-semibold">
+                {every ? `${rupees(every)} kept aside every payday` : 'Keep aside every payday'}
+              </h2>
+              <p className="mt-0.5 text-[13.5px] text-ink2">
+                {every
+                  ? `PULSE holds it back from safe-to-spend, so you don't spend it by accident. Held now: ${rupees(plan.cycleReserve)}. Refills ${fmtDate(payday)}.`
+                  : `Set it once and this plan fills itself. ${rupees(suggestEvery)} each payday gets you there on time.`}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {every ? (
+                  <>
+                    <button type="button" className="chip" onClick={() => ui.openSheet({ type: 'plan-form', planId: plan.id })}>
+                      Change amount
+                    </button>
+                    <button type="button" className="chip" onClick={() => store.setPlanAutoSave(plan.id, 0)}>
+                      Turn off
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => store.setPlanAutoSave(plan.id, suggestEvery)}>
+                    Turn on · {rupees(suggestEvery)}/payday
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
       )}
 
       {group && (
@@ -293,8 +401,18 @@ export function PlanDetail({ id }: { id: string }) {
       )}
 
       <section className="mt-8" aria-labelledby="pt-h">
-        <SectionHeader id="pt-h" title="Linked transactions" />
-        <TransactionList txs={txs} emptyText="Nothing linked yet. Assign an expense to this plan from any transaction." />
+        <SectionHeader id="pt-h" title="History" />
+        {txs.length ? (
+          <TransactionList txs={txs} />
+        ) : (
+          <div className="rounded-3xl border border-dashed border-line px-5 py-8 text-center">
+            <p className="text-[28px]" aria-hidden="true">
+              {plan.icon}
+            </p>
+            <p className="mt-2 text-[15px] font-semibold">No top-ups yet</p>
+            <p className="mt-1 text-[13.5px] text-ink3">Every rupee you add or take out shows up here.</p>
+          </div>
+        )}
       </section>
 
       <div className="mt-10 text-center">
@@ -305,7 +423,7 @@ export function PlanDetail({ id }: { id: string }) {
             ui.openSheet({
               type: 'confirm',
               title: `Delete ${plan.name}?`,
-              body: `The ${rupees(plan.saved)} you've saved stays in your history. Linked expenses keep their categories.`,
+              body: `The ${rupees(plan.saved)} you've saved stays in your history.`,
               confirm: 'Delete plan',
               run: () => {
                 store.deletePlan(plan.id);
