@@ -311,3 +311,41 @@ export function PaydayWin() {
     </section>
   );
 }
+
+// ------------------------------------------------------------------
+// Beta: one card on Home that points to everything new
+// ------------------------------------------------------------------
+export function NewStuffCard() {
+  const store = useStore();
+  const ui = useUI();
+  if (store.state.settings.newStuffSeen) return null;
+  const go = (f: () => void) => () => f();
+  const items: { emoji: string; label: string; run: () => void }[] = [
+    { emoji: '🏺', label: 'Bhisi', run: () => { ui.setPlansSegment('bhisi'); ui.resetTo('plans'); } },
+    { emoji: '🪙', label: 'Gullak', run: () => ui.openSheet({ type: 'gullak-form' }) },
+    { emoji: '🔒', label: 'Cart jail', run: () => ui.openSheet({ type: 'jail-form' }) },
+    { emoji: '✨', label: 'Money aura', run: () => ui.openSheet({ type: 'aura' }) },
+    { emoji: '🔥', label: 'Roast me', run: () => ui.openSheet({ type: 'ai', ask: 'Roast me' }) },
+  ];
+  return (
+    <section aria-label="New in PULSE" className="rounded-3xl border border-line bg-surface p-4">
+      <div className="flex items-center justify-between">
+        <p className="display text-[17px]">New in PULSE ✨</p>
+        <button type="button" className="tap -mr-1 grid h-8 w-8 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Hide" onClick={() => store.updateSettings({ newStuffSeen: true })}>
+          <Icon name="x" size={15} />
+        </button>
+      </div>
+      <p className="mt-0.5 text-[13px] text-ink3">Fresh drops. Tap one to try it.</p>
+      <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1">
+        {items.map((x) => (
+          <button key={x.label} type="button" onClick={go(x.run)} className="tap flex w-[84px] shrink-0 flex-col items-center gap-1.5 rounded-2xl bg-sunk px-2 py-3 text-[12.5px] font-semibold">
+            <span className="text-[26px]" aria-hidden="true">
+              {x.emoji}
+            </span>
+            {x.label}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}

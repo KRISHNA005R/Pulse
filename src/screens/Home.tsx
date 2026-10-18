@@ -1,5 +1,5 @@
 import { CartJailCard } from '../components/CartJail';
-import { AuraTeaser, GuessCard, PaydayWin } from '../components/Fun';
+import { AuraTeaser, GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
@@ -39,6 +39,7 @@ export function HomeScreen() {
     <div className="stagger flex flex-col gap-8">
       <PaydayCard />
       <PaydayWin />
+      <NewStuffCard />
       <InstallBanner />
       <ReminderCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />

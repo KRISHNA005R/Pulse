@@ -260,7 +260,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
     case 'ai':
       return (
         <Sheet title="PULSE AI" onClose={close} size="full" tone="bg" z={z}>
-          <AIChat />
+          <AIChat initial={spec.ask} />
         </Sheet>
       );
     case 'confirm':

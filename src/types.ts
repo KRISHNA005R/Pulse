@@ -388,6 +388,8 @@ export interface Settings {
   setupSkipped?: string[];
   /** Money aura card already opened for this month key (YYYY-MM). */
   auraSeen?: string;
+  /** The "New in PULSE" card on Home was closed. */
+  newStuffSeen?: boolean;
   /** "Survived payday" card closed for this payday. */
   paydaySeen?: string;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */

@@ -59,7 +59,7 @@ export type SheetSpec =
   | { type: 'receipt' }
   | { type: 'command'; query?: string }
   | { type: 'recap'; month?: string }
-  | { type: 'ai' }
+  | { type: 'ai'; ask?: string }
   | { type: 'income-form'; incomeId?: string }
   | { type: 'account-form'; accountId?: string }
   | { type: 'erase' }
