@@ -32,6 +32,7 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
+import { skipStatus, isSlip } from '../lib/skip';
 import { applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
@@ -368,6 +369,7 @@ export function refresh(input: State): State {
   processDueInsurance(s);
   autoMade = [...processDueDebts(s), ...processDueSubscriptions(s)];
   refillReserves(s);
+  if (s.skip) s.skip.best = Math.max(s.skip.best, skipStatus(s)?.count ?? 0);
   return s;
 }
 
@@ -540,6 +542,7 @@ function useStoreImpl() {
     (input: NewTx, opts: { quiet?: boolean } = {}) => {
       const tx: Transaction = { status: 'completed', ...input, id: uid('t') } as Transaction;
       const before = streak(ref.current);
+      const skipBefore = skipStatus(ref.current);
       if (ref.current.mode === 'personal' && !opts.quiet) track(tx.type === 'income' ? 'income' : 'expense');
       const next = commit((s) => {
         s.transactions.unshift(tx);
@@ -560,6 +563,22 @@ function useStoreImpl() {
             burst({ kind: 'fire', power: Math.min(1.8, 0.8 + after.count / 10) });
             toast({ text: after.count >= after.best && after.count > 2 ? `${after.count}-day streak. Your best ever!` : `${after.count}-day streak. Keep it going!`, tone: 'good', emoji: '🔥' });
           }, 650);
+        }
+        // Logged something from the skip list today: say what it did to the skip streak, kindly.
+        const sk = next.skip;
+        if (sk && skipBefore && tx.date === next.today && isSlip(sk.cats, tx) && skipBefore.today !== 'freed' && skipBefore.today !== 'broke' && skipBefore.today !== 'early') {
+          const now = skipStatus(next)!;
+          window.setTimeout(
+            () =>
+              toast(
+                now.today === 'freed'
+                  ? { text: `Free slip used for this week. Your ${now.count}-day skip streak is safe.`, emoji: '🧊' }
+                  : skipBefore.count
+                    ? { text: `Skip streak reset after ${skipBefore.count} ${skipBefore.count === 1 ? 'day' : 'days'}. No stress, day one again tomorrow.` }
+                    : { text: 'That one’s on the skip list. Tomorrow’s a fresh start.' },
+              ),
+            1100,
+          );
         }
       }
       return tx;
@@ -709,6 +728,50 @@ function useStoreImpl() {
         p.reserveEvery = roundMoney(Math.max(0, every));
         p.reserveFor = nextPayday(s);
         p.cycleReserve = roundMoney(Math.min(p.reserveEvery, Math.max(0, p.target - p.saved)));
+      }),
+    [commit],
+  );
+
+  // ---------- skip streak ----------
+  /** Start (or restart with new picks) a skip streak. */
+  const startSkip = useCallback(
+    (cats: string[]) =>
+      commit((s) => {
+        const keep = s.skip && s.skip.cats.slice().sort().join() === cats.slice().sort().join();
+        if (keep) return;
+        s.skip = { cats, since: s.today, checkins: [], moved: [], best: s.skip?.best ?? 0, cheered: 0 };
+      }),
+    [commit],
+  );
+  const stopSkip = useCallback(() => {
+    commit((s) => void delete s.skip);
+    toast({ text: 'Skip streak stopped. Start one again any time from You.' });
+  }, [commit, toast]);
+  const skipCheckin = useCallback(() => {
+    const next = commit((s) => {
+      if (s.skip && !s.skip.checkins.includes(s.today)) s.skip.checkins = [...s.skip.checkins.slice(-120), s.today];
+    });
+    const st = skipStatus(next);
+    haptic(16);
+    if (st) {
+      burst({ kind: 'fire', power: Math.min(1.6, 0.7 + st.count / 10) });
+      if (!st.level || st.level.at <= (next.skip?.cheered ?? 0)) toast({ text: st.count > 1 ? `${st.count} days skipped. Stay locked in.` : 'Day one done. Easy.', tone: 'good' });
+    }
+  }, [commit, toast]);
+  const skipMoved = useCallback(
+    (amount: number) =>
+      commit((s) => {
+        if (s.skip && amount > 0) s.skip.moved = [...s.skip.moved.slice(-60), { date: s.today, amount: roundMoney(amount) }];
+      }),
+    [commit],
+  );
+  const skipCheer = useCallback(
+    (at: number) =>
+      commit((s) => {
+        if (s.skip) {
+          s.skip.cheered = Math.max(s.skip.cheered, at);
+          s.skip.best = Math.max(s.skip.best, skipStatus(s)?.count ?? 0);
+        }
       }),
     [commit],
   );
@@ -1724,6 +1787,11 @@ function useStoreImpl() {
     deleteSubscription,
     addPerson,
     withdrawFromPlan,
+    startSkip,
+    stopSkip,
+    skipCheckin,
+    skipMoved,
+    skipCheer,
     setPlanAutoSave,
     setPersonUpi,
     linkPerson,

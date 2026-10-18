@@ -72,6 +72,7 @@ export function YouScreen() {
         <NavRow icon="card" label="Credit cards" sub={`${state.cards.length} cards`} onClick={() => go({ name: 'cards' })} />
         <NavRow icon="bank" label="Debt" sub="Loans and payoff plans" onClick={() => go({ name: 'debt' })} />
         <NavRow icon="wallet" label="Accounts" sub={state.accounts.map((a) => a.name).slice(0, 3).join(', ')} onClick={() => go({ name: 'accounts' })} />
+        <NavRow emoji="🔥" label="Skip streak" sub={state.skip ? 'On · tap to change what you skip' : 'Skip delivery apps, shopping or anything. See what you don’t spend.'} onClick={() => ui.openSheet({ type: 'skip' })} />
         <NavRow icon="share" label="Budget out loud" sub="Share a budget card, never your balance" onClick={() => ui.openSheet({ type: 'share-card' })} />
       </section>
 

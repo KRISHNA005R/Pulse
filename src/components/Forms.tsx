@@ -182,14 +182,14 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
   );
 }
 
-export function ContributeForm({ planId, onDone }: { planId: string; onDone: () => void }) {
+export function ContributeForm({ planId, amount: preset, fromSkip, onDone }: { planId: string; amount?: number; fromSkip?: boolean; onDone: () => void }) {
   const store = useStore();
   const { state } = store;
   const plan = state.plans.find((p) => p.id === planId)!;
   const m = planMetrics(state, plan);
   const sts = safeToSpend(state);
   const suggest = plan.cycleReserve || m.weekExtra || Math.min(m.remaining, Math.round(m.monthly / 4 / 10) * 10);
-  const [amount, setAmount] = useState(String(suggest || ''));
+  const [amount, setAmount] = useState(String(preset || suggest || ''));
   const [from, setFrom] = useState(defaultAccount(state));
   const n = parseFloat(amount) || 0;
   const freeCost = Math.max(0, n - plan.cycleReserve);
@@ -222,6 +222,7 @@ export function ContributeForm({ planId, onDone }: { planId: string; onDone: () 
         className="btn-accent mt-4 w-full disabled:opacity-40"
         onClick={() => {
           store.contribute(planId, Math.round(n), from);
+          if (fromSkip) store.skipMoved(Math.round(n));
           onDone();
         }}
       >
