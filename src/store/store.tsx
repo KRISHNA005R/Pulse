@@ -32,7 +32,11 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
-import { applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { notePayday, nextCoin, gullakFull } from '../lib/fun';
+import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { reminderDeviceId } from '../lib/reminders';
+import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
+import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
 // (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
@@ -356,6 +360,7 @@ export function refresh(input: State): State {
         // Auto-add: record the payday as money in (same id on every synced device).
         const id = `pay-${i.id}-${i.nextDate}`;
         if (i.autoCredit && i.expected > 0 && !s.transactions.some((t) => t.id === id)) {
+          if (i === mainIncome(s)) notePayday(s, i.nextDate);
           const tx: Transaction = { id, merchant: i.kind === 'salary' && !/^salary$/i.test(i.name.trim()) ? `Salary · ${i.name}` : i.name, amount: i.expected, type: 'income', category: incomeCategory(i.kind), date: i.nextDate, account: defaultAccount(s), recurring: true, status: 'completed', incomeId: i.id, notes: 'Added automatically on payday' };
           s.transactions.unshift(tx);
           applyMoney(s, tx, 1);
@@ -542,6 +547,8 @@ function useStoreImpl() {
       const before = streak(ref.current);
       if (ref.current.mode === 'personal' && !opts.quiet) track(tx.type === 'income' ? 'income' : 'expense');
       const next = commit((s) => {
+        // Salary landing: remember what was left just before it ("survived payday").
+        if (tx.type === 'income' && tx.category === 'salary' && tx.date <= s.today && s.mode === 'personal') notePayday(s, tx.date);
         s.transactions.unshift(tx);
         applyMoney(s, tx, 1);
         if (tx.recurring && tx.type === 'expense' && !s.subscriptions.some((x) => x.name.toLowerCase() === tx.merchant.toLowerCase())) {
@@ -709,6 +716,258 @@ function useStoreImpl() {
         p.reserveEvery = roundMoney(Math.max(0, every));
         p.reserveFor = nextPayday(s);
         p.cycleReserve = roundMoney(Math.min(p.reserveEvery, Math.max(0, p.target - p.saved)));
+      }),
+    [commit],
+  );
+
+  // ---------- bhisi ----------
+  const createBhisi = useCallback(
+    (b: { name: string; emoji: string; amount: number; members: string[]; start: ISODate }) => {
+      const id = uid('bh');
+      const next = commit((s) => {
+        s.bhisis ??= [];
+        // On a real account it's shared: friends picked here hold a seat by name until they join with the link.
+        const share = s.mode === 'personal' ? newBhisiShare(true) : undefined;
+        if (share) {
+          share.ghosts = b.members.filter((m) => m !== 'me').map((pid) => ({ id: newGhostId(), name: s.people.find((p) => p.id === pid)?.name ?? 'Friend', pid }));
+          share.seats = { [share.mid]: 'me', ...Object.fromEntries(share.ghosts.map((g) => [g.id, g.pid])) };
+        }
+        s.bhisis.unshift({ id, name: b.name, emoji: b.emoji, amount: roundMoney(b.amount), members: b.members, createdAt: s.today, start: b.start, rounds: b.members.map((_, i) => ({ date: addMonths(b.start, i), paid: [] })), ...(share ? { share } : {}) });
+      });
+      const made = next.bhisis?.find((x) => x.id === id);
+      if (made?.share) void createBhisiChannel(made, reminderDeviceId());
+      burst({ kind: 'mini', power: 1.2 });
+      toast({ text: `${b.name} is on. Send the invite link so everyone can join.`, tone: 'good', emoji: b.emoji });
+      return id;
+    },
+    [commit, toast],
+  );
+  /** Tick (or untick) who has paid this round. My own payment is recorded as money out. */
+  const toggleBhisiPaid = useCallback(
+    (id: string, round: number, person: string) => {
+      const next = commit((s) => {
+        const b = s.bhisis?.find((x) => x.id === id);
+        const r = b?.rounds[round];
+        if (!b || !r) return;
+        const was = r.paid.includes(person);
+        const sh = b.share;
+        if (sh && person !== 'me') {
+          // Shared: only the organiser marks other people, and it travels as their marks.
+          if (!sh.owner) return;
+          const seat = Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+          if (!seat) return;
+          sh.marks ??= {};
+          const cur = sh.marks[seat] ?? [];
+          sh.marks[seat] = was ? cur.filter((x) => x !== round) : [...cur, round];
+        }
+        r.paid = was ? r.paid.filter((p) => p !== person) : [...r.paid, person];
+        // When they paid matters a little: paying early adds luck (lib/bhisi.ts → tickets).
+        r.paidAt ??= {};
+        if (was) delete r.paidAt[person];
+        else r.paidAt[person] = new Date().toISOString();
+        if (person !== 'me') return;
+        if (was && r.myTx) {
+          const tx = s.transactions.find((t) => t.id === r.myTx);
+          if (tx) {
+            applyMoney(s, tx, -1);
+            s.transactions = s.transactions.filter((t) => t.id !== tx.id);
+          }
+          delete r.myTx;
+        } else if (!was) {
+          const tx: Transaction = { id: uid('t'), merchant: `Bhisi · ${b.name}`, amount: b.amount, type: 'transfer', direction: 'out', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${round + 1} of ${b.rounds.length}` };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+          r.myTx = tx.id;
+        }
+      });
+      // Shared: the server notes the time (its clock decides "early").
+      const b = next.bhisis?.find((x) => x.id === id);
+      const sh = b?.share;
+      if (sh) {
+        const seat = person === 'me' ? sh.mid : Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+        if (seat && (person === 'me' || sh.owner)) void markPaidShared(sh, round, seat, !!b.rounds[round]?.paid.includes(person));
+      }
+    },
+    [commit],
+  );
+  /** Draw the lucky chit for the current round. Returns the winner's person id. */
+  const drawBhisi = useCallback(
+    (id: string): string | undefined => {
+      const b0 = ref.current.bhisis?.find((x) => x.id === id);
+      if (!b0) return;
+      const i = currentRound(b0);
+      const bowl = inBowl(b0);
+      if (i === undefined || !bowl.length) return;
+      // Same luck rule as the server: paying early adds tickets, nobody is guaranteed.
+      const odds = Object.fromEntries(chances(b0, i).map((c) => [c.id, c.tickets]));
+      const winner = pickWeighted(bowl.map((m) => ({ id: m, w: odds[m] ?? 4 })));
+      commit((s) => {
+        const b = s.bhisis!.find((x) => x.id === id)!;
+        const r = b.rounds[i];
+        r.winner = winner;
+        r.drawnAt = s.today;
+        r.at = new Date().toISOString();
+        r.drawnBy = 'me';
+        r.pool = bowl.length;
+        r.odds = odds;
+        r.seen = true;
+        if (winner === 'me') {
+          const tx: Transaction = { id: uid('t'), merchant: `Bhisi won · ${b.name}`, amount: pot(b), type: 'transfer', direction: 'in', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${i + 1} of ${b.rounds.length}` };
+          s.transactions.unshift(tx);
+          applyMoney(s, tx, 1);
+          r.wonTx = tx.id;
+        }
+      });
+      return winner;
+    },
+    [commit],
+  );
+  /** Shared bhisi: the server draws the chit. Resolves with the winner here, or why it didn't happen. */
+  const drawBhisiShared = useCallback(
+    async (id: string): Promise<{ winner?: string; error?: string }> => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      const round = b ? b.rounds.findIndex((r) => !r.winner) : -1;
+      if (!b?.share || round < 0) return { error: 'Nothing to draw.' };
+      const res = await drawShared(ref.current, b, round, reminderDeviceId());
+      if (!res.ok) return { error: res.error };
+      let winner: string | undefined;
+      commit((s) => {
+        applyBhisiIn(s, id, res.view);
+        const bb = s.bhisis!.find((x) => x.id === id)!;
+        winner = bb.share!.seats[res.winner];
+        bb.rounds[round].seen = true;
+      });
+      return { winner };
+    },
+    [commit],
+  );
+  const applyBhisiView = useCallback(
+    (id: string, view: BhisiView) => {
+      let out: { news: BhisiNews[]; ghosts?: string[] } = { news: [] };
+      commit((s) => void (out = applyBhisiIn(s, id, view)));
+      return out;
+    },
+    [commit],
+  );
+  const bhisiGone = useCallback(
+    (id: string, why: string) => {
+      commit((s) => {
+        const b = s.bhisis?.find((x) => x.id === id);
+        if (b) delete b.share;
+      });
+      toast({ text: why });
+    },
+    [commit, toast],
+  );
+  const bhisiNews = useCallback(
+    (id: string, news: BhisiNews[]) => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      if (!b) return;
+      const last = news[news.length - 1];
+      const who = last.winner === 'me' ? 'You' : ref.current.people.find((p) => p.id === last.winner)?.short ?? 'Someone';
+      if (last.winner === 'me') {
+        burst({ kind: 'confetti', power: 1.8 });
+        toast({ text: `Your chit came out! You won round ${last.round + 1} of ${b.name}.`, tone: 'good', emoji: '🎉' });
+      } else toast({ text: `${who} won round ${last.round + 1} of ${b.name}. Tap the bhisi to watch the chit.`, emoji: '🏺' });
+    },
+    [toast],
+  );
+  const markRoundSeen = useCallback(
+    (id: string, round: number) =>
+      commit((s) => {
+        const r = s.bhisis?.find((x) => x.id === id)?.rounds[round];
+        if (r) r.seen = true;
+      }),
+    [commit],
+  );
+  /** Opened someone's bhisi link: take a seat. The rest arrives with the next sync. */
+  const joinBhisi = useCallback(
+    async (inv: BhisiInvite): Promise<{ id?: string; error?: string }> => {
+      const have = ref.current.bhisis?.find((x) => x.share?.bid === inv.bid);
+      if (have) return { id: have.id };
+      const res = await joinBhisiChannel(inv, reminderDeviceId());
+      if (!res.ok) return { error: res.error };
+      const id = uid('bh');
+      commit((s) => {
+        s.bhisis ??= [];
+        s.bhisis.unshift({ id, name: inv.name || 'Bhisi', emoji: '🏺', amount: 0, members: ['me'], createdAt: s.today, rounds: [], share: res.share });
+      });
+      toast({ text: `You’re in ${inv.name || 'the bhisi'}. Your chit is in the matka 🤞`, tone: 'good' });
+      return { id };
+    },
+    [commit, toast],
+  );
+  const deleteBhisi = useCallback(
+    (id: string) => {
+      const b = ref.current.bhisis?.find((x) => x.id === id);
+      if (b?.share) void deleteBhisiChannel(b.share);
+      commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
+      if (b) toast({ text: b.share && !b.share.owner ? `You left ${b.name}. Money already recorded stays in Activity.` : `${b.name} deleted. Money already recorded stays in Activity.` });
+    },
+    [commit, toast],
+  );
+
+  /** A new feature was tried: the "New in PULSE" card counts it. */
+  const markTried = useCallback(
+    (key: string) =>
+      commit((s) => {
+        const t = s.settings.newTried ?? [];
+        if (!t.includes(key)) s.settings.newTried = [...t, key];
+      }),
+    [commit],
+  );
+
+  // ---------- gullak ----------
+  const startGullak = useCallback(
+    (g: { name: string; mode: 'fixed' | 'rising'; step: number; days: number; target: number }) => {
+      const id = uid('plan');
+      commit((s) => {
+        s.plans.unshift({ id, name: g.name, icon: '🏺', kind: 'goal', target: g.target, saved: 0, startDate: s.today, targetDate: addDays(s.today, g.days), status: 'active', categories: [], cycleReserve: 0, contributions: [], gullak: { mode: g.mode, step: g.step, days: g.days, drops: [] } });
+      });
+      burst({ kind: 'mini', power: 1.2 });
+      toast({ text: `${g.name} is ready. Drop your first coin today.`, tone: 'good', emoji: '🏺' });
+      return id;
+    },
+    [commit, toast],
+  );
+  /** Drop today's coin into a gullak: money moves from the account into the gullak plan. */
+  const dropCoin = useCallback(
+    (planId: string) => {
+      const p0 = ref.current.plans.find((p) => p.id === planId);
+      const g = p0?.gullak;
+      if (!p0 || !g || g.drops.includes(ref.current.today) || gullakFull(g)) return;
+      const coin = nextCoin(g);
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId)!;
+        const tx: Transaction = { id: uid('t'), merchant: `Coin in ${p.name}`, amount: coin, type: 'transfer', direction: 'out', toAccount: `pot:${p.id}`, category: 'transfer', date: s.today, account: defaultAccount(s), plan: p.id, recurring: false, status: 'completed' };
+        s.transactions.unshift(tx);
+        applyMoney(s, tx, 1);
+        p.contributions.push({ date: s.today, amount: coin });
+        p.gullak!.drops.push(s.today);
+      });
+      haptic(16);
+      return coin;
+    },
+    [commit],
+  );
+  const breakGullak = useCallback(
+    (planId: string) =>
+      commit((s) => {
+        const p = s.plans.find((x) => x.id === planId);
+        if (!p?.gullak) return;
+        p.gullak.broken = true;
+        p.status = 'done';
+      }),
+    [commit],
+  );
+
+  // ---------- guess the bill ----------
+  const saveGuess = useCallback(
+    (g: { week: ISODate; cat: string; guess: number; actual: number }) =>
+      commit((s) => {
+        s.guesses ??= [];
+        if (!s.guesses.some((x) => x.week === g.week)) s.guesses.push(g);
+        if (s.guesses.length > 60) s.guesses.splice(0, s.guesses.length - 60);
       }),
     [commit],
   );
@@ -1724,6 +1983,21 @@ function useStoreImpl() {
     deleteSubscription,
     addPerson,
     withdrawFromPlan,
+    createBhisi,
+    toggleBhisiPaid,
+    drawBhisi,
+    drawBhisiShared,
+    applyBhisiView,
+    bhisiGone,
+    bhisiNews,
+    markRoundSeen,
+    joinBhisi,
+    deleteBhisi,
+    startGullak,
+    markTried,
+    dropCoin,
+    breakGullak,
+    saveGuess,
     setPlanAutoSave,
     setPersonUpi,
     linkPerson,

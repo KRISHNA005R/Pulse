@@ -23,7 +23,14 @@
 //   POST /api/friends  { action: 'door-clear', door, token, ns }
 //   POST /api/friends  { action: 'door-close', door, token }                        the link stops working
 //
-// What is stored and why it can't be read here: netlify/lib/friends.ts.
+// A shared bhisi (bid = the bhisi, mid = this member). The draw happens on the server:
+//   POST /api/friends  { action: 'b-create', bid, mid, token, start, ghosts?, dev? }  start one
+//   POST /api/friends  { action: 'b-join' | 'b-get' | 'b-leave' | 'b-delete', bid, mid, token, dev? }
+//   POST /api/friends  { action: 'b-put',   bid, mid, token, box }                   publish my sealed box
+//   POST /api/friends  { action: 'b-setup', bid, mid, token, ghosts?, start? }       organiser, before the draws
+//   POST /api/friends  { action: 'b-draw',  bid, mid, token, round, names, title, pot }  -> the winner
+//
+// What is stored and why it can't be read here: netlify/lib/friends.ts and netlify/lib/bhisi.ts.
 import { getStore } from '@netlify/blobs';
 import { handleFriends } from '../lib/friends';
 import { getVapid, type StoreLike } from '../lib/push';

@@ -53,6 +53,9 @@ function useHost(): FriendHost {
     knocked: (name, link, uid) => ref.current.friendKnocked(name, link, uid),
     applyGroup: (id, view) => ref.current.applyGroupView(id, view),
     groupLeft: (id) => ref.current.unshareGroup(id),
+    applyBhisi: (id, view) => ref.current.applyBhisiView(id, view),
+    bhisiGone: (id, why) => ref.current.bhisiGone(id, why),
+    bhisiNews: (id, news) => ref.current.bhisiNews(id, news),
   }).current;
 }
 
@@ -67,7 +70,7 @@ export function useFriends() {
   const host = useHost();
   const ready = state.onboarding.done && state.mode === 'personal';
   // Anything to keep in step: a connected friend, a shared group, or my own link that people may have opened.
-  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door;
+  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door || !!state.bhisis?.some((b) => b.share);
 
   // The id other people's apps know me by.
   useEffect(() => {
@@ -110,6 +113,7 @@ export function useFriends() {
         state.user.face,
         state.user.gif,
         state.user.door?.id,
+        (state.bhisis ?? []).filter((b) => b.share).map((b) => [b.id, b.name, b.emoji, b.amount, b.rounds.map((r) => r.paid.includes('me')), b.share?.marks, b.share?.ghosts?.length]),
       ])
     : '';
   useEffect(() => {

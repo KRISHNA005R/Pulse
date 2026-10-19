@@ -1,6 +1,8 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
+import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './Bhisi';
+import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
 import { Sheet } from './ui/Sheet';
@@ -91,6 +93,42 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Edit group" onClose={close} z={z}>
           <GroupPeople groupId={spec.groupId} onDone={close} />
+        </Sheet>
+      );
+    case 'gullak-form':
+      return (
+        <Sheet title="New gullak" onClose={close} z={z}>
+          <GullakForm onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-form':
+      return (
+        <Sheet title="New bhisi" onClose={close} z={z}>
+          <BhisiForm onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-draw':
+      return (
+        <Sheet title="Lucky draw" onClose={close} z={z}>
+          <BhisiDraw bhisiId={spec.bhisiId} onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-watch':
+      return (
+        <Sheet title="The chit for this round" onClose={close} z={z}>
+          <BhisiWatch bhisiId={spec.bhisiId} round={spec.round} onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-join':
+      return (
+        <Sheet title="Bhisi invite" onClose={close} size="sm" z={z}>
+          <BhisiJoin invite={spec.invite} onDone={close} />
+        </Sheet>
+      );
+    case 'draw-replay':
+      return (
+        <Sheet title="Bhisi draw" onClose={close} z={z}>
+          <DrawReplaySheet replay={spec.replay} onDone={close} />
         </Sheet>
       );
     case 'group-form':
@@ -220,7 +258,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
     case 'ai':
       return (
         <Sheet title="PULSE AI" onClose={close} size="full" tone="bg" z={z}>
-          <AIChat />
+          <AIChat initial={spec.ask} />
         </Sheet>
       );
     case 'confirm':

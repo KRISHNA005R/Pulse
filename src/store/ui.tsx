@@ -7,6 +7,7 @@ export type Tab = 'home' | 'activity' | 'plans' | 'you';
 
 export type Route =
   | { name: 'plan'; id: string }
+  | { name: 'bhisi'; id: string }
   | { name: 'group'; id: string }
   | { name: 'person'; id: string }
   | { name: 'people' }
@@ -40,6 +41,12 @@ export type SheetSpec =
   | { type: 'budget-form'; budgetId?: string; category?: string }
   | { type: 'sub-form'; subId?: string; preset?: { name: string; amount: number; category: string }; kind?: 'bill' | 'subscription' }
   | { type: 'group-form' }
+  | { type: 'bhisi-form' }
+  | { type: 'bhisi-draw'; bhisiId: string }
+  | { type: 'bhisi-watch'; bhisiId: string; round: number }
+  | { type: 'bhisi-join'; invite: import('../lib/bhisiShare').BhisiInvite }
+  | { type: 'draw-replay'; replay: import('../lib/bhisi').DrawReplay }
+  | { type: 'gullak-form' }
   | { type: 'group-people'; groupId: string }
   | { type: 'group-expense'; groupId?: string; personId?: string }
   | { type: 'settle'; personId: string; groupId?: string }
@@ -52,7 +59,7 @@ export type SheetSpec =
   | { type: 'receipt' }
   | { type: 'command'; query?: string }
   | { type: 'recap'; month?: string }
-  | { type: 'ai' }
+  | { type: 'ai'; ask?: string }
   | { type: 'income-form'; incomeId?: string }
   | { type: 'account-form'; accountId?: string }
   | { type: 'erase' }
@@ -64,7 +71,7 @@ export type SheetSpec =
   | { type: 'debt-form'; debtId?: string }
   | { type: 'confirm'; title: string; body: string; confirm: string; run: () => void };
 
-export type PlansSegment = 'plans' | 'splits' | 'budgets';
+export type PlansSegment = 'plans' | 'splits' | 'bhisi' | 'budgets';
 
 export interface ActivityFilter {
   chip: string; // 'all' | category | 'plans' | 'people'

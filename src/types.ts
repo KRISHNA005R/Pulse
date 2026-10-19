@@ -127,6 +127,8 @@ export interface Plan {
   categories: CategoryId[];
   /** Planned contribution still to move before next payday (reserved in safe-to-spend). */
   cycleReserve: number;
+  /** A gullak challenge: a coin a day, the plan fills like a clay piggy bank (lib/fun.ts). */
+  gullak?: Gullak;
   /** Kept aside every payday: cycleReserve refills to this when a new pay cycle starts. */
   reserveEvery?: number;
   /** The payday the current cycleReserve is counting towards (so it refills once per cycle). */
@@ -384,6 +386,12 @@ export interface Settings {
   soundsAsked?: boolean;
   /** Things the person said during setup they don't have, e.g. 'bills' (lib/setup.ts). */
   setupSkipped?: string[];
+  /** The "New in PULSE" card on Home was closed. */
+  newStuffSeen?: boolean;
+  /** New features already tried (the card hides once they all are). */
+  newTried?: string[];
+  /** "Survived payday" card closed for this payday. */
+  paydaySeen?: string;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
   reminders?: ReminderPrefs;
 }
@@ -436,4 +444,77 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
+  /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
+  bhisis?: Bhisi[];
+  /** Money left just before each main payday ("survived payday"). */
+  paydays?: { date: ISODate; left: number }[];
+  /** "Guess the bill" answers, one per week. */
+  guesses?: { week: ISODate; cat: string; guess: number; actual: number }[];
 }
+
+export interface Gullak {
+  /** 'fixed': the same coin every day. 'rising': day 1 = step, day 2 = 2 × step, and so on. */
+  mode: 'fixed' | 'rising';
+  step: number;
+  days: number;
+  /** Days a coin went in. */
+  drops: ISODate[];
+  broken?: boolean;
+}
+
+export interface Bhisi {
+  id: string;
+  name: string;
+  emoji: string;
+  /** Each person puts in this much every round. */
+  amount: number;
+  /** Person ids, including 'me'. */
+  members: string[];
+  /** One round a month: the pot goes to one person each round, drawn by lucky chit. */
+  rounds: BhisiRound[];
+  createdAt: ISODate;
+  /** Date of the first draw; then the same date each month. */
+  start?: ISODate;
+  /** Shared with the members through an invite link; the draw then happens on PULSE's server. */
+  share?: BhisiShare;
+}
+
+export interface BhisiShare {
+  bid: string;
+  /** Seals what members publish. Only ever travels inside the invite link. */
+  key: string;
+  /** This phone's seat. */
+  mid: string;
+  token: string;
+  owner?: boolean;
+  /** Seat id (member id, or an organiser's name-only seat) → person id here ('me' for mine). */
+  seats: Record<string, string>;
+  /** Organiser: people added by name, until they join with the link. */
+  ghosts?: { id: string; name: string; pid: string }[];
+  /** Organiser: rounds marked paid for other people, by seat id. */
+  marks?: Record<string, number[]>;
+  /** The server's seat list is locked (the draws have started). */
+  locked?: boolean;
+}
+
+export interface BhisiRound {
+  date: ISODate;
+  paid: string[];
+  winner?: string;
+  drawnAt?: ISODate;
+  /** Exact time of the draw, and who pressed draw (person id here). */
+  at?: string;
+  drawnBy?: string;
+  /** How many chits were in the matka for this round. */
+  pool?: number;
+  /** When each person paid this round (person id → time). Paying early adds a little luck. */
+  paidAt?: Record<string, string>;
+  /** Tickets each person had in this round's draw (person id → tickets), once it's drawn. */
+  odds?: Record<string, number>;
+  /** I watched this round's chit come out (or drew it myself). */
+  seen?: boolean;
+  /** The transfer recorded when I paid this round / when I won it. */
+  myTx?: string;
+  wonTx?: string;
+}
+

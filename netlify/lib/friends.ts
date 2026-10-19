@@ -17,6 +17,7 @@
 // The one thing that is not end-to-end encrypted is the notification: its text passes through the
 // server on its way to the friend's phone, and is not stored.
 import type { Payload, Sender, StoreLike, Sub, Vapid } from './push';
+import { handleBhisi } from './bhisi';
 
 interface Side {
   /** SHA-256 of this side's token. */
@@ -83,6 +84,7 @@ const addDev = (devs: string[], dev: unknown) => {
 export async function handleFriends(body: Record<string, unknown>, ctx: Ctx): Promise<Result> {
   if (typeof body.action === 'string' && body.action.startsWith('g-')) return handleGroups(body, ctx);
   if (typeof body.action === 'string' && body.action.startsWith('door-')) return handleDoor(body, ctx);
+  if (typeof body.action === 'string' && body.action.startsWith('b-')) return handleBhisi(body, ctx as never);
   const { store } = ctx;
   const now = ctx.now ?? new Date();
   const chan = String(body.chan ?? '');

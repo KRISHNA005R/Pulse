@@ -1,5 +1,6 @@
 import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney } from './currency';
+import { bhisiDues } from './bhisi';
 import { INSURANCE_ON } from './features';
 import {
   addDays,
@@ -88,7 +89,7 @@ export interface UpcomingItem {
   name: string;
   amount: number;
   date: ISODate;
-  kind: 'subscription' | 'bill' | 'card' | 'loan' | 'income' | 'investment' | 'insurance';
+  kind: 'subscription' | 'bill' | 'card' | 'loan' | 'income' | 'investment' | 'insurance' | 'bhisi';
   /** Recorded by PULSE on the date (SIPs, EMIs, bills, subscriptions, auto-debit premiums). */
   auto?: boolean;
   ref?: string;
@@ -151,6 +152,8 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
     // A premium that's past due and not recorded yet still has to be paid, so it stays on the list.
     if (p.nextDate < until) out.push({ id: p.id, name: `${p.name} premium`, amount: p.premium, date: p.nextDate, kind: 'insurance', ref: p.id, auto: p.autoDebit });
   }
+  // My bhisi share for the round, until I tick that I've paid it.
+  for (const { b, date } of bhisiDues(s, until)) out.push({ id: `bhisi-${b.id}`, name: `Bhisi · ${b.name}`, amount: b.amount, date, kind: 'bhisi', ref: b.id, auto: false });
   if (includeIncome) {
     for (const i of s.incomes) {
       if (i.nextDate && i.nextDate >= s.today && i.nextDate < until)

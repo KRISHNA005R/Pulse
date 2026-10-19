@@ -659,7 +659,7 @@ const EMOJI = /^(\p{Extended_Pictographic}\uFE0F?(?:\u200D\p{Extended_Pictograph
 const lead = (q: string) => q.match(EMOJI)?.[1] ?? '';
 const rest = (q: string) => q.replace(EMOJI, '');
 
-export function AIChat({ compact }: { compact?: boolean }) {
+export function AIChat({ compact, initial }: { compact?: boolean; initial?: string }) {
   const { state } = useStore();
   const ui = useUI();
   const [q, setQ] = useState('');
@@ -689,6 +689,15 @@ export function AIChat({ compact }: { compact?: boolean }) {
     const wait = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.min(900, 380 + answer.text.length * 2);
     window.setTimeout(() => ui.setChat((c) => c.map((m) => (m.id === aiId ? { ...m, text: answer.text, answer, typing: false } : m))), wait);
   };
+  // Opened with a question already: ask it once.
+  const asked = useRef(false);
+  useEffect(() => {
+    if (initial && !asked.current) {
+      asked.current = true;
+      ask(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' });

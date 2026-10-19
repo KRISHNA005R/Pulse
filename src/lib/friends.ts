@@ -19,12 +19,13 @@ import { roundMoney } from './currency';
 import { daysBetween, rupees } from './format';
 import { okFace, okGif } from './photo';
 import { cleanVpa, okVpa } from './upi';
+import { syncBhisi, type BhisiHost } from './bhisiShare';
 
 // ---------------------------------------------------------------------------------------------
 // Invites
 // ---------------------------------------------------------------------------------------------
-const rand = (n: number) => crypto.getRandomValues(new Uint8Array(new ArrayBuffer(n)));
-const hex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+export const rand = (n: number) => crypto.getRandomValues(new Uint8Array(new ArrayBuffer(n)));
+export const hex = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 
 /** The id other people's apps know this person by. */
 export const newUid = () => hex(rand(16));
@@ -44,7 +45,7 @@ export interface Invite {
   name: string;
 }
 
-const label = (name: string) => toB64Url(utf8(name.replace(/\s+/g, ' ').trim().slice(0, 40)));
+export const label = (name: string) => toB64Url(utf8(name.replace(/\s+/g, ' ').trim().slice(0, 40)));
 export const inviteCode = (l: Pick<FriendLink, 'chan' | 'key'>, myName: string) => `${l.chan}.${l.key}.${label(myName)}`;
 /** The key sits after the #, which browsers never send to a server. */
 export const inviteUrl = (l: Pick<FriendLink, 'chan' | 'key'>, myName: string) => `${location.origin}/#join=${inviteCode(l, myName)}`;
@@ -342,12 +343,12 @@ function aes(key: string) {
   }
   return k;
 }
-async function seal(key: string, what: unknown): Promise<string> {
+export async function seal(key: string, what: unknown): Promise<string> {
   const iv = rand(12);
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aes(key), utf8(JSON.stringify(what))));
   return `f1.${toB64Url(iv)}.${toB64Url(ct)}`;
 }
-async function unseal<T>(key: string, data: string): Promise<T | null> {
+export async function unseal<T>(key: string, data: string): Promise<T | null> {
   try {
     const m = data.match(/^f1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/);
     if (!m) return null;
@@ -371,7 +372,7 @@ const ENDPOINT = '/api/friends';
 type Reply = { status: number; data: Record<string, unknown> };
 
 /** null = no connection, or this address has no friends server (a preview). */
-async function api(body: Record<string, unknown>): Promise<Reply | null> {
+export async function api(body: Record<string, unknown>): Promise<Reply | null> {
   try {
     const res = await fetch(ENDPOINT, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
     if (!(res.headers.get('content-type') ?? '').includes('application/json')) return null;
@@ -464,6 +465,10 @@ export interface FriendHost {
   applyGroup(groupId: string, view: GroupView): GroupNews[];
   /** I'm no longer in this shared group (taken out, or it's gone): it becomes an ordinary group here. */
   groupLeft(groupId: string): void;
+  // Shared bhisis (lib/bhisiShare.ts)
+  applyBhisi: BhisiHost['applyBhisi'];
+  bhisiGone: BhisiHost['bhisiGone'];
+  bhisiNews: BhisiHost['bhisiNews'];
 }
 
 let running: Promise<void> | null = null;
@@ -483,6 +488,7 @@ async function run(host: FriendHost) {
   const dev = host.dev();
   if (first.user.door && !(await readDoor(host, first.user.door, dev))) return;
   for (const g of (host.state()?.groups ?? []).filter((x) => x.shared)) if (!(await syncGroup(host, g.id, dev))) return;
+  for (const b of (host.state()?.bhisis ?? []).filter((x) => x.share)) if (!(await syncBhisi(host, b.id, dev))) return;
   for (const person of (host.state()?.people ?? []).filter((p) => p.link)) {
     const link = person.link!;
     let r = await api({ action: 'get', ...cred(link), dev });
