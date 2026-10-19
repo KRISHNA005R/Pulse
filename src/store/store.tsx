@@ -33,7 +33,7 @@ import { suggestEmoji } from '../lib/lexicon';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
-import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
 import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
 import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
@@ -1105,12 +1105,24 @@ function useStoreImpl() {
   );
   /** Disconnect: what the friend shared stays here as ordinary history, and nothing more is exchanged. */
   const unlinkPerson = useCallback(
-    (personId: string) =>
+    (personId: string, deleted?: boolean) =>
       commit((s) => {
         const p = s.people.find((x) => x.id === personId);
         const chan = p?.link?.chan;
         if (!p || !chan) return;
         delete p.link;
+        // They deleted their PULSE account: no longer a friend. With no history together, the name goes too.
+        if (deleted) {
+          delete p.uid;
+          delete p.upi;
+          const used =
+            s.splits.some((x) => x.paidBy === personId || x.shares.some((y) => y.person === personId)) ||
+            s.settlements.some((x) => x.from === personId || x.to === personId) ||
+            s.groups.some((g) => g.members.includes(personId)) ||
+            (s.bhisis ?? []).some((b) => b.members.includes(personId)) ||
+            s.transactions.some((t) => t.people?.includes(personId));
+          if (!used) s.people = s.people.filter((x) => x.id !== personId);
+        }
         // No longer connected: their photo goes, unless a shared group still brings it.
         if (!s.groups.some((g) => inGroupOnPulse(g, personId))) {
           delete p.photo;
@@ -1471,12 +1483,14 @@ function useStoreImpl() {
   }, [toast]);
   const replayOnboarding = useCallback(() => commit((s) => void (s.onboarding.done = false)), [commit]);
   /** Wipe everything this device has stored and return to the welcome screen. */
-  const eraseAll = useCallback(() => {
+  const eraseAll = useCallback((opts: { deleted?: boolean } = {}) => {
     // Friends stop seeing this person's splits: leave every shared channel (this device only if it's the last one syncing).
+    // A deleted account tells friends so: they take this person off their friends, groups and bhisis.
     const mine = ref.current.mode === 'personal' ? ref.current : readStash();
-    if (!loadSync()) {
-      for (const p of mine?.people ?? []) if (p.link) void leaveChannel(p.link);
-      for (const g of mine?.groups ?? []) if (g.shared) void leaveGroupChannel(g.shared);
+    if (!loadSync() || opts.deleted) {
+      for (const p of mine?.people ?? []) if (p.link) void leaveChannel(p.link, !!opts.deleted);
+      for (const g of mine?.groups ?? []) if (g.shared) void leaveGroupChannel(g.shared, !!opts.deleted);
+      for (const b of mine?.bhisis ?? []) if (b.share) void leaveBhisiForGood(b.share);
       if (mine?.user.door) void closeDoor(mine.user.door);
     }
     try {

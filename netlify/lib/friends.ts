@@ -33,6 +33,8 @@ interface Side {
   sent?: number;
   /** This side disconnected. */
   gone?: boolean;
+  /** …because they deleted their PULSE account. */
+  deleted?: boolean;
 }
 
 const CHAN = /^[0-9a-f]{32}$/;
@@ -120,7 +122,7 @@ export async function handleFriends(body: Record<string, unknown>, ctx: Ctx): Pr
     const devs = addDev(me.mine.devs ?? [], body.dev);
     if (devs.join() !== (me.mine.devs ?? []).join()) await store.setJSON(key(chan, me.side), { ...me.mine, devs });
     const t = me.theirs;
-    return { status: 200, body: { ok: true, side: me.side, mine: { box: me.mine.box, rev: me.mine.rev }, theirs: t ? { box: t.box, rev: t.rev, at: t.at, gone: !!t.gone } : null } };
+    return { status: 200, body: { ok: true, side: me.side, mine: { box: me.mine.box, rev: me.mine.rev }, theirs: t ? { box: t.box, rev: t.rev, at: t.at, gone: !!t.gone, deleted: !!t.deleted } : null } };
   }
 
   // Publish my box, and optionally tell the other side something changed.
@@ -157,7 +159,7 @@ export async function handleFriends(body: Record<string, unknown>, ctx: Ctx): Pr
   if (action === 'leave') {
     if (!me.theirs || me.theirs.gone) {
       await Promise.all([store.delete(key(chan, 'a')), store.delete(key(chan, 'b'))]);
-    } else await store.setJSON(key(chan, me.side), { th: me.mine.th, box: '', rev: me.mine.rev + 1, at: now.toISOString(), devs: [], gone: true } satisfies Side);
+    } else await store.setJSON(key(chan, me.side), { th: me.mine.th, box: '', rev: me.mine.rev + 1, at: now.toISOString(), devs: [], gone: true, ...(body.deleted === true ? { deleted: true } : {}) } satisfies Side);
     return { status: 200, body: { ok: true } };
   }
 
@@ -183,6 +185,8 @@ interface Member {
   closed?: boolean;
   /** Left by themselves. What they added stays for the others. */
   gone?: boolean;
+  /** …because they deleted their PULSE account. */
+  deleted?: boolean;
   /** Taken out by the owner. What they added goes with them. */
   removed?: boolean;
   day?: string;
@@ -241,7 +245,7 @@ async function handleGroups(body: Record<string, unknown>, ctx: Ctx): Promise<Re
     if (devs.join() !== (mine.devs ?? []).join()) await store.setJSON(gkey(gid, mid), { ...mine, devs });
     return {
       status: 200,
-      body: { ok: true, closed: !!owner?.closed, members: all.filter((x) => !x.m.removed).map((x) => ({ mid: x.mid, box: x.m.box, rev: x.m.rev, owner: !!x.m.owner, gone: !!x.m.gone })) },
+      body: { ok: true, closed: !!owner?.closed, members: all.filter((x) => !x.m.removed).map((x) => ({ mid: x.mid, box: x.m.box, rev: x.m.rev, owner: !!x.m.owner, gone: !!x.m.gone, deleted: !!x.m.deleted })) },
     };
   }
 
@@ -281,7 +285,7 @@ async function handleGroups(body: Record<string, unknown>, ctx: Ctx): Promise<Re
   if (action === 'g-leave') {
     const left = all.filter((x) => x.mid !== mid && !x.m.gone && !x.m.removed);
     if (!left.length) await Promise.all(all.map((x) => store.delete(gkey(gid, x.mid))));
-    else await store.setJSON(gkey(gid, mid), { ...mine, gone: true, devs: [], rev: mine.rev + 1 });
+    else await store.setJSON(gkey(gid, mid), { ...mine, gone: true, devs: [], rev: mine.rev + 1, ...(body.deleted === true ? { deleted: true } : {}) });
     return { status: 200, body: { ok: true } };
   }
 

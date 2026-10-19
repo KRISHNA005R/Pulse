@@ -226,7 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(null);
         setOutcome(null);
         setFreshState(false);
-        ref.current.eraseAll();
+        ref.current.eraseAll({ deleted: true });
         leaving.current = false;
         ref.current.toast({ text: 'Your account and its data are deleted.' });
         return null;

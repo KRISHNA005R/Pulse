@@ -401,8 +401,8 @@ export async function joinChannel(inv: Invite, today: ISODate, dev?: string): Pr
   return { ok: true, link };
 }
 
-export async function leaveChannel(l: FriendLink) {
-  await api({ action: 'leave', ...cred(l) });
+export async function leaveChannel(l: FriendLink, deleted = false) {
+  await api({ action: 'leave', ...cred(l), ...(deleted ? { deleted: true } : {}) });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -454,8 +454,8 @@ export interface FriendHost {
   apply(personId: string, box: Box): BoxItem[];
   /** The friend opened the invite but hasn't shared anything yet. */
   joined(personId: string): void;
-  /** The friend disconnected. */
-  left(personId: string): void;
+  /** The friend disconnected (deleted = they deleted their PULSE account). */
+  left(personId: string, deleted?: boolean): void;
   toast(text: string): void;
   /** This device's id for notifications, when reminders are on. */
   dev(): string | undefined;
@@ -505,11 +505,11 @@ async function run(host: FriendHost) {
     }
     if (r.status !== 200) continue;
     const mine = r.data.mine as { box: string; rev: number };
-    const theirs = r.data.theirs as { box: string; rev: number; gone: boolean } | null;
+    const theirs = r.data.theirs as { box: string; rev: number; gone: boolean; deleted?: boolean } | null;
     if (theirs?.gone) {
-      host.left(person.id);
+      host.left(person.id, !!theirs.deleted);
       await leaveChannel(link);
-      host.toast(`${person.short} disconnected on PULSE. What you shared stays in your history.`);
+      host.toast(theirs.deleted ? `${person.short} deleted their PULSE account, so they’re no longer your friend on PULSE. Anything you split stays in your history.` : `${person.short} disconnected on PULSE. What you shared stays in your history.`);
       continue;
     }
 
@@ -687,6 +687,8 @@ export interface MemberView {
   box: GroupBox | null;
   gone: boolean;
   owner: boolean;
+  /** Left because they deleted their PULSE account. */
+  deleted?: boolean;
 }
 export interface GroupView {
   closed: boolean;
@@ -812,6 +814,7 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
     if (!m.gone) setFace(p, m.box);
     sh.refs[m.mid] = p.id;
     if (!known && !m.gone) news.push({ person: p.id, group: group.id, title: `${p.short} joined ${group.name}`, body: 'They see the group’s expenses and can add their own.' });
+    if (m.deleted && (sh.on ?? []).includes(m.mid)) news.push({ person: p.id, group: group.id, title: `${p.short} deleted their PULSE account`, body: `They’ve left ${group.name}. What they added stays.` });
   }
   // The writer of a hand-typed name can also say who it is (they merged the two names on their phone).
   for (const m of others) {
@@ -988,8 +991,8 @@ export async function createGroupChannel(sh: GroupShare, dev?: string): Promise<
   const r = await api({ action: 'g-create', ...gcred(sh), dev });
   return !!r && r.status === 200;
 }
-export async function leaveGroupChannel(sh: GroupShare) {
-  await api({ action: 'g-leave', ...gcred(sh) });
+export async function leaveGroupChannel(sh: GroupShare, deleted = false) {
+  await api({ action: 'g-leave', ...gcred(sh), ...(deleted ? { deleted: true } : {}) });
 }
 /**
  * The group is being deleted on this phone. The person who made it takes it off the server for
@@ -1133,7 +1136,7 @@ async function syncGroup(host: FriendHost, groupId: string, dev?: string): Promi
     return true;
   }
   if (r.status !== 200) return true;
-  const list = (Array.isArray(r.data.members) ? r.data.members : []) as { mid: string; box: string; rev: number; owner: boolean; gone: boolean }[];
+  const list = (Array.isArray(r.data.members) ? r.data.members : []) as { mid: string; box: string; rev: number; owner: boolean; gone: boolean; deleted?: boolean }[];
   const closed = r.data.closed === true;
 
   // 1. Everyone else's side.
@@ -1141,7 +1144,7 @@ async function syncGroup(host: FriendHost, groupId: string, dev?: string): Promi
   const seenKey = `g:${sh.gid}`;
   if (book().seen[seenKey] !== sig) {
     const members: MemberView[] = [];
-    for (const m of list) if (m.mid !== sh.mid) members.push({ mid: m.mid, box: m.box ? await unseal<GroupBox>(sh.key, m.box) : null, gone: !!m.gone, owner: !!m.owner });
+    for (const m of list) if (m.mid !== sh.mid) members.push({ mid: m.mid, box: m.box ? await unseal<GroupBox>(sh.key, m.box) : null, gone: !!m.gone, owner: !!m.owner, deleted: !!m.deleted });
     const news = host.applyGroup(groupId, { closed, members });
     const now = book();
     const firstTime = now.seen[seenKey] === undefined;

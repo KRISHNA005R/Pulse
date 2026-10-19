@@ -140,6 +140,11 @@ export async function markPaidShared(sh: BhisiShare, round: number, seat: string
   return !!r && r.status === 200;
 }
 
+/** Leaving for good (account deleted, or all data erased): my chit comes out of the matka. */
+export async function leaveBhisiForGood(sh: BhisiShare) {
+  await api({ action: 'b-leave', ...cred(sh), deleted: true });
+}
+
 export async function deleteBhisiChannel(sh: BhisiShare) {
   await api({ action: sh.owner ? 'b-delete' : 'b-leave', ...cred(sh) });
 }

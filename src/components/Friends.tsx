@@ -47,7 +47,7 @@ function useHost(): FriendHost {
     state: () => (ref.current.state.mode === 'personal' ? ref.current.personalState() : null),
     apply: (id, box) => ref.current.applyFriendBox(id, box),
     joined: (id) => ref.current.markFriendJoined(id),
-    left: (id) => ref.current.unlinkPerson(id),
+    left: (id, deleted) => ref.current.unlinkPerson(id, deleted),
     toast: (text) => ref.current.toast({ text, emoji: '🤝' }),
     dev: reminderDeviceId,
     knocked: (name, link, uid) => ref.current.friendKnocked(name, link, uid),

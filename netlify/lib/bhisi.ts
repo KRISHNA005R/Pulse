@@ -44,6 +44,8 @@ interface Seat {
   devs: string[];
   owner?: boolean;
   gone?: boolean;
+  /** Left because they deleted their PULSE account: their chit comes out of the matka. */
+  deleted?: boolean;
   removed?: boolean;
 }
 interface Draw {
@@ -149,7 +151,10 @@ async function load(ctx: Ctx, bid: string) {
 /** Everyone in the matka's list: locked at the first draw, otherwise members who are in plus name-only seats. */
 function seatList(meta: Meta, seats: { mid: string; s: Seat }[], draws: { r: number; d: Draw }[]) {
   const locked = draws.find((x) => x.r === 0)?.d.seats;
-  if (locked) return locked;
+  // Someone who deleted their account can't take a pot any more: their chit comes out (unless they already won).
+  const deleted = new Set(seats.filter((x) => x.s.deleted).map((x) => x.mid));
+  const won = new Set(draws.map((x) => x.d.w));
+  if (locked) return locked.filter((s) => !deleted.has(s) || won.has(s));
   return [...seats.filter((x) => !x.s.gone && !x.s.removed).map((x) => x.mid), ...meta.ghosts];
 }
 
@@ -204,7 +209,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     ghosts: meta.ghosts,
     seats: seatList(meta, seats, draws),
     locked: draws.some((x) => x.r === 0),
-    members: seats.filter((x) => !x.s.removed).map((x) => ({ mid: x.mid, box: x.s.box, rev: x.s.rev, owner: !!x.s.owner, gone: !!x.s.gone })),
+    members: seats.filter((x) => !x.s.removed).map((x) => ({ mid: x.mid, box: x.s.box, rev: x.s.rev, owner: !!x.s.owner, gone: !!x.s.gone, deleted: !!x.s.deleted })),
     draws: draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at, by: x.d.by, odds: x.d.odds })),
     paid,
   });
@@ -304,8 +309,9 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   }
 
   if (action === 'b-leave') {
-    if (mine.owner) return fail(403, 'You made this bhisi. Delete it instead.');
-    await store.setJSON(skey(bid, mid), { ...mine, gone: true, devs: [], rev: mine.rev + 1 });
+    // The organiser can only leave by deleting their account (their box stays, so the bhisi keeps its name and amount).
+    if (mine.owner && body.deleted !== true) return fail(403, 'You made this bhisi. Delete it instead.');
+    await store.setJSON(skey(bid, mid), { ...mine, gone: true, devs: [], rev: mine.rev + 1, ...(body.deleted === true ? { deleted: true } : {}) });
     return { status: 200, body: { ok: true } };
   }
 
