@@ -674,7 +674,6 @@ export function AIChat({ compact, initial }: { compact?: boolean; initial?: stri
   );
 
   const ask = (question: string) => {
-    if (/\broast\b/i.test(question)) store.markTried('roast');
     const text = question.trim();
     if (!text) return;
     if (/weekend budget card|share.*budget/i.test(text)) {
@@ -690,7 +689,7 @@ export function AIChat({ compact, initial }: { compact?: boolean; initial?: stri
     const wait = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : Math.min(900, 380 + answer.text.length * 2);
     window.setTimeout(() => ui.setChat((c) => c.map((m) => (m.id === aiId ? { ...m, text: answer.text, answer, typing: false } : m))), wait);
   };
-  // Opened with a question already (e.g. "Roast me" from Home): ask it once.
+  // Opened with a question already: ask it once.
   const asked = useRef(false);
   useEffect(() => {
     if (initial && !asked.current) {

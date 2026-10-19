@@ -1,5 +1,4 @@
 import type { CategoryId, ISODate, Person, State, Transaction } from '../types';
-import { roastMe, toastMe } from './fun';
 import { ex, scaled } from './currency';
 import { categoryName, myCost, personBalances, planMetrics, safeToSpend, spendBetween } from './finance';
 import { addDays, addMonths, daysBetween, fmtDate, monthName, parseDate, relDay, rupees } from './format';
@@ -120,10 +119,6 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function askMore(s: State, q: string): AIAnswer | null {
   const today = s.today;
   const monthStart = today.slice(0, 8) + '01';
-
-  // --- Roast or toast ---
-  if (/\broast\b/.test(q)) return { text: `🔥 ${roastMe(s)}`, followups: ['🔥 Roast me again', '🥂 Toast me instead'] };
-  if (/\btoast me\b|\bhype me\b|\bpraise me\b/.test(q)) return { text: `🥂 ${toastMe(s)}`, followups: ['🥂 Toast me again', '🔥 Roast me'] };
 
   // --- Fix or undo the last entry ---
   const last = [...s.transactions].filter((t) => t.type !== 'transfer' || !t.investmentId).sort((a, b) => (b.date === a.date ? b.id.localeCompare(a.id) : b.date.localeCompare(a.date)))[0];
@@ -331,8 +326,6 @@ export function quickQuestions(s: State): string[] {
   const owesMe = owe.length && owe[owe.length - 1][1] > 0 ? s.people.find((p) => p.id === owe[owe.length - 1][0]) : undefined;
   return [
     '💸 Kitna bacha hai?',
-    '🔥 Roast me',
-    '🥂 Toast me',
     '⏳ Paisa kab tak chalega?',
     `🛵 ${app} pe kitna uda diya?`,
     `🤔 Can I afford ${ex(3000)} shoes?`,

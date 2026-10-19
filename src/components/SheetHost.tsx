@@ -2,7 +2,6 @@ import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
 import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './Bhisi';
-import { AuraSheet } from './Fun';
 import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
@@ -94,12 +93,6 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Edit group" onClose={close} z={z}>
           <GroupPeople groupId={spec.groupId} onDone={close} />
-        </Sheet>
-      );
-    case 'aura':
-      return (
-        <Sheet title="Money aura" onClose={close} z={z}>
-          <AuraSheet />
         </Sheet>
       );
     case 'gullak-form':

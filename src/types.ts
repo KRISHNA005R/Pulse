@@ -386,8 +386,6 @@ export interface Settings {
   soundsAsked?: boolean;
   /** Things the person said during setup they don't have, e.g. 'bills' (lib/setup.ts). */
   setupSkipped?: string[];
-  /** Money aura card already opened for this month key (YYYY-MM). */
-  auraSeen?: string;
   /** The "New in PULSE" card on Home was closed. */
   newStuffSeen?: boolean;
   /** New features already tried (the card hides once they all are). */

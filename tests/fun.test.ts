@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../src/data/seed';
 import { currentRound, inBowl, myStanding, pickWinner, pot, bhisiDues } from '../src/lib/bhisi';
-import { guessVerdict, gullakTarget, moneyAura, nextCoin, roastMe, toastMe, survived, notePayday } from '../src/lib/fun';
+import { guessVerdict, gullakTarget, nextCoin, survived, notePayday } from '../src/lib/fun';
 import { safeToSpend } from '../src/lib/finance';
 import type { Bhisi } from '../src/types';
 
@@ -57,16 +57,6 @@ describe('the fun bits', () => {
     expect(guessVerdict(1000, 1050).title).toBe('Spot on');
     expect(guessVerdict(500, 1500).good).toBe(false);
     expect(guessVerdict(2000, 1500).title).toBe('Less than you thought');
-  });
-  it('the demo month has an aura', () => {
-    const a = moneyAura(createSeed());
-    expect(a?.name).toBeTruthy();
-    expect(a?.stats.length).toBeGreaterThan(1);
-  });
-  it('roast and toast always say something', () => {
-    const s = createSeed();
-    expect(roastMe(s).length).toBeGreaterThan(10);
-    expect(toastMe(s).length).toBeGreaterThan(10);
   });
   it('survived payday shows for 3 days, with a run count', () => {
     const s = createSeed();

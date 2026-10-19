@@ -1,4 +1,4 @@
-import { AuraTeaser, GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
+import { GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
@@ -87,7 +87,6 @@ export function HomeScreen() {
       </section>
 
       <FriendNewsCard />
-      <AuraTeaser />
       <GuessCard />
 
       {askFeedback && (
