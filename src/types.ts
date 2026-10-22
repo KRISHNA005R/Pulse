@@ -444,8 +444,6 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
-  /** Days the person tapped "Nothing spent today" (they keep the logging streak going). */
-  noSpendDays?: ISODate[];
   /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
   bhisis?: Bhisi[];
   /** Money left just before each main payday ("survived payday"). */

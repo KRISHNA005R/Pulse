@@ -3,16 +3,13 @@ import { isAuto } from './auto';
 import { addDays } from './format';
 
 /**
- * Logging streak: how many days in a row the person has logged something themselves, or said
- * "Nothing spent today" (a no-spend day shouldn't break a streak: it's the best kind of day).
- * Entries PULSE records by itself (SIPs, EMIs, bills, paydays) don't count, and neither does just
- * opening the app. If nothing is logged yet today the streak is still alive (it counts up to
- * yesterday) until the day ends.
+ * Logging streak: how many days in a row the person has logged something themselves.
+ * Entries PULSE records by itself (SIPs, EMIs, bills, paydays) don't count. If nothing is logged yet today the streak is still
+ * alive (it counts up to yesterday) until the day ends.
  */
 export function streak(s: State): { count: number; today: boolean; best: number } {
   const days = new Set<string>();
   for (const t of s.transactions) if (!t.investmentId && !isAuto(t) && t.date <= s.today) days.add(t.date);
-  for (const d of s.noSpendDays ?? []) if (d <= s.today) days.add(d);
   const today = days.has(s.today);
   let d = today ? s.today : addDays(s.today, -1);
   let count = 0;

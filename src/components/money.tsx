@@ -48,7 +48,7 @@ export function StreakPill() {
       onClick={(e) => {
         haptic(8);
         burstFrom(e.currentTarget, { kind: 'fire', power: 0.5 });
-        toast({ text: st.today ? `${st.count}-day streak. Best: ${st.best} days.` : `${st.count}-day streak. Log a spend today, or tap “Nothing spent” tonight, to keep it.`, emoji: '🔥' });
+        toast({ text: st.today ? `${st.count}-day logging streak. Best: ${st.best} days.` : `${st.count}-day streak. Log anything today to keep it alive.`, emoji: '🔥' });
       }}
       className={`tap inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-bold ${st.today ? 'bg-accent-soft text-accent-ink' : 'animate-ring bg-sunk text-ink2'}`}
       aria-label={`${st.count}-day logging streak${st.today ? '' : ', log today to keep it'}`}
@@ -58,36 +58,6 @@ export function StreakPill() {
       </span>
       <span className="num">{st.count}</span>
     </button>
-  );
-}
-
-/**
- * Evening, nothing logged today: one honest tap keeps the streak ("Nothing spent today"), so a
- * no-spend day never breaks it. Or log what was spent. Just opening the app doesn't count.
- */
-export function StreakSaver() {
-  const { state, markNoSpend } = useStore();
-  const ui = useUI();
-  const st = useMemo(() => streak(state), [state]);
-  if (state.mode !== 'personal' || st.today || !state.transactions.length || new Date().getHours() < 18) return null;
-  return (
-    <section aria-label="Keep your streak" className="-mt-4 flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
-      <span className="inline-block animate-flicker text-[22px]" aria-hidden="true">
-        🔥
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[14.5px] font-semibold leading-tight">{st.count ? `Keep your ${st.count}-day streak` : 'Start a streak today'}</span>
-        <span className="block text-[12.5px] text-ink3">Didn’t spend anything today? That counts.</span>
-      </span>
-      <span className="flex shrink-0 flex-col gap-1.5">
-        <button type="button" className="btn-primary min-h-[34px] px-3 text-[13px]" onClick={markNoSpend}>
-          Nothing spent ✓
-        </button>
-        <button type="button" className="text-[12px] font-semibold text-accent-ink" onClick={() => ui.openSheet({ type: 'composer' })}>
-          or log a spend
-        </button>
-      </span>
-    </section>
   );
 }
 

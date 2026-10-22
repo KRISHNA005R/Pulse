@@ -917,19 +917,6 @@ function useStoreImpl() {
     [commit],
   );
 
-  /** "Nothing spent today": an honest no-spend day keeps the logging streak going. */
-  const markNoSpend = useCallback(() => {
-    const before = streak(ref.current);
-    const next = commit((s) => {
-      const list = s.noSpendDays ?? [];
-      if (!list.includes(s.today)) s.noSpendDays = [...list.slice(-400), s.today];
-    });
-    const after = streak(next);
-    haptic(20);
-    burst({ kind: 'fire', power: Math.min(1.8, 0.8 + after.count / 10) });
-    toast({ text: after.count > 1 ? `${after.count}-day streak${after.count >= before.best && after.count > 2 ? ', your best ever' : ''}. A no-spend day, love that.` : 'No-spend day noted. Streak started.', tone: 'good', emoji: '🔥' });
-  }, [commit, toast]);
-
   // ---------- gullak ----------
   const startGullak = useCallback(
     (g: { name: string; mode: 'fixed' | 'rising'; step: number; days: number; target: number }) => {
@@ -2021,7 +2008,6 @@ function useStoreImpl() {
     joinBhisi,
     deleteBhisi,
     startGullak,
-    markNoSpend,
     markTried,
     dropCoin,
     breakGullak,

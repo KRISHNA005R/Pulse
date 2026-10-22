@@ -49,17 +49,3 @@ describe('bills paid by hand', () => {
     expect(s.subscriptions.find((x) => x.id === 'rent')!.nextDate).toBe('2026-10-20');
   });
 });
-
-import { streak } from '../src/lib/streak';
-describe('logging streak', () => {
-  it('a "nothing spent" day keeps the streak going', () => {
-    const s = demo();
-    s.transactions = s.transactions.filter((t) => t.date < '2026-09-25');
-    s.transactions.push({ id: 'x1', merchant: 'Chai', amount: 20, type: 'expense', category: 'cafe', date: '2026-09-25', account: 'cash', recurring: false, status: 'completed' } as never);
-    s.transactions.push({ id: 'x2', merchant: 'Chai', amount: 20, type: 'expense', category: 'cafe', date: '2026-09-27', account: 'cash', recurring: false, status: 'completed' } as never);
-    s.today = '2026-09-27';
-    const gap = streak(s).count;
-    s.noSpendDays = ['2026-09-26'];
-    expect(streak(s).count).toBeGreaterThan(gap);
-  });
-});
