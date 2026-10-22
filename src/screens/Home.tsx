@@ -9,7 +9,7 @@ import { detections, personBalances, socialTotals, upcoming } from '../lib/finan
 import { FriendNewsCard } from '../components/Friends';
 import { addDays, daysBetween, fmtDate, greeting, relDay, rupees } from '../lib/format';
 import { firstSeen } from '../lib/stats';
-import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, TransactionRow } from '../components/money';
+import { InsightCard, PaydayCard, PlanProgress, SafeToSpendCard, StreakSaver, TransactionRow } from '../components/money';
 import { CategoryMark, EmptyState, PersonAvatar, SectionHeader } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 import { InstallBanner } from '../components/InstallPrompt';
@@ -42,6 +42,7 @@ export function HomeScreen() {
       <InstallBanner />
       <ReminderCard />
       <SafeToSpendCard greeting={`${greeting()}, ${state.user.name}`} />
+      <StreakSaver />
 
       <section aria-labelledby="h-next">
         <SectionHeader id="h-next" title="Up next" action={{ label: 'All bills', onClick: () => ui.push({ name: 'subscriptions' }, 'you') }} />
