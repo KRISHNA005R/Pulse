@@ -202,7 +202,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const dateLabel = effDate === state.today ? 'Today' : effDate === addDays(state.today, -1) ? 'Yesterday' : fmtDate(effDate);
   const catName = state.categories.find((c) => c.id === effCat)?.name ?? 'Other';
 
-  const picks = quickPicks(state, effBack ? 'expense' : effType);
+  const picks = quickPicks(state, effType);
   const catObj = state.categories.find((c) => c.id === effCat);
   const liveEmoji = text.trim() ? emojiFor(text, state.categories, catObj?.emoji ?? '🧾') : catObj?.emoji ?? (effBack ? '↩️' : effType === 'income' ? '🤑' : '✨');
   const TYPES: { value: TxType; label: string; emoji: string }[] = [
@@ -265,50 +265,11 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
         </p>
       )}
 
-      {/* Money in: new money (income) or your own money coming back (comes off spending) */}
-      {effType === 'income' && (
-        <div className="mt-1">
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="What is this money?">
-            {[
-              { v: false, emoji: '💰', label: 'New money', sub: 'Salary, gift' },
-              { v: true, emoji: '↩️', label: 'Got it back', sub: 'Payback, refund' },
-            ].map((o) => {
-              const on = effBack === o.v;
-              return (
-                <button
-                  key={o.label}
-                  type="button"
-                  role="radio"
-                  aria-checked={on}
-                  onClick={() => {
-                    haptic(6);
-                    setBack(o.v);
-                    setCat(null);
-                  }}
-                  className={`tap flex min-w-0 items-center gap-2.5 rounded-2xl border-[1.5px] px-3 py-2 text-left transition-colors ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-line bg-bg text-ink2 hover:border-ink/40'}`}
-                >
-                  <span className="text-[20px] leading-none" aria-hidden="true">
-                    {o.emoji}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[14.5px] font-semibold leading-tight">{o.label}</span>
-                    <span className={`mt-0.5 block truncate text-[12px] leading-tight ${on ? 'opacity-80' : 'text-ink3'}`}>{o.sub}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="mt-2 text-center text-[12.5px] text-ink2" aria-live="polite">
-            {effBack ? <>Not income. It comes off your {catName.toLowerCase()} spending.</> : <>Counts as income.</>}
-          </p>
-        </div>
-      )}
-
       {/* Quick picks: your usual places, then every category, then make your own */}
       {picks.length > 0 && (
         <div className="no-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1" role="group" aria-label="Quick picks">
           {picks.map((q) => {
-            const on = q.kind === 'category' && effCat === q.category && (cat !== null || !!text.trim());
+            const on = q.kind === 'category' && !effBack && effCat === q.category && (cat !== null || !!text.trim());
             return (
               <button
                 key={`${q.kind}-${q.label}`}
@@ -318,6 +279,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
                   haptic(6);
                   if (q.kind === 'merchant') setText(q.label);
                   setCat(q.category);
+                  setBack(false);
                 }}
                 className={`tap flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-2 transition-colors ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-line bg-bg text-ink2 hover:border-ink/40'}`}
               >
@@ -328,6 +290,23 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
               </button>
             );
           })}
+          {effType === 'income' && (
+            <button
+              type="button"
+              aria-pressed={effBack}
+              onClick={() => {
+                haptic(6);
+                setBack(!effBack);
+                setCat(null);
+              }}
+              className={`tap flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border-[1.5px] px-3 py-2 transition-colors ${effBack ? 'border-transparent bg-pill text-pill-fg' : 'border-line bg-bg text-ink2 hover:border-ink/40'}`}
+            >
+              <span className="text-[22px] leading-none" aria-hidden="true">
+                ↩️
+              </span>
+              <span className="whitespace-nowrap text-[12px] font-semibold">Got it back</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => ui.openSheet({ type: 'category-form', kind: catKind, name: text && !parsed.category ? parsed.label : undefined, onSaved: (id) => setCat(id) })}
@@ -339,6 +318,16 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             <span className="whitespace-nowrap text-[12px] font-semibold">New</span>
           </button>
         </div>
+      )}
+
+      {effBack && (
+        <p className="mt-2 text-center text-[12.5px] text-ink2" aria-live="polite">
+          Not income. It comes off your{' '}
+          <button type="button" className="font-semibold text-accent-ink underline-offset-2 hover:underline" onClick={() => togglePanel('category')}>
+            {catName.toLowerCase()} spending
+          </button>
+          .
+        </p>
       )}
 
       {/* What for */}
@@ -419,7 +408,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       {effType !== 'transfer' ? (
         <div className="no-scrollbar -mx-5 mt-4 flex gap-1.5 overflow-x-auto px-5 pb-1">
           <button type="button" className="chip shrink-0 rounded-full" aria-expanded={panel === 'category'} onClick={() => togglePanel('category')}>
-            <span aria-hidden="true">{catObj?.emoji ?? '✨'}</span> {catName}
+            <span aria-hidden="true">{catObj?.emoji ?? '✨'}</span> {effBack ? `Comes off ${catName}` : catName}
           </button>
           <button type="button" className="chip shrink-0" aria-expanded={panel === 'date'} onClick={() => togglePanel('date')}>
             <Icon name="calendar" size={15} /> {dateLabel}

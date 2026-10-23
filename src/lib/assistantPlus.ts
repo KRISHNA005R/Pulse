@@ -3,6 +3,7 @@ import { ex, scaled } from './currency';
 import { categoryName, myCost, personBalances, planMetrics, safeToSpend, spendBetween } from './finance';
 import { addDays, addMonths, daysBetween, fmtDate, monthName, parseDate, relDay, rupees } from './format';
 import { guessCategory } from './parse';
+import { newQuickQuestions } from './assistantNew';
 import type { AIAnswer } from './assistant';
 
 // PULSE AI, round 2: Hinglish, and the newer questions (how long the money lasts, what-ifs,
@@ -327,6 +328,7 @@ export function quickQuestions(s: State): string[] {
   return [
     '💸 Kitna bacha hai?',
     '⏳ Paisa kab tak chalega?',
+    ...newQuickQuestions(s),
     `🛵 ${app} pe kitna uda diya?`,
     `🤔 Can I afford ${ex(3000)} shoes?`,
     ...(plan ? [`${plan.icon} ${plan.name} ho payega ${monthName(plan.targetDate).split(' ')[0]} tak?`] : []),

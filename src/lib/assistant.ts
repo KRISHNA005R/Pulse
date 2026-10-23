@@ -29,6 +29,7 @@ import { monthIn, parseAction, type AIAction } from './aiActions';
 import { buildRecap } from './insights';
 import { yearSummary } from './history';
 import { actionFromHinglish, askMore, fromHinglish, quickQuestions } from './assistantPlus';
+import { askNew } from './assistantNew';
 
 // PULSE AI: answers are computed from the app's own data, not generated text.
 
@@ -44,7 +45,7 @@ export type AIBlock =
 
 /** Where a link button in an answer goes. */
 export type AILink =
-  | { kind: 'route'; tab: 'home' | 'activity' | 'plans' | 'you'; route?: { name: string; [k: string]: unknown } }
+  | { kind: 'route'; tab: 'home' | 'activity' | 'plans' | 'you'; route?: { name: string; [k: string]: unknown }; segment?: string }
   | { kind: 'sheet'; sheet: { type: string; [k: string]: unknown } }
   | { kind: 'url'; href: string };
 
@@ -131,6 +132,10 @@ export function askPulse(s: State, asked: string): AIAnswer {
     };
   }
 
+  // --- The newest features: Bhisi, Gullak, Got it back, Guess the bill (lib/assistantNew.ts) ---
+  const fresh = askNew(s, q);
+  if (fresh) return fresh;
+
   // --- Monthly / yearly report ---
   if (/\b(report|recap|summary|review|wrapped|overview|breakdown)\b|how did i do|how was my (month|year)|spend(ing)? history|this year|yearly|annual|whole year/.test(q) && !/\bafford\b/.test(q)) {
     const yearMatch = q.match(/\b(20\d\d)\b/);
@@ -172,6 +177,8 @@ export function askPulse(s: State, asked: string): AIAnswer {
       [/cards?/, 'Credit cards', { kind: 'route', tab: 'you', route: { name: 'cards' } }],
       [/loans?|debts?|emi/, 'Loans', { kind: 'route', tab: 'you', route: { name: 'debt' } }],
       [/currenc/, 'Currency', { kind: 'route', tab: 'you', route: { name: 'settings', section: 'currency' } }],
+      [/bhisi|bisi|matka/, 'Bhisi', { kind: 'route', tab: 'plans', segment: 'bhisi' }],
+      [/gullak|piggy/, 'Plans', { kind: 'route', tab: 'plans' }],
       [/plans?|goals?|budgets?|splits?/, 'Plans', { kind: 'route', tab: 'plans' }],
       [/activity|transactions?|expenses?/, 'Activity', { kind: 'route', tab: 'activity' }],
       [/recap/, 'Monthly recap', { kind: 'sheet', sheet: { type: 'recap' } }],

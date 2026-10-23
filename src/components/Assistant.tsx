@@ -559,6 +559,7 @@ function LinkButton({ label, to }: { label: string; to: AILink }) {
           return;
         }
         ui.closeAllSheets();
+        if (to.segment) ui.setPlansSegment(to.segment as Parameters<typeof ui.setPlansSegment>[0]);
         ui.resetTo(to.tab, to.route as Route | undefined);
       }}
     >

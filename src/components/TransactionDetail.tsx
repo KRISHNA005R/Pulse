@@ -72,29 +72,41 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
         {share != null && <p className="text-[14px] text-ink2">Your share {rupees(share)}{group ? ` · ${group.emoji} ${group.name}` : ''}</p>}
       </div>
 
-      {tx.type === 'income' && (
-        <Row label="What is it?">
-          <span className="inline-flex rounded-full bg-sunk p-0.5" role="radiogroup" aria-label="What is this money?">
-            {[
-              { v: false, label: '💰 New money' },
-              { v: true, label: '↩️ Got it back' },
-            ].map((o) => (
-              <button key={o.label} type="button" role="radio" aria-checked={back === o.v} onClick={() => setBack(o.v)} className={`tap rounded-full px-3 py-1.5 text-[13.5px] font-semibold ${back === o.v ? 'bg-pill text-pill-fg' : 'text-ink2'}`}>
-                {o.label}
-              </button>
+      {tx.type === 'income' ? (
+        <>
+          <Row label="Category">
+            <select aria-label="Category" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={back ? '__back' : tx.category} onChange={(e) => (e.target.value === '__back' ? setBack(true) : back ? store.updateTransaction(tx.id, { back: undefined, category: e.target.value }) : store.updateTransaction(tx.id, { category: e.target.value }))}>
+              {state.categories.filter((c) => c.kind === 'income').map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                </option>
+              ))}
+              <option value="__back">↩️ Got it back</option>
+            </select>
+          </Row>
+          {back && (
+            <Row label="Comes off">
+              <select aria-label="Comes off which spending" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.category} onChange={(e) => store.updateTransaction(tx.id, { category: e.target.value })}>
+                {cats.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.emoji ? `${c.emoji} ` : ''}{c.name}
+                  </option>
+                ))}
+              </select>
+            </Row>
+          )}
+        </>
+      ) : (
+        <Row label="Category">
+          <select aria-label="Move category" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.category} onChange={(e) => store.updateTransaction(tx.id, { category: e.target.value })}>
+            {cats.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.emoji ? `${c.emoji} ` : ''}{c.name}
+              </option>
             ))}
-          </span>
+          </select>
         </Row>
       )}
-      <Row label={back ? 'Comes off' : 'Category'}>
-        <select aria-label="Move category" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.category} onChange={(e) => store.updateTransaction(tx.id, { category: e.target.value })}>
-          {cats.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.emoji ? `${c.emoji} ` : ''}{c.name}
-            </option>
-          ))}
-        </select>
-      </Row>
       <Row label="Date">
         <input aria-label="Date" type="date" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.date} max={state.today} onChange={(e) => e.target.value && store.updateTransaction(tx.id, { date: e.target.value })} />
       </Row>
