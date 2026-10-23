@@ -153,14 +153,15 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
       ];
       break;
     case 'income':
-      title = 'Money in';
+      title = a.back ? 'Got it back' : 'Money in';
       icon = 'download';
       rows = [
         { label: 'Amount', value: rupees(a.amount) },
         { label: 'What', value: a.merchant },
-        { label: 'Category', value: catLabel(a.category) },
+        { label: a.back ? 'Comes off' : 'Category', value: catLabel(a.category) },
         { label: 'Date', value: dayLabel(a.date) },
         { label: 'Into', value: acctName },
+        ...(a.back ? [{ label: 'Counts as', value: 'Not income' }] : []),
       ];
       break;
     case 'split':
@@ -265,7 +266,7 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
     switch (a.kind) {
       case 'expense':
       case 'income': {
-        const tx = store.addTransaction({ merchant: a.merchant, amount: a.amount, type: a.kind, category: a.category, date: a.date, account: acct, plan: a.plan, recurring: false });
+        const tx = store.addTransaction({ merchant: a.merchant, amount: a.amount, type: a.kind, category: a.category, date: a.date, account: acct, plan: a.plan, recurring: false, back: a.back || undefined });
         const after = a.kind === 'expense' ? Math.max(0, sts.safe - a.amount) : null;
         update({ status: 'done', txId: tx.id, note: a.kind === 'expense' ? `Added. Safe to spend is now about ${rupees(after ?? 0)}.` : `Added ${rupees(a.amount)} to ${acctName}.` });
         return;

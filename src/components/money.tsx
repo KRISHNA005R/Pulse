@@ -3,7 +3,7 @@ import { INSURANCE_ON } from '../lib/features';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, categoryName, groupSummary, myCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addDays, addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, parseDate, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
@@ -447,7 +447,8 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
     if (d.v < -0.45 || (d.v <= 0.3 && -x > actionsW * 0.42)) openRow();
     else close();
   };
-  const sub = [cat, card ? `${card.name} card` : null].filter(Boolean).join(' · ');
+  const back = isBack(tx);
+  const sub = [back ? `↩ Got back · ${cat}` : cat, card ? `${card.name} card` : null].filter(Boolean).join(' · ');
 
   return (
     <li ref={liRef} className="group/row relative overflow-hidden rounded-xl">
@@ -504,7 +505,7 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
           </span>
         </span>
         <span className="shrink-0 text-right">
-          <span className={`num block text-[15.5px] font-semibold ${isIn ? 'text-pos' : ''}`}>{isIn ? rupees(tx.amount, { sign: true }) : `−${rupees(tx.amount)}`}</span>
+          <span className={`num block text-[15.5px] font-semibold ${back ? 'text-ink2' : isIn ? 'text-pos' : ''}`}>{isIn ? rupees(tx.amount, { sign: true }) : `−${rupees(tx.amount)}`}</span>
           {share != null && <span className="block text-[12px] text-ink3">your share {rupees(share)}</span>}
           {tx.recurring && share == null && (
             <span className="inline-flex items-center gap-0.5 text-[12px] text-ink3">
@@ -536,7 +537,7 @@ export function TransactionList({ txs, emptyText }: { txs: Transaction[]; emptyT
 
 export function DateGroup({ date, today, txs }: { date: string; today: string; txs: Transaction[] }) {
   const { state } = useStore();
-  const out = txs.filter((t) => t.type === 'expense').reduce((a, t) => a + myCost(state, t), 0);
+  const out = Math.max(0, txs.filter((t) => t.type === 'expense' || isBack(t)).reduce((a, t) => a + netCost(state, t), 0));
   return (
     <section aria-label={fmtDayHeader(date, today)}>
       <div className="mb-1 flex items-baseline justify-between px-1">

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../store/store';
 import { useUI, type ActivityFilter } from '../store/ui';
-import { monthRange, myCost, prevMonth } from '../lib/finance';
+import { isBack, monthRange, netCost, prevMonth, spendBetween } from '../lib/finance';
 import { addDays, monthName, rupees } from '../lib/format';
 import { TransactionList } from '../components/money';
 import { FilterChip, TopNavigation } from '../components/ui/bits';
@@ -59,8 +59,8 @@ export function ActivityScreen() {
   }, [state, f]);
 
   const [ms, me] = monthRange(state.today);
-  const monthSpent = Math.round(state.transactions.filter((t) => t.type === 'expense' && t.date >= ms && t.date <= me).reduce((a, t) => a + myCost(state, t), 0));
-  const filteredOut = Math.round(txs.filter((t) => t.type === 'expense').reduce((a, t) => a + myCost(state, t), 0));
+  const monthSpent = Math.round(spendBetween(state, ms, me));
+  const filteredOut = Math.max(0, Math.round(txs.filter((t) => t.type === 'expense' || isBack(t)).reduce((a, t) => a + netCost(state, t), 0)));
   const filtered = f.chip !== 'all' || f.query || f.range !== 'all' || f.account !== 'all';
 
   return (

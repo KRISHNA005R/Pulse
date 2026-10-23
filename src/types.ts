@@ -94,6 +94,11 @@ export interface Transaction {
   insuranceId?: ID;
   /** Set when this is a payday from one of the person's income sources. */
   incomeId?: ID;
+  /**
+   * Money in that is your own money coming back (a friend's share of a bill, a refund, cashback).
+   * Not income: it comes off your spending in `category`, which is then a spending category.
+   */
+  back?: boolean;
   /** A loan EMI: the loan it pays, and how much of it came off the loan itself (the rest is interest). */
   debtId?: ID;
   principal?: number;

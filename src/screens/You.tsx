@@ -9,7 +9,7 @@ import { playSfx } from '../lib/sfx';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { debtDue, defaultAccount, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { debtDue, defaultAccount, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, fmtMonthYear, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -424,7 +424,7 @@ export function IncomeScreen() {
   const { state } = useStore();
   const ui = useUI();
   const ms = startOfMonth(state.today);
-  const received = state.transactions.filter((t) => t.type === 'income' && t.date >= ms);
+  const received = state.transactions.filter((t) => isEarned(t) && t.date >= ms);
   const m = incomeThisMonth(state);
   const byId = new Map(m.sources.map((x) => [x.income.id, x]));
   const sts = safeToSpend(state);
@@ -471,16 +471,19 @@ export function IncomeScreen() {
         <SectionHeader id="inc-rec" title="Received this month" action={{ label: 'Log income', onClick: () => ui.openSheet({ type: 'composer', preset: { type: 'income' } }) }} />
         <ul>
           {received.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 px-2 py-2.5">
-              <CategoryMark state={state} category={t.category} size={38} />
-              <span className="flex-1">
-                <span className="block text-[15px] font-semibold">{t.merchant}</span>
-                <span className="block text-[13px] text-ink3">{fmtDate(t.date)}</span>
-              </span>
-              <span className="num text-[15px] font-semibold text-pos">{rupees(t.amount, { sign: true })}</span>
+            <li key={t.id}>
+              <button type="button" className="tap flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-sunk/60" onClick={() => ui.openSheet({ type: 'tx', id: t.id })}>
+                <CategoryMark state={state} category={t.category} size={38} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold">{t.merchant}</span>
+                  <span className="block text-[13px] text-ink3">{fmtDate(t.date)}</span>
+                </span>
+                <span className="num text-[15px] font-semibold text-pos">{rupees(t.amount, { sign: true })}</span>
+              </button>
             </li>
           ))}
         </ul>
+        {received.length > 0 && <p className="mt-1 px-1 text-[12.5px] text-ink3">Friend paid you back or a refund? Tap it and pick “Got it back”, so it isn’t counted as income.</p>}
       </section>
     </div>
   );

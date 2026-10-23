@@ -6,9 +6,9 @@ import type { CategoryId, SplitMode, TxType } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { parseEntry } from '../lib/parse';
-import { emojiFor } from '../lib/lexicon';
+import { categoryFor, emojiFor } from '../lib/lexicon';
 import { addDays, fmtDate, haptic, rupees } from '../lib/format';
-import { budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
+import { BACK_WORDS, budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { SwipeToConfirm } from './ui/SwipeToConfirm';
@@ -82,6 +82,8 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const [values, setValues] = useState<Record<string, string>>({});
   const [paidBy, setPaidBy] = useState('me');
   const [saved, setSaved] = useState(false);
+  /** Money in: null lets the words decide (a "refund" is money back), true/false once picked by hand. */
+  const [back, setBack] = useState<boolean | null>(null);
 
   const parsed = useMemo(() => parseEntry(text, { people: state.people, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions }), [text, state.people, state.plans, state.today, state.categories, state.transactions]);
 
@@ -90,7 +92,10 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const effType: TxType = type !== 'expense' ? type : parsed.type === 'income' ? 'income' : 'expense';
   // Only a spend can go on a credit card. Switching to Got or Moved falls back to the main account.
   const account = effType !== 'expense' && state.cards.some((c) => c.id === picked) ? defaultAccount(state) : picked;
-  const effCat: CategoryId = cat ?? (effType === 'income' ? (parsed.type === 'income' && /freelance|client/i.test(text) ? 'freelance' : /salary/i.test(text) ? 'salary' : 'income-other') : parsed.category ?? 'other');
+  // Got it back: your own money returning. Not income; it comes off a spending category.
+  const effBack = effType === 'income' && (back ?? BACK_WORDS.test(text));
+  const catKind: 'income' | 'expense' = effType === 'income' && !effBack ? 'income' : 'expense';
+  const effCat: CategoryId = cat ?? (effBack ? categoryFor(text.replace(BACK_WORDS, ' '), state.categories, 'expense') ?? 'other' : effType === 'income' ? (parsed.type === 'income' && /freelance|client/i.test(text) ? 'freelance' : /salary/i.test(text) ? 'salary' : 'income-other') : parsed.category ?? 'other');
   const effPlan = plan === undefined ? parsed.plan : plan;
   const effDate = preset?.date || date !== state.today ? date : parsed.date ?? date;
   const effPeople = people ?? parsed.people;
@@ -98,7 +103,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const participants = ['me', ...effPeople];
   const hasSplit = effType === 'expense' && (effPeople.length > 0 || pendingNew.length > 0);
 
-  const label = parsed.label || parsed.merchant || (effType === 'income' ? 'Money in' : categoryLabel(state.categories.find((c) => c.id === effCat)?.name));
+  const label = parsed.label || parsed.merchant || (effBack ? 'Got back' : effType === 'income' ? 'Money in' : categoryLabel(state.categories.find((c) => c.id === effCat)?.name));
   const merchant = parsed.merchant && !parsed.label.toLowerCase().includes(parsed.merchant.toLowerCase()) ? `${parsed.merchant} · ${parsed.label}` : label;
 
   const allIds = [...participants, ...pendingNew.map((n) => `new:${n}`)];
@@ -117,7 +122,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     parsed.amount && !amount ? rupees(parsed.amount) : null,
     parsed.category && !cat ? state.categories.find((c) => c.id === parsed.category)?.name : null,
     parsed.people.length || parsed.newPeople.length ? `with ${[...parsed.people.map((id) => state.people.find((p) => p.id === id)?.short), ...parsed.newPeople].join(', ')}` : null,
-    parsed.people.length || parsed.newPeople.length ? `split ${Math.round(100 / (1 + parsed.people.length + parsed.newPeople.length))}/${Math.round(100 - 100 / (1 + parsed.people.length + parsed.newPeople.length))}` : null,
+    effType === 'expense' && (parsed.people.length || parsed.newPeople.length) ? `split ${Math.round(100 / (1 + parsed.people.length + parsed.newPeople.length))}/${Math.round(100 - 100 / (1 + parsed.people.length + parsed.newPeople.length))}` : null,
     parsed.plan && plan === undefined ? state.plans.find((p) => p.id === parsed.plan)?.name : null,
     parsed.date && parsed.date !== state.today ? 'yesterday' : null,
   ].filter(Boolean);
@@ -149,7 +154,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       store.addSplit({ group: preset?.group, description: merchant, amount: effAmount, paidBy, date: effDate, mode, shares: finalShares, category: effCat, plan: effPlan ?? undefined, account: from, notes: undefined });
       void ids;
     } else {
-      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined });
+      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined, back: effBack || undefined });
     }
     if (preset?.replaceTx) store.deleteTransaction(preset.replaceTx, { quiet: true });
     // Sounds: played straight from the swipe, so phones allow it. Asked about once, after a first log.
@@ -197,9 +202,9 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const dateLabel = effDate === state.today ? 'Today' : effDate === addDays(state.today, -1) ? 'Yesterday' : fmtDate(effDate);
   const catName = state.categories.find((c) => c.id === effCat)?.name ?? 'Other';
 
-  const picks = quickPicks(state, effType);
+  const picks = quickPicks(state, effBack ? 'expense' : effType);
   const catObj = state.categories.find((c) => c.id === effCat);
-  const liveEmoji = text.trim() ? emojiFor(text, state.categories, catObj?.emoji ?? '🧾') : catObj?.emoji ?? (effType === 'income' ? '🤑' : '✨');
+  const liveEmoji = text.trim() ? emojiFor(text, state.categories, catObj?.emoji ?? '🧾') : catObj?.emoji ?? (effBack ? '↩️' : effType === 'income' ? '🤑' : '✨');
   const TYPES: { value: TxType; label: string; emoji: string }[] = [
     { value: 'expense', label: 'Spent', emoji: '💸' },
     { value: 'income', label: 'Got', emoji: '🤑' },
@@ -209,7 +214,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
 
   return (
     <div className="flex flex-col">
-      <p className="eyebrow mt-2 pr-12">{effType === 'income' ? 'Money in' : effType === 'transfer' ? 'Move money' : 'New spend'} · {dateLabel}</p>
+      <p className="eyebrow mt-2 pr-12">{effBack ? 'Got it back' : effType === 'income' ? 'Money in' : effType === 'transfer' ? 'Move money' : 'New spend'} · {dateLabel}</p>
 
       {/* Type: the chosen one is a filled pill, like the tab bar */}
       <div className="mt-3 flex items-center gap-1.5">
@@ -226,6 +231,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
                   haptic(6);
                   setType(t.value);
                   setCat(null);
+                  setBack(null);
                 }}
                 className={`tap flex h-11 items-center justify-center gap-1.5 rounded-full border-[1.5px] text-[14px] font-semibold transition-colors ${on ? 'flex-[1.3] border-transparent bg-pill text-pill-fg' : 'flex-1 border-line text-ink2 hover:border-ink/50'}`}
               >
@@ -259,6 +265,45 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
         </p>
       )}
 
+      {/* Money in: new money (income) or your own money coming back (comes off spending) */}
+      {effType === 'income' && (
+        <div className="mt-1">
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="What is this money?">
+            {[
+              { v: false, emoji: '💰', label: 'New money', sub: 'Salary, gift' },
+              { v: true, emoji: '↩️', label: 'Got it back', sub: 'Payback, refund' },
+            ].map((o) => {
+              const on = effBack === o.v;
+              return (
+                <button
+                  key={o.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    haptic(6);
+                    setBack(o.v);
+                    setCat(null);
+                  }}
+                  className={`tap flex min-w-0 items-center gap-2.5 rounded-2xl border-[1.5px] px-3 py-2 text-left transition-colors ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-line bg-bg text-ink2 hover:border-ink/40'}`}
+                >
+                  <span className="text-[20px] leading-none" aria-hidden="true">
+                    {o.emoji}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-[14.5px] font-semibold leading-tight">{o.label}</span>
+                    <span className={`mt-0.5 block truncate text-[12px] leading-tight ${on ? 'opacity-80' : 'text-ink3'}`}>{o.sub}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-center text-[12.5px] text-ink2" aria-live="polite">
+            {effBack ? <>Not income. It comes off your {catName.toLowerCase()} spending.</> : <>Counts as income.</>}
+          </p>
+        </div>
+      )}
+
       {/* Quick picks: your usual places, then every category, then make your own */}
       {picks.length > 0 && (
         <div className="no-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1" role="group" aria-label="Quick picks">
@@ -285,7 +330,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
           })}
           <button
             type="button"
-            onClick={() => ui.openSheet({ type: 'category-form', kind: effType === 'income' ? 'income' : 'expense', name: text && !parsed.category ? parsed.label : undefined, onSaved: (id) => setCat(id) })}
+            onClick={() => ui.openSheet({ type: 'category-form', kind: catKind, name: text && !parsed.category ? parsed.label : undefined, onSaved: (id) => setCat(id) })}
             className="tap flex min-w-[68px] shrink-0 flex-col items-center gap-1 rounded-2xl border-[1.5px] border-dashed border-ink/40 px-3 py-2 text-ink2 hover:border-ink"
           >
             <span className="grid h-[22px] place-items-center" aria-hidden="true">
@@ -307,7 +352,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
         <input
           id="composer-text"
           className="min-w-0 flex-1 bg-transparent text-[15px] placeholder:text-ink3 focus:outline-none"
-          placeholder={effType === 'income' ? 'salary, freelance, refund…' : effType === 'transfer' ? 'note (optional)' : 'what for? try “dinner w/ Rahul”'}
+          placeholder={effBack ? 'who paid back, or what refund? e.g. “Rahul dinner”' : effType === 'income' ? 'salary, freelance, gift…' : effType === 'transfer' ? 'note (optional)' : 'what for? try “dinner w/ Rahul”'}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -430,12 +475,12 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       {/* Inline pickers */}
       {panel === 'category' && (
         <div className="mt-4 grid animate-rise grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="Category">
-          {state.categories.filter((c) => c.kind === (effType === 'income' ? 'income' : 'expense')).map((c) => (
+          {state.categories.filter((c) => c.kind === catKind).map((c) => (
             <button key={c.id} type="button" role="radio" aria-checked={c.id === effCat} onClick={() => { setCat(c.id); setPanel(null); }} className={`tap flex flex-col items-center gap-1 rounded-2xl p-2 text-center text-[11.5px] font-semibold leading-tight ${c.id === effCat ? 'bg-pill text-pill-fg' : 'hover:bg-sunk'}`}>
               <span className="text-[22px]" aria-hidden="true">{c.emoji ?? '✨'}</span> {c.name}
             </button>
           ))}
-          <button type="button" onClick={() => ui.openSheet({ type: 'category-form', kind: effType === 'income' ? 'income' : 'expense', onSaved: (id) => { setCat(id); setPanel(null); } })} className="tap flex flex-col items-center gap-1 rounded-2xl border-[1.5px] border-dashed border-ink/30 p-2 text-[11.5px] font-semibold text-ink2">
+          <button type="button" onClick={() => ui.openSheet({ type: 'category-form', kind: catKind, onSaved: (id) => { setCat(id); setPanel(null); } })} className="tap flex flex-col items-center gap-1 rounded-2xl border-[1.5px] border-dashed border-ink/30 p-2 text-[11.5px] font-semibold text-ink2">
             <Icon name="plus" size={22} /> New
           </button>
         </div>
@@ -536,7 +581,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
           disabledLabel={err ? 'Fix the split first' : 'Enter an amount'}
           done={saved}
           doneLabel="Logged. Nice."
-          label={effType === 'income' ? `Swipe to add ${rupees(effAmount)}` : effType === 'transfer' ? `Swipe to move ${rupees(effAmount)}` : hasSplit ? `Swipe to split · you ${rupees(myShare)}` : `Swipe to log ${rupees(effAmount)}`}
+          label={effBack ? `Swipe to add ${rupees(effAmount)} back` : effType === 'income' ? `Swipe to add ${rupees(effAmount)}` : effType === 'transfer' ? `Swipe to move ${rupees(effAmount)}` : hasSplit ? `Swipe to split · you ${rupees(myShare)}` : `Swipe to log ${rupees(effAmount)}`}
           onConfirm={save}
         />
       </div>

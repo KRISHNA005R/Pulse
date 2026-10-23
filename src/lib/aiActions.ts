@@ -1,15 +1,15 @@
 import type { BudgetPeriod, CategoryId, FundType, ISODate, State, Subscription } from '../types';
 import { AMOUNT_PREFIX, roundMoney } from './currency';
-import { FUND_TYPES } from './finance';
+import { BACK_WORDS, FUND_TYPES } from './finance';
 import { addDays, addMonths } from './format';
 import { guessCategory, parseEntry } from './parse';
-import { suggestEmoji } from './lexicon';
+import { categoryFor, suggestEmoji } from './lexicon';
 
 // PULSE AI actions: turn a plain sentence ("spent 450 on dinner", "add netflix 199 monthly",
 // "start a SIP of 2000 on the 5th") into one concrete change the person confirms with a tap.
 
 export type AIAction =
-  | { kind: 'expense' | 'income'; amount: number; merchant: string; category: CategoryId; date: ISODate; plan?: string }
+  | { kind: 'expense' | 'income'; amount: number; merchant: string; category: CategoryId; date: ISODate; plan?: string; back?: boolean }
   | { kind: 'split'; text: string; amount: number; names: string[] }
   | { kind: 'contribute'; planId: string; planName: string; amount: number }
   | { kind: 'plan'; name: string; icon: string; target: number; targetDate: ISODate }
@@ -185,6 +185,15 @@ export function parseAction(s: State, input: string): AIAction | null {
   }
 
   if (!amount) return null;
+
+  // --- Got it back: a friend's share, a refund. Money in, but not income ---
+  if (BACK_WORDS.test(lower) && !/\b(spent|bought|i paid|split (it|this|the bill))\b/.test(lower)) {
+    const date = /\byesterday\b/.test(lower) ? addDays(today, -1) : today;
+    const rest = raw.replace(BACK_WORDS, ' ').replace(/\b(me|for|from|the|got|received|yesterday|today)\b/gi, ' ');
+    const category: CategoryId = categoryFor(rest, s.categories, 'expense') ?? 'other';
+    const name = cleanName(raw, [/\b(me|got|received|yesterday|today)\b/gi]) || 'Got back';
+    return { kind: 'income', amount, merchant: name, category, date, back: true };
+  }
 
   // --- Income ---
   const incomeWords = /\b(got paid|got|received|receive|earned|credited|salary|income|refund|cashback|freelance|stipend|allowance|bonus|client paid)\b/;

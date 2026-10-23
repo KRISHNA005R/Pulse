@@ -510,6 +510,12 @@ function useStoreImpl() {
       }
       const sts = safeToSpend(next);
       const b = budgetFor(next, tx.category);
+      if (tx.type === 'income' && tx.back) {
+        const left = b ? budgetState(next, b).left : null;
+        const cat = categoryName(next, tx.category).toLowerCase();
+        toast({ text: `Got it back. Not income, it comes off your ${cat} spending${left != null && left >= 0 ? `. ${rupees(left)} left in the budget` : ''}.`, tone: 'good', emoji: '↩️' });
+        return;
+      }
       if (tx.type === 'income') {
         toast({ text: `${tx.category === 'salary' ? 'Your salary landed.' : 'Money in.'} Safe to spend is now ${rupees(sts.safe)}.`, tone: 'good' });
         return;
@@ -558,7 +564,7 @@ function useStoreImpl() {
       haptic(12);
       if (!opts.quiet) {
         momentAfterExpense(next, tx);
-        if (tx.type === 'income') burst({ kind: 'coins', power: tx.category === 'salary' ? 1.6 : 1 });
+        if (tx.type === 'income' && !tx.back) burst({ kind: 'coins', power: tx.category === 'salary' ? 1.6 : 1 });
         // First thing logged today keeps the streak alive: make it a moment.
         const after = streak(next);
         if (after.today && !before.today && tx.date === next.today && after.count >= 2) {

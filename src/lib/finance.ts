@@ -30,19 +30,32 @@ export function myCost(s: State, tx: Transaction): number {
   return tx.amount;
 }
 
+/** Money in that's your own money coming back (a friend's share, a refund). Not income. */
+export const isBack = (t: Transaction) => t.type === 'income' && !!t.back;
+/** Money in that's really new: salary, freelance, a gift. Only this counts as income. */
+export const isEarned = (t: Transaction) => t.type === 'income' && !t.back;
+/** Words that usually mean money coming back rather than new money. */
+export const BACK_WORDS = /\b(refund\w*|cash ?back|paid (me )?back|pa(y|ys|ying) (me )?back|returned|reimburs\w*|(my|his|her|their|your) share|share of)\b/i;
+
+/** What a transaction does to my spending: a spend adds my share, money got back takes it off. */
+export function netCost(s: State, tx: Transaction): number {
+  if (isBack(tx)) return -tx.amount;
+  return myCost(s, tx);
+}
+
 export function spendBetween(s: State, start: ISODate, end: ISODate, cats?: CategoryId[]): number {
   let sum = 0;
   for (const tx of s.transactions) {
-    if (tx.type !== 'expense' || !inRange(tx.date, start, end)) continue;
+    if ((tx.type !== 'expense' && !isBack(tx)) || !inRange(tx.date, start, end)) continue;
     if (cats && !cats.includes(tx.category)) continue;
-    sum += myCost(s, tx);
+    sum += netCost(s, tx);
   }
-  return roundMoney(sum);
+  return roundMoney(Math.max(0, sum));
 }
 
 export function incomeBetween(s: State, start: ISODate, end: ISODate): number {
   return s.transactions
-    .filter((t) => t.type === 'income' && inRange(t.date, start, end))
+    .filter((t) => isEarned(t) && inRange(t.date, start, end))
     .reduce((a, t) => a + t.amount, 0);
 }
 
@@ -62,10 +75,13 @@ export function investedBetween(s: State, start: ISODate, end: ISODate): number 
 export function spendByCategory(s: State, start: ISODate, end: ISODate): { category: CategoryId; amount: number }[] {
   const m = new Map<CategoryId, number>();
   for (const tx of s.transactions) {
-    if (tx.type !== 'expense' || !inRange(tx.date, start, end)) continue;
-    m.set(tx.category, (m.get(tx.category) ?? 0) + myCost(s, tx));
+    if ((tx.type !== 'expense' && !isBack(tx)) || !inRange(tx.date, start, end)) continue;
+    m.set(tx.category, (m.get(tx.category) ?? 0) + netCost(s, tx));
   }
-  return [...m.entries()].map(([category, amount]) => ({ category, amount: roundMoney(amount) })).sort((a, b) => b.amount - a.amount);
+  return [...m.entries()]
+    .map(([category, amount]) => ({ category, amount: roundMoney(Math.max(0, amount)) }))
+    .filter((x) => x.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
 }
 
 export const monthRange = (d: ISODate): [ISODate, ISODate] => [startOfMonth(d), endOfMonth(d)];
@@ -784,7 +800,7 @@ export function pendingPaydays(s: State): { income: IncomeSource; date: ISODate 
     if (s.dismissedDetections.includes(`payday:${i.id}:${date}`)) continue;
     const cat = incomeCategory(i.kind);
     const landed = s.transactions.some(
-      (t) => t.type === 'income' && t.date >= addDays(date, -4) && (t.incomeId === i.id || (!t.incomeId && t.category === cat && Math.abs(t.amount - i.expected) <= i.expected * 0.35)),
+      (t) => isEarned(t) && t.date >= addDays(date, -4) && (t.incomeId === i.id || (!t.incomeId && t.category === cat && Math.abs(t.amount - i.expected) <= i.expected * 0.35)),
     );
     if (!landed) out.push({ income: i, date });
   }
@@ -810,7 +826,7 @@ export interface SourceMonth {
 export function incomeThisMonth(s: State): { sources: SourceMonth[]; expected: number; fixedReceived: number; pending: number; extra: number; total: number } {
   const ms = startOfMonth(s.today);
   const me = endOfMonth(s.today);
-  const txs = s.transactions.filter((t) => t.type === 'income' && t.date >= ms && t.date <= me);
+  const txs = s.transactions.filter((t) => isEarned(t) && t.date >= ms && t.date <= me);
   const used = new Set<string>();
   const fixed = s.incomes.filter((i) => i.cycle === 'monthly' && i.nextDate && i.expected > 0);
   // Tagged payments first, so a guess never steals another source's money.

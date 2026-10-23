@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { roundMoney } from '../lib/currency';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { myCost } from '../lib/finance';
+import { BACK_WORDS, isBack, myCost } from '../lib/finance';
+import { categoryFor } from '../lib/lexicon';
 import { fmtDate, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { CategoryMark, PersonAvatar, Toggle } from './ui/bits';
@@ -22,7 +23,14 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
   const share = tx.splitId ? myCost(state, tx) : null;
   const split = tx.splitId ? state.splits.find((s) => s.id === tx.splitId) : undefined;
   const group = split?.group ? state.groups.find((g) => g.id === split.group) : undefined;
-  const cats = state.categories.filter((c) => c.kind === (tx.type === 'income' ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense'));
+  const back = isBack(tx);
+  const cats = state.categories.filter((c) => c.kind === (tx.type === 'income' && !back ? 'income' : tx.type === 'transfer' ? 'transfer' : 'expense'));
+  // Money in: switch between new money (income) and money got back (comes off spending).
+  const setBack = (v: boolean) => {
+    if (v === back) return;
+    if (v) store.updateTransaction(tx.id, { back: true, incomeId: undefined, category: categoryFor(tx.merchant.replace(BACK_WORDS, ' '), state.categories, 'expense') ?? 'other' });
+    else store.updateTransaction(tx.id, { back: undefined, category: 'income-other' });
+  };
 
   const startEdit = (f: 'merchant' | 'amount') => {
     setEditing(f);
@@ -55,15 +63,30 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
         {editing === 'amount' ? (
           <input autoFocus aria-label="Amount" inputMode="decimal" className="field num-hero mt-2 w-[200px] text-center text-[28px]" value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^\d.]/g, ''))} onBlur={commitEdit} onKeyDown={(e) => e.key === 'Enter' && commitEdit()} />
         ) : (
-          <button type="button" onClick={() => startEdit('amount')} className={`tap num-hero mt-1 rounded-xl px-2 text-[36px] leading-tight hover:bg-sunk ${isIn ? 'text-pos' : ''}`} aria-label={`Amount ${rupees(tx.amount)}. Edit`}>
+          <button type="button" onClick={() => startEdit('amount')} className={`tap num-hero mt-1 rounded-xl px-2 text-[36px] leading-tight hover:bg-sunk ${back ? '' : isIn ? 'text-pos' : ''}`} aria-label={`Amount ${rupees(tx.amount)}. Edit`}>
             {isIn ? '+' : '−'}
             {rupees(tx.amount)}
           </button>
         )}
+        {back && <p className="text-[14px] text-ink2">Got it back · not income, comes off your spending</p>}
         {share != null && <p className="text-[14px] text-ink2">Your share {rupees(share)}{group ? ` · ${group.emoji} ${group.name}` : ''}</p>}
       </div>
 
-      <Row label="Category">
+      {tx.type === 'income' && (
+        <Row label="What is it?">
+          <span className="inline-flex rounded-full bg-sunk p-0.5" role="radiogroup" aria-label="What is this money?">
+            {[
+              { v: false, label: '💰 New money' },
+              { v: true, label: '↩️ Got it back' },
+            ].map((o) => (
+              <button key={o.label} type="button" role="radio" aria-checked={back === o.v} onClick={() => setBack(o.v)} className={`tap rounded-full px-3 py-1.5 text-[13.5px] font-semibold ${back === o.v ? 'bg-pill text-pill-fg' : 'text-ink2'}`}>
+                {o.label}
+              </button>
+            ))}
+          </span>
+        </Row>
+      )}
+      <Row label={back ? 'Comes off' : 'Category'}>
         <select aria-label="Move category" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.category} onChange={(e) => store.updateTransaction(tx.id, { category: e.target.value })}>
           {cats.map((c) => (
             <option key={c.id} value={c.id}>
