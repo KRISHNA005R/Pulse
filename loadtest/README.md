@@ -3,7 +3,7 @@
 `pulse.k6.js` simulates people using PULSE at the same time, so you can see when it starts to slow
 down or fail before real users do.
 
-**Only run it against a local copy (`netlify dev`).** Never against pulsemoney.in or any
+**Only run it against a local copy (`node e2e/server.mjs`, or `netlify dev`).** Never against pulsemoney.in or any
 `*.netlify.app` address, not even a deploy preview: all deploys of the site share the same Netlify
 Blobs stores, so a preview would write test data into the real ones. The script refuses those
 addresses.

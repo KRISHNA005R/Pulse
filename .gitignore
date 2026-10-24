@@ -7,3 +7,8 @@ dist-artifact/
 .env.*
 *.log
 .DS_Store
+
+# Test output
+coverage/
+playwright-report/
+test-results/

@@ -9,7 +9,11 @@
     "build:artifact": "vite build --mode artifact",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.netlify.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "e2e": "playwright test",
+    "e2e:report": "playwright show-report",
+    "check": "npm run typecheck && npm test && npm run build && npm run e2e"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
@@ -27,11 +31,14 @@
   },
   "devDependencies": {
     "@fortawesome/free-brands-svg-icons": "^7.3.1",
+    "@playwright/test": "1.56.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/web-push": "^3.6.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "2.1.9",
     "autoprefixer": "^10.4.20",
+    "esbuild": "0.21.5",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.6.3",

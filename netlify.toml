@@ -1,6 +1,7 @@
 # Netlify builds the app from this repository on every push to the main branch.
 [build]
-  command = "npm run build"
+  # The unit tests run first: if any test fails, the build stops and nothing goes live.
+  command = "npm test && npm run build"
   publish = "dist"
 
 [build.environment]
