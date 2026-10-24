@@ -62,18 +62,24 @@ describe('the announcement email', () => {
     expect(mail.text).toContain('Gullak');
   });
 
-  // Gmail puts designed, newsletter-looking mail in Promotions. A plain note from a person has the
-  // best chance of landing in Primary.
-  it('looks like a personal note, not a newsletter', () => {
+  it('is the designed PULSE email with a proper button for each feature', () => {
+    const mail = make();
+    expect(mail.html).toContain('/email/mark.png'); // PULSE header
+    expect(mail.html).toMatch(/border-radius:999px[^>]*>\s*<a href="https:\/\/pulsemoney\.in\/\?tab=bhisi/); // button, not a text link
+    expect(mail.html).toMatch(/>Start a bhisi</);
+    expect(mail.html).toMatch(/>Start a gullak</);
+  });
+
+  // Gmail decides the tab. These keep the signals that push mail into Promotions as low as a designed email allows.
+  it('keeps the subject plain: no emoji, no hype words', () => {
     const mail = make();
     expect(mail.subject).toBe('Two new things in PULSE');
-    expect(mail.subject).not.toMatch(/\p{Extended_Pictographic}/u); // no emoji in the subject
-    expect(mail.html).not.toMatch(/<img/i); // no logo or images
-    expect(mail.html).not.toMatch(/<table/i); // no designed layout
-    expect(mail.html).not.toMatch(/border-radius:\s*999px/); // no big buttons
-    expect(mail.html).not.toMatch(/<style/i);
-    expect(mail.html.length).toBeLessThan(4000);
-    expect((mail.html.match(/<a /g) ?? []).length).toBeLessThanOrEqual(3); // bhisi, gullak, unsubscribe
+    expect(mail.subject).not.toMatch(/\p{Extended_Pictographic}/u);
+    expect(mail.subject).not.toMatch(/dropped|free|offer|!/i);
+  });
+
+  it('asks people to move it to Primary if it lands in Promotions', () => {
+    expect(make().text).toMatch(/Promotions.*Primary/);
   });
 
   it('asks people to reply, and signs off as a person', () => {
