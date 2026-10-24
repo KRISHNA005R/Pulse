@@ -5,6 +5,7 @@ import { BrandSignature } from '../components/ui/BrandSignature';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { buildInsights } from '../lib/insights';
+import { pickDaily } from '../lib/rotate';
 import { detections, personBalances, socialTotals, upcoming } from '../lib/finance';
 import { FriendNewsCard } from '../components/Friends';
 import { addDays, daysBetween, fmtDate, greeting, relDay, rupees } from '../lib/format';
@@ -28,7 +29,8 @@ export function HomeScreen() {
   }, [state]);
   const plans = state.plans.filter((p) => p.status === 'active' && !p.gullak).slice(0, 3);
   const recent = useMemo(() => [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4), [state.transactions]);
-  const insight = useMemo(() => buildInsights(state).find((i) => !i.id.startsWith('plan-')), [state]);
+  // A different suggestion every day; urgent ones (over budget, a bill due today or tomorrow) first.
+  const insight = useMemo(() => pickDaily(buildInsights(state).filter((i) => !i.id.startsWith('plan-')), state.today), [state]);
   const social = useMemo(() => socialTotals(state), [state]);
   const owe = [...social.balances.entries()].filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1])[0];
   const oweGroup = owe ? state.groups.find((g) => (personBalances(state, g.id).get(owe[0]) ?? 0) < 0) : undefined;

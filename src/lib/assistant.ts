@@ -30,6 +30,7 @@ import { buildRecap } from './insights';
 import { yearSummary } from './history';
 import { actionFromHinglish, askMore, fromHinglish, quickQuestions } from './assistantPlus';
 import { askNew } from './assistantNew';
+import { everyOtherDay } from './rotate';
 
 // PULSE AI: answers are computed from the app's own data, not generated text.
 
@@ -57,7 +58,8 @@ export interface AIAnswer {
 
 /** Starter questions that fit this person's data. */
 export function starterQuestions(s: State): string[] {
-  return quickQuestions(s);
+  // A new order every 2 days, so the AI opens with something fresh (lib/rotate.ts).
+  return everyOtherDay(quickQuestions(s), s.today);
 }
 
 /** The older, plain-English starter list (kept for reference). */

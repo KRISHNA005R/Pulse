@@ -630,7 +630,7 @@ export function GoalCard({ plan, onOpen }: { plan: Plan; onOpen: () => void }) {
 export function InsightCard({ insight }: { insight: Insight }) {
   const ui = useUI();
   return (
-    <button type="button" onClick={() => ui.openSheet({ type: 'insight', insight })} className="tap flex w-full items-start gap-3 rounded-2xl bg-accent-soft/70 p-4 text-left hover:bg-accent-soft">
+    <button type="button" data-testid="home-suggestion" onClick={() => ui.openSheet({ type: 'insight', insight })} className="tap flex w-full items-start gap-3 rounded-2xl bg-accent-soft/70 p-4 text-left hover:bg-accent-soft">
       <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface text-accent-ink" aria-hidden="true">
         <Icon name="spark" size={16} />
       </span>

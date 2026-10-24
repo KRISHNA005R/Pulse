@@ -88,6 +88,7 @@ export function buildInsights(s: State): Insight[] {
       text: `You have ${week.length} recurring payments this week.`,
       tone: 'neutral',
       priority: 55,
+      urgent: week.some((w) => w.date <= addDays(today, 1)),
       detail: { kind: 'list', title: 'Due in the next 7 days', rows: week.map((w) => ({ label: w.name, value: rupees(w.amount), sub: fmtDate(w.date) })), note: `${rupees(week.reduce((a, w) => a + w.amount, 0))} in total. It's already set aside in safe-to-spend.` },
     });
   }
@@ -182,6 +183,7 @@ export function buildInsights(s: State): Insight[] {
         text: `${categoryName(s, b.category)} is ${rupees(-st.left)} past its ${b.period} budget.`,
         tone: 'heads-up',
         priority: 75,
+        urgent: true,
         detail: { kind: 'list', title: `${categoryName(s, b.category)} budget`, rows: [{ label: 'Budget', value: rupees(b.amount) }, { label: 'Spent', value: rupees(st.spent) }], note: 'Nothing breaks. Safe-to-spend already counts what you spent.' },
       });
     }

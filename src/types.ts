@@ -366,6 +366,8 @@ export interface Insight {
   text: string;
   tone: 'good' | 'neutral' | 'heads-up';
   priority: number;
+  /** Needs attention now (a budget gone over, a payment due today or tomorrow): shown before the daily turn. */
+  urgent?: boolean;
   detail: InsightDetail;
 }
 
