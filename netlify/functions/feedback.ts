@@ -38,7 +38,7 @@ export interface Env {
   fetch: typeof fetch;
 }
 
-const DEFAULT_TO = 'krsnastudios16@gmail.com';
+export const DEFAULT_TO = 'krsnastudios16@gmail.com';
 // Resend's shared sender. It can only deliver to the Resend account's own address, which is all this needs.
 const DEFAULT_FROM = 'PULSE Feedback <onboarding@resend.dev>';
 

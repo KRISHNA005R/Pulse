@@ -237,7 +237,7 @@ function Shell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.onboarding.done, state.mode]);
 
-  // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback, /?tab=plans|splits|activity|you
+  // Home-screen shortcuts and deep links: /?action=add | afford | ai | feedback | gullak, /?tab=plans|splits|activity|you
   useEffect(() => {
     if (!state.onboarding.done) return;
     const q = new URLSearchParams(location.search);
@@ -258,6 +258,11 @@ function Shell() {
     if (action === 'add') ui.openSheet({ type: 'composer' });
     if (action === 'afford') ui.openSheet({ type: 'afford' });
     if (action === 'ai') ui.openSheet({ type: 'ai' });
+    // The announcement email's "Start a gullak" button.
+    if (action === 'gullak') {
+      ui.resetTo('plans');
+      ui.openSheet({ type: 'gullak-form' });
+    }
     if (action === 'feedback') ui.resetTo('you', { name: 'feedback' });
     q.delete('action');
     q.delete('tab');

@@ -36,9 +36,15 @@
 | `e2e/money.spec.ts` | Log a spend → bank balance and Activity. Got it back: payback is not income, comes off spending; Income screen; switching an old entry |
 | `e2e/ai.spec.ts` | PULSE AI: "What's new", money got back this month |
 | `e2e/bhisi.spec.ts` | Two phones: create a shared bhisi → invite link → join → server draw → same winner on both |
+| `e2e/links.spec.ts` | The announcement email's links (Start a bhisi, Start a gullak) and the private announce page |
 
 Not covered yet: sign-in (Google and email code), cloud sync between two devices, splits and settle up
 between two phones, plans and gullak, reminders, feedback, deleting an account.
+
+## Proof scripts (`tests-poc/`)
+
+Scripts that demonstrate reported problems. They are **not** part of `npm test` and pass while the
+problem still exists. Run one with `npx vitest run --dir tests-poc --config /dev/null`.
 
 ## Load tests
 

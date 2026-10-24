@@ -167,7 +167,8 @@
       '<a href="/stats/feedback/" id="fbopen" style="display:inline-block;text-decoration:none;font-weight:700;border-radius:999px;padding:10px 18px;font-size:14px;background:var(--accent);color:#fff">' +
       (fb.total ? 'Open all ' + fmt(fb.total) + ' message' + (fb.total === 1 ? '' : 's') + ' →' : 'Open feedback page →') + '</a></div>' +
       (wants.length ? '<h2 style="margin-top:16px">Most wanted</h2><div class="rows">' + bars(wants, wMax) + '</div>' : '') +
-      (fb.total ? '' : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up the moment someone sends it from You → Send feedback.</p>') + '</div>';
+      (fb.total ? '' : '<p class="muted" style="margin-top:10px">No feedback yet. It shows up the moment someone sends it from You → Send feedback.</p>') +
+      '<p style="margin:14px 0 0"><a href="/stats/announce/" style="font-weight:700;font-size:14px">📣 Announcement email (Bhisi &amp; Gullak) →</a></p></div>';
   }
 
   function reminders(p) {

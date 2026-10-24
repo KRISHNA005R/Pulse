@@ -37,6 +37,9 @@ http://pulsemoney.in/*                        https://pulsemoney.in/:splat   301
 # ---- GIF profile photos (see netlify/functions/face.ts) ---------------------------------------
 /api/face  /.netlify/functions/face  200
 
+# ---- Announcement emails, sent from /stats/announce/ (see netlify/functions/announce.ts) ------
+/api/announce  /.netlify/functions/announce  200
+
 # ---- Paths ----------------------------------------------------------------------------------
 # Old share links or typos land on the app instead of an error
 /app        /           301

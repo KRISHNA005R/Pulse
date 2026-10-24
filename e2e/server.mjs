@@ -24,6 +24,10 @@ const BLOBS_PORT = PORT + 1082;
 
 // --- 1. No real keys, no real network -------------------------------------------------------------
 for (const k of ['RESEND_API_KEY', 'AUTH_FROM', 'FEEDBACK_FROM', 'FEEDBACK_TO', 'GOOGLE_CLIENT_ID', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY']) delete process.env[k];
+// The private stats pages open with this test password (never the real one).
+import { createHash } from 'node:crypto';
+export const E2E_STATS_KEY = 'e2e-stats-key';
+process.env.STATS_KEY_HASH = createHash('sha256').update(E2E_STATS_KEY).digest('hex');
 const local = (host) => /^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(String(host).replace(/:\d+$/, ''));
 export const blocked = [];
 const realFetch = globalThis.fetch;
@@ -56,7 +60,7 @@ const edge = `http://127.0.0.1:${BLOBS_PORT}`;
 process.env.NETLIFY_BLOBS_CONTEXT = Buffer.from(JSON.stringify({ siteID: 'e2e-site', token: 'local', edgeURL: edge, uncachedEdgeURL: edge })).toString('base64');
 
 // --- 3. The real server functions, bundled the way Netlify does ----------------------------------
-const routes = { '/api/sync': 'sync', '/api/ping': 'stats', '/api/stats': 'stats', '/api/push': 'push', '/api/friends': 'friends', '/api/auth': 'auth', '/api/face': 'face', '/api/feedback': 'feedback' };
+const routes = { '/api/sync': 'sync', '/api/ping': 'stats', '/api/stats': 'stats', '/api/push': 'push', '/api/friends': 'friends', '/api/auth': 'auth', '/api/face': 'face', '/api/feedback': 'feedback', '/api/announce': 'announce' };
 const out = path.join(dir, 'fn');
 const fns = {};
 for (const name of new Set(Object.values(routes))) {

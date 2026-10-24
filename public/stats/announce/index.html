@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PULSE announcement</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face { font-family: 'Unbounded'; font-weight: 200 900; font-display: swap; src: url(/fonts/unbounded.woff2) format('woff2'); }
+    @font-face { font-family: 'Onest'; font-weight: 100 900; font-display: swap; src: url(/fonts/onest.woff2) format('woff2'); }
+    :root {
+      --bg: #F6F5F2; --surface: #FFFFFF; --sunk: #EDEBE6; --ink: #17140F; --ink2: #57524A; --ink3: #746F67; --line: #E4E1DA;
+      --accent: #EC5B2B; --accent-soft: #F5E1D8; --pos: #1F7A4D; --bar2: #C9C4BA;
+      --display: 'Unbounded', system-ui, sans-serif; --body: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; --bg: #12110F; --surface: #1C1A17; --sunk: #25221E; --ink: #F3F1EC; --ink2: #BDB8AE; --ink3: #948F86; --line: #2F2C27; --accent-soft: #3E2015; --pos: #4CC38A; --bar2: #4A453E; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .wm { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; font-size: 22px; }
+    .wm span { color: var(--accent); }
+    .muted { color: var(--ink3); font-size: 13px; }
+    h2 { font-family: var(--display); font-size: 15px; font-weight: 700; margin: 0 0 2px; letter-spacing: -0.01em; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+    .grid { display: grid; gap: 12px; }
+    .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 12px; }
+    .two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 12px; }
+    .kpi .n { font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px; }
+    .kpi .l { font-size: 13px; color: var(--ink2); font-weight: 600; }
+    .chart { display: flex; align-items: flex-end; gap: 2px; height: 160px; margin-top: 14px; border-bottom: 1px solid var(--line); }
+    .chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; min-width: 0; }
+    .chart .b { background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; }
+    .chart .b.new { background: var(--bar2); border-radius: 0; }
+    .chart .c:hover .b { opacity: .8; }
+    .axis { display: flex; justify-content: space-between; color: var(--ink3); font-size: 11.5px; margin-top: 6px; }
+    .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink2); margin-top: 8px; flex-wrap: wrap; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .rows { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .row .top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .row .top b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .track { height: 8px; background: var(--sunk); border-radius: 99px; margin-top: 5px; overflow: hidden; }
+    .fill { height: 100%; background: var(--accent); border-radius: 99px; }
+    .fill.pos { background: var(--pos); }
+    .ret { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .ret > div { background: var(--sunk); border-radius: 14px; padding: 10px 11px; min-width: 0; }
+    .ret .muted { font-size: 12px; line-height: 1.3; }
+    .ret .n { font-family: var(--display); font-size: clamp(17px, 4.6vw, 22px); font-weight: 700; margin: 4px 0 2px; white-space: nowrap; }
+    .row .top span:first-child::first-letter { text-transform: uppercase; }
+    .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 5; }
+    form { max-width: 380px; margin: 14vh auto 0; display: flex; flex-direction: column; gap: 12px; }
+    input { font: inherit; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 999px; padding: 13px 20px; background: var(--accent); color: #fff; cursor: pointer; }
+    .ghost { background: transparent; color: var(--ink2); padding: 8px 12px; font-weight: 600; font-size: 13px; border: 1px solid var(--line); }
+    select { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .err { color: #C2412D; font-size: 14px; }
+    .note { font-size: 12.5px; color: var(--ink3); margin-top: 10px; }
+    .fb { border-top: 1px solid var(--line); padding: 14px 0 12px; }
+    .fb:first-of-type { margin-top: 12px; }
+    .fbh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag { background: var(--sunk); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; }
+    .fbm { margin: 8px 0 6px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    a { color: inherit; }
+    .back { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; text-decoration: none; color: var(--ink2); padding: 8px 12px 8px 8px; border: 1px solid var(--line); border-radius: 999px; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+    .f { background: var(--surface); color: var(--ink2); border: 1.5px solid var(--line); padding: 8px 14px; font-size: 13.5px; font-weight: 600; }
+    .f[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .f b { font-weight: 700; opacity: .7; margin-left: 4px; }
+    #q { width: 100%; margin-top: 10px; }
+    .list { display: grid; gap: 10px; margin-top: 14px; }
+    .item { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 16px 18px; min-width: 0; }
+    .item .fbh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .item .fbm { margin: 12px 0 10px; font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chip { background: var(--ink); color: var(--bg); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; }
+    .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px; }
+    .act { display: inline-block; text-decoration: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 13.5px; padding: 8px 16px; border-radius: 999px; }
+    .ok { color: var(--pos); font-size: 12.5px; font-weight: 600; }
+    .bad { color: #C2412D; font-size: 12.5px; font-weight: 600; }
+    .banner { background: var(--accent-soft); border-radius: 16px; padding: 12px 16px; font-size: 13.5px; margin-top: 12px; }
+  </style>
+<style>
+  .steps { display: grid; gap: 12px; margin-top: 12px; }
+  .step h2 { display: flex; align-items: center; gap: 10px; }
+  .num { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 99px; background: var(--ink); color: var(--bg); font-size: 13px; }
+  .step button { margin-top: 12px; }
+  button[disabled] { opacity: .45; cursor: not-allowed; }
+  .result { margin-top: 10px; font-size: 14px; }
+  iframe { width: 100%; height: 640px; border: 1px solid var(--line); border-radius: 16px; background: #fff; margin-top: 12px; }
+  label.check { display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+(function () {
+  var app = document.getElementById('app');
+  var KEY = 'pulse-stats-key';
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var fmt = function (n) { return Number(n).toLocaleString('en-IN'); };
+  function getKey() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { k ? localStorage.setItem(KEY, k) : localStorage.removeItem(KEY); } catch (e) {} }
+  var s = null, busy = false, msg = '', checked = false;
+
+  function login(m) {
+    app.innerHTML = '<form id="f"><div class="wm">PULSE<span>.</span> announce</div>' +
+      '<p class="muted" style="margin:0">Private. Enter your password.</p>' +
+      '<input id="k" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>' +
+      (m ? '<p class="err" role="alert" style="margin:0">' + esc(m) + '</p>' : '') +
+      '<button type="submit">Open</button></form>';
+    document.getElementById('f').onsubmit = function (e) { e.preventDefault(); setKey(document.getElementById('k').value.trim()); load(); };
+  }
+
+  function api(method, query, body) {
+    return fetch('/api/announce' + (query || ''), { method: method, headers: { 'x-stats-key': getKey(), 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 401) { setKey(''); login('That password is not right.'); throw new Error('stop'); }
+        return r.json().then(function (d) { d._status = r.status; return d; });
+      });
+  }
+
+  function load() {
+    if (!getKey()) return login();
+    app.innerHTML = '<p class="muted">Loading…</p>';
+    api('GET', '?status=1').then(function (d) { s = d; render(); loadPreview(); }).catch(function (e) { if (e.message !== 'stop') app.innerHTML = '<p class="err">Could not load (' + esc(e.message) + ').</p>'; });
+  }
+
+  function loadPreview() {
+    fetch('/api/announce?preview=1', { headers: { 'x-stats-key': getKey() }, cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (html) {
+      var f = document.getElementById('pv'); if (f) f.srcdoc = html;
+    });
+  }
+
+  function act(action) {
+    if (busy) return;
+    if (action === 'send' && !window.confirm('Send the email to the next ' + Math.min(s.left, s.perRun, Math.max(0, s.perDay - s.sentToday)) + ' people? This can’t be undone.')) return;
+    busy = true; msg = ''; render();
+    api('POST', '', { action: action }).then(function (d) {
+      busy = false;
+      if (action === 'test') msg = d.ok ? '✓ Test sent to ' + d.to + '. Check your inbox (and spam), then come back for step 2.' : '✗ ' + (d.error || 'Could not send the test.');
+      else msg = d.error ? '✗ ' + d.error : d.ok === false ? '✗ Resend didn’t accept this batch (' + d.failed + ' marked failed, they won’t be retried). Check the Netlify function log.' : d.sent ? '✓ Sent to ' + d.sent + ' people.' + (d.left ? ' ' + d.left + ' left: press again (tomorrow, if today’s limit is reached).' : ' That’s everyone. 🎉') : 'Nobody left to send to.';
+      return api('GET', '?status=1').then(function (n) { s = n; render(); });
+    }).catch(function (e) { busy = false; if (e.message !== 'stop') { msg = '✗ ' + e.message; render(); } });
+  }
+
+  function render() {
+    var warn = !s.emailOn ? '<div class="banner"><b>Email is off.</b> RESEND_API_KEY and AUTH_FROM (or FEEDBACK_FROM) are needed in Netlify.</div>'
+      : !s.canBroadcast ? '<div class="banner"><b>The sender is Resend’s test address</b> (' + esc(s.from) + '). It only delivers to you, so the test works but step 2 is locked. Verify pulsemoney.in in Resend, then set AUTH_FROM in Netlify (for example: PULSE &lt;hello@pulsemoney.in&gt;).</div>' : '';
+    var room = Math.max(0, s.perDay - s.sentToday);
+    var next = Math.min(s.left, s.perRun, room);
+    var canSend = s.emailOn && s.canBroadcast && s.tested && checked && next > 0 && !busy;
+    app.innerHTML =
+      '<header><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><a class="back" href="/stats/">← Stats</a><div class="wm">PULSE<span>.</span> announce</div></div>' +
+      '<button class="ghost" id="ref">Refresh</button></header>' +
+      '<div class="card"><div class="muted">Subject</div><div style="font-weight:700;font-size:16px;margin-top:2px">' + esc(s.subject) + '</div>' +
+      '<div class="muted" style="margin-top:8px">From: ' + (s.from ? esc(s.from) : '—') + ' · replies go to your FEEDBACK_TO address</div></div>' +
+      warn +
+      '<div class="grid kpis" style="margin-top:12px">' +
+      '<div class="card kpi"><div class="l">People with an account</div><div class="n">' + fmt(s.total) + '</div></div>' +
+      '<div class="card kpi"><div class="l">Sent</div><div class="n">' + fmt(s.sent) + '</div>' + (s.failed ? '<div class="bad">' + fmt(s.failed) + ' failed</div>' : '') + '</div>' +
+      '<div class="card kpi"><div class="l">Still to send</div><div class="n">' + fmt(s.left) + '</div>' + (s.off ? '<div class="muted">' + fmt(s.off) + ' unsubscribed</div>' : '') + '</div>' +
+      '<div class="card kpi"><div class="l">Sent today</div><div class="n">' + fmt(s.sentToday) + '<span class="muted" style="font-size:14px"> / ' + s.perDay + '</span></div><div class="muted">daily cap, so login codes still go out</div></div>' +
+      '</div>' +
+      '<div class="steps">' +
+      '<div class="card step"><h2><span class="num">1</span> Send a test to yourself</h2><div class="muted">One copy to your own inbox, so you can check how it looks.' + (s.tested ? ' <span class="ok">Done ✓</span>' : '') + '</div>' +
+      '<button id="test"' + (s.emailOn && !busy ? '' : ' disabled') + '>' + (busy ? 'Sending…' : s.tested ? 'Send another test' : 'Send test to me') + '</button></div>' +
+      '<div class="card step"><h2><span class="num">2</span> Send to everyone</h2><div class="muted">Goes out in batches of up to ' + s.perRun + ', and never twice to the same person. Each email has an unsubscribe link.</div>' +
+      (s.tested ? '<label class="check"><input type="checkbox" id="ok"' + (checked ? ' checked' : '') + '> I checked the test email and it looks right.</label>' : '<p class="muted" style="margin:10px 0 0">Unlocks after the test is sent.</p>') +
+      '<button id="send"' + (canSend ? '' : ' disabled') + '>' + (s.left === 0 ? 'Everyone has it 🎉' : room === 0 ? 'Today’s limit reached: come back tomorrow' : 'Send to the next ' + next + ' people') + '</button></div>' +
+      '</div>' +
+      (msg ? '<div class="banner result" role="status">' + esc(msg) + '</div>' : '') +
+      '<div class="card" style="margin-top:12px"><h2>Preview</h2><div class="muted">How it looks (with your name). Each person sees their own first name.</div><iframe id="pv" title="Email preview"></iframe></div>';
+    document.getElementById('ref').onclick = load;
+    document.getElementById('test').onclick = function () { act('test'); };
+    document.getElementById('send').onclick = function () { act('send'); };
+    var ok = document.getElementById('ok');
+    if (ok) ok.onchange = function () { checked = ok.checked; render(); loadPreview(); };
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>
