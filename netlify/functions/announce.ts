@@ -3,7 +3,8 @@
 //
 // Uses the same Netlify environment variables as sign-in emails:
 //   RESEND_API_KEY   the Resend key (never leaves Netlify)
-//   AUTH_FROM        the sender, e.g. "PULSE <hello@pulsemoney.in>" (FEEDBACK_FROM when missing)
+//   ANNOUNCE_FROM    optional sender just for announcements, e.g. "Krishna from PULSE <krishna@pulsemoney.in>"
+//   AUTH_FROM        the sign-in sender, used when ANNOUNCE_FROM is missing (then FEEDBACK_FROM)
 //   FEEDBACK_TO      where the test copy goes (the owner)
 //   STATS_KEY_HASH   the stats key that unlocks the page
 import { getStore } from '@netlify/blobs';
@@ -13,9 +14,12 @@ import type { Mail } from '../lib/emails';
 import { DEFAULT_TO } from './feedback';
 import { DEFAULT_KEY_HASH, json } from './stats';
 
+/** ANNOUNCE_FROM (e.g. "Krishna from PULSE <krishna@pulsemoney.in>") when set, else the sign-in sender. */
+const fromAddress = () => process.env.ANNOUNCE_FROM || process.env.AUTH_FROM || process.env.FEEDBACK_FROM || '';
+
 export function sender(): AnnounceCtx['send'] {
   const key = process.env.RESEND_API_KEY;
-  const from = process.env.AUTH_FROM || process.env.FEEDBACK_FROM;
+  const from = fromAddress();
   if (!key || !from) return null;
   return async (mails: { to: string; mail: Mail }[]) => {
     const res = await fetch('https://api.resend.com/emails/batch', {
@@ -32,7 +36,7 @@ export function sender(): AnnounceCtx['send'] {
 
 export default async (req: Request) => {
   try {
-    const from = process.env.AUTH_FROM || process.env.FEEDBACK_FROM || '';
+    const from = fromAddress();
     return await handleAnnounce(req, {
       store: getStore({ name: 'pulse-accounts', consistency: 'strong' }) as unknown as AuthStore,
       send: sender(),

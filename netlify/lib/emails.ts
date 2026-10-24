@@ -272,61 +272,48 @@ export function codeEmail(code: string): Mail {
 
 // ---------------------------------------------------------------------------------------------
 // 4. Announcement to everyone with an account: Bhisi and Gullak
+//
+// Written as a short personal note on purpose: Gmail files designed, newsletter-looking mail
+// (logo, big buttons, layout tables, emoji subject) under Promotions. A plain note from a person,
+// that asks for a reply, has the best chance of landing in Primary. Nothing can guarantee it.
 // ---------------------------------------------------------------------------------------------
-const feature = (emoji: string, title: string, line: string, bullets: string[]) =>
-  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px"><tr><td class="e-sunk" style="background:${C.sunk};border-radius:20px;padding:18px 18px 8px">
-<div style="font-size:30px;line-height:1;margin:0 0 10px">${emoji}</div>
-<div class="e-ink" style="font-family:${DISPLAY};font-size:18px;font-weight:800;letter-spacing:-0.3px;color:${C.ink};margin:0 0 6px">${title}</div>
-<p class="e-ink2" style="margin:0 0 10px;font-family:${BODY};font-size:15px;line-height:1.55;color:${C.ink2}">${line}</p>
-${bullets.map((b) => `<p class="e-ink2" style="margin:0 0 8px;font-family:${BODY};font-size:14.5px;line-height:1.5;color:${C.ink2}">• ${b}</p>`).join('')}
-</td></tr></table>`;
-
 export function announceEmail(name: string, unsubUrl: string): Mail {
   const first = name.trim().split(/\s+/)[0] || 'there';
   const bhisi = `${SITE}/?tab=bhisi&source=announce`;
   const gullak = `${SITE}/?action=gullak&source=announce`;
-  const body =
-    p(`Hey ${esc(first)} 👋`, C.ink) +
-    h1('Two new ways to save, made for us') +
-    p('We just added two new things to PULSE.') +
-    feature('🏺', 'Bhisi: save together, win the pot', 'You and your friends each put in the same amount every month. On draw day, one chit comes out of the matka and that person takes the whole pot. Everyone wins once.', [
-      'The draw is truly random. No one can cheat, and everyone sees the same result.',
-      'Pay 3 days early for a little extra luck 🍀',
-      'Invite friends with one link, even if they’re new to PULSE.',
-    ]) +
-    feature('🪙', 'Gullak: a coin a day', 'Pick a coin, like ₹20, and a number of days. Drop one in every day and watch it fill. When it’s full, break it open 🔨', []) +
-    `<div style="margin-top:20px">${button('Start a bhisi', esc(bhisi))}${button('Start a gullak', esc(gullak), 'dark')}</div>` +
-    `<p class="e-ink2" style="margin:18px 0 0;font-family:${BODY};font-size:14.5px;line-height:1.5;color:${C.ink2}">Got feedback? Just reply to this email.</p>` +
-    `<p class="e-ink" style="margin:14px 0 0;font-family:${BODY};font-size:15px;font-weight:700;color:${C.ink}">Team PULSE 🧡</p>`;
+  const link = (href: string, label: string) => `<a href="${esc(href)}" style="color:#AD431F">${label}</a>`;
+  const para = (t: string) => `<p style="margin:0 0 14px">${t}</p>`;
+  const html =
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>` +
+    `<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#17140F">` +
+    para(`Hey ${esc(first)},`) +
+    para('Krishna here, I build PULSE. Two new things just went live, and I’d love for you to try them.') +
+    para(`<b>Bhisi</b>: save together with friends. Everyone puts in the same amount every month, and once a month one chit is drawn from the matka. That person takes the whole pot, and everyone wins once. The draw is truly random, and paying 3 days early gives you a little extra luck. ${link(bhisi, 'Start a bhisi')}`) +
+    para(`<b>Gullak</b>: a coin a day. Pick a coin, like ₹20, and drop one in every day. When it’s full, break it open. ${link(gullak, 'Start a gullak')}`) +
+    para('If you try one, just reply and tell me what you think. I read every reply.') +
+    para('Krishna<br>PULSE') +
+    para('P.S. If this landed in Promotions, drag it to Primary so you don’t miss your bhisi draw days.') +
+    `<p style="margin:24px 0 0;font-size:12px;color:#746F67">You’re getting this because you have a PULSE account. ${link(unsubUrl, 'Unsubscribe')}</p>` +
+    `</body></html>`;
   const text = [
     `Hey ${first},`,
     '',
-    'We just added two new ways to save in PULSE.',
+    'Krishna here, I build PULSE. Two new things just went live, and I’d love for you to try them.',
     '',
-    '🏺 Bhisi: save together, win the pot',
-    'You and your friends each put in the same amount every month. On draw day, one chit comes out of the matka and that person takes the whole pot. Everyone wins once.',
-    '- The draw is truly random. No one can cheat, and everyone sees the same result.',
-    '- Pay 3 days early for a little extra luck.',
-    '- Invite friends with one link, even if they’re new to PULSE.',
+    'Bhisi: save together with friends. Everyone puts in the same amount every month, and once a month one chit is drawn from the matka. That person takes the whole pot, and everyone wins once. The draw is truly random, and paying 3 days early gives you a little extra luck.',
     `Start a bhisi: ${bhisi}`,
     '',
-    '🪙 Gullak: a coin a day',
-    'Pick a coin, like ₹20, and a number of days. Drop one in every day and watch it fill. When it’s full, break it open.',
+    'Gullak: a coin a day. Pick a coin, like ₹20, and drop one in every day. When it’s full, break it open.',
     `Start a gullak: ${gullak}`,
     '',
-    'Got feedback? Just reply to this email.',
-    'Team PULSE',
+    'If you try one, just reply and tell me what you think. I read every reply.',
+    '',
+    'Krishna',
+    'PULSE',
+    '',
+    'P.S. If this landed in Promotions, drag it to Primary so you don’t miss your bhisi draw days.',
     '',
     `You’re getting this because you have a PULSE account. Unsubscribe: ${unsubUrl}`,
   ].join('\n');
-  return {
-    subject: '🏺 Bhisi and 🪙 Gullak just dropped in PULSE',
-    html: shell({
-      preheader: 'Save with friends, win the pot, or drop a coin a day.',
-      tag: 'New in PULSE',
-      body,
-      footer: `You’re getting this because you have a PULSE account.<br><a href="${esc(unsubUrl)}" class="e-ink3" style="color:${C.ink3}">Unsubscribe</a> · <a href="${SITE}" class="e-ink3" style="color:${C.ink3}">pulsemoney.in</a>`,
-    }),
-    text,
-  };
+  return { subject: 'Two new things in PULSE', html, text };
 }

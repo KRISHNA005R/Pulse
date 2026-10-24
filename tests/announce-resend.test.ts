@@ -40,6 +40,19 @@ describe('Resend batch request', () => {
     ]);
   });
 
+  it('uses ANNOUNCE_FROM as the sender when it is set (a person’s name helps Gmail treat it as personal)', async () => {
+    vi.stubEnv('RESEND_API_KEY', 'test-key');
+    vi.stubEnv('AUTH_FROM', 'PULSE <login@pulsemoney.in>');
+    vi.stubEnv('ANNOUNCE_FROM', 'Krishna from PULSE <krishna@pulsemoney.in>');
+    let body: { from: string }[] = [];
+    vi.stubGlobal('fetch', async (_u: string, init: RequestInit) => {
+      body = JSON.parse(String(init.body));
+      return new Response('{}', { status: 200 });
+    });
+    await sender()!([{ to: 'a@example.com', mail: { subject: 'S', html: 'h', text: 't' } }]);
+    expect(body[0].from).toBe('Krishna from PULSE <krishna@pulsemoney.in>');
+  });
+
   it('reports a refused batch as failed', async () => {
     vi.stubEnv('RESEND_API_KEY', 'test-key');
     vi.stubEnv('AUTH_FROM', 'PULSE <hello@pulsemoney.in>');

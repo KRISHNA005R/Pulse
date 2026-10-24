@@ -25,7 +25,7 @@ test('announce page: password, numbers, email-off warning, buttons locked, previ
 
   await page.getByLabel('Password').fill('e2e-stats-key');
   await page.getByRole('button', { name: 'Open' }).click();
-  await expect(page.getByText('🏺 Bhisi and 🪙 Gullak just dropped in PULSE')).toBeVisible();
+  await expect(page.getByText('Two new things in PULSE')).toBeVisible();
   await expect(page.getByText(/Email is off/)).toBeVisible();
   await expect(page.getByRole('button', { name: /Send test to me/ })).toBeDisabled();
   await expect(page.locator('#send')).toBeDisabled();

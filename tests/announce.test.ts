@@ -53,14 +53,34 @@ async function setup(opts: { people?: [string, string][]; perRun?: number; perDa
 describe('the announcement email', () => {
   const make = () => announceEmail('Asha', `${SITE}/api/announce?u=u1&t=abc`);
 
-  it('talks about Bhisi and Gullak, with buttons for both', () => {
+  it('talks about Bhisi and Gullak, with a plain link to each', () => {
     const mail = make();
-    expect(mail.subject).toBe('🏺 Bhisi and 🪙 Gullak just dropped in PULSE');
     expect(mail.html).toContain('Hey Asha');
     expect(mail.html).toContain(`${SITE}/?tab=bhisi`);
     expect(mail.html).toContain(`${SITE}/?action=gullak`);
     expect(mail.text).toContain('Bhisi');
     expect(mail.text).toContain('Gullak');
+  });
+
+  // Gmail puts designed, newsletter-looking mail in Promotions. A plain note from a person has the
+  // best chance of landing in Primary.
+  it('looks like a personal note, not a newsletter', () => {
+    const mail = make();
+    expect(mail.subject).toBe('Two new things in PULSE');
+    expect(mail.subject).not.toMatch(/\p{Extended_Pictographic}/u); // no emoji in the subject
+    expect(mail.html).not.toMatch(/<img/i); // no logo or images
+    expect(mail.html).not.toMatch(/<table/i); // no designed layout
+    expect(mail.html).not.toMatch(/border-radius:\s*999px/); // no big buttons
+    expect(mail.html).not.toMatch(/<style/i);
+    expect(mail.html.length).toBeLessThan(4000);
+    expect((mail.html.match(/<a /g) ?? []).length).toBeLessThanOrEqual(3); // bhisi, gullak, unsubscribe
+  });
+
+  it('asks people to reply, and signs off as a person', () => {
+    const mail = make();
+    expect(mail.text).toMatch(/reply/i);
+    expect(mail.text).toMatch(/Krishna/);
+    expect(mail.html).toMatch(/Krishna/);
   });
 
   it('has an unsubscribe link in both the HTML and the plain text', () => {
