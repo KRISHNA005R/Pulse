@@ -18,15 +18,18 @@
 //   news/<campaign>/test         -> { at }  a test copy went to the owner
 //   news/<campaign>/claim/<uid>  -> { at }  this person's email went out (or was tried)
 //   news/<campaign>/fail/<uid>   -> { at }  ...and the batch failed
-//   news/day/<YYYY-MM-DD>        -> { c }   announcement emails sent that India day
+//   news/day/<YYYY-MM-DD>/<i>    -> { at }  one of that India day's PER_DAY sending slots, taken
+//                                           once (onlyIfNew), so two presses can't go past the cap
 import type { Account, AuthStore } from './auth';
 import { EMAIL, SITE, announceEmail, esc, type Mail } from './emails';
+import { checkAdmin } from './admin';
 
 export { announceEmail };
 export const CAMPAIGN = 'bhisi-gullak-2026-10';
 const PER_RUN = 80;
 const PER_DAY = 90;
-const MAX_MEMBERS = 5000;
+/** Resend's batch API takes at most 100 emails per call. */
+const MAX_BATCH = 100;
 
 export interface AnnounceCtx {
   store: AuthStore;
@@ -58,7 +61,6 @@ const page = (title: string, line: string, status = 200) =>
   );
 
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
-const sha256 = async (s: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
 const istDay = (d: Date) => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 const get = <T>(store: AuthStore, key: string) => store.get(key, { type: 'json' }) as Promise<T | null>;
 const same = (a: string, b: string) => {
@@ -85,7 +87,7 @@ const unsubUrl = async (store: AuthStore, uid: string) => `${SITE}/api/announce?
 
 /** Everyone with a live account and a real email address, in member order. */
 async function people(store: AuthStore): Promise<Person[]> {
-  const highest = Math.min((await get<{ n: number }>(store, 'meta/count'))?.n ?? 0, MAX_MEMBERS);
+  const highest = (await get<{ n: number }>(store, 'meta/count'))?.n ?? 0;
   const out: Person[] = [];
   for (let i = 1; i <= highest; i += 25) {
     const batch = await Promise.all(
@@ -108,7 +110,7 @@ async function overview(ctx: AnnounceCtx, campaign = CAMPAIGN) {
   const all = await people(store);
   const [off, claimed, failed] = await Promise.all([keys(store, 'news/off/'), keys(store, `news/${campaign}/claim/`), keys(store, `news/${campaign}/fail/`)]);
   const today = istDay(ctx.now ?? new Date());
-  const used = (await get<{ c: number }>(store, `news/day/${today}`))?.c ?? 0;
+  const used = (await keys(store, `news/day/${today}/`)).size;
   const pending = all.filter((p) => !off.has(p.uid) && !claimed.has(p.uid));
   return {
     all,
@@ -127,17 +129,22 @@ async function overview(ctx: AnnounceCtx, campaign = CAMPAIGN) {
       emailOn: !!ctx.send,
       canBroadcast: ctx.canBroadcast !== false,
       from: ctx.from ?? '',
-      perRun: ctx.perRun ?? PER_RUN,
+      perRun: perRun(ctx),
       perDay: ctx.perDay ?? PER_DAY,
       sentToday: used,
     },
   };
 }
 
-async function countToday(store: AuthStore, day: string, n: number) {
-  const k = `news/day/${day}`;
-  const c = (await get<{ c: number }>(store, k))?.c ?? 0;
-  await store.setJSON(k, { c: c + n });
+const perRun = (ctx: AnnounceCtx) => Math.max(1, Math.min(ctx.perRun ?? PER_RUN, MAX_BATCH));
+
+/** Takes one of today's sending slots. False when all of them are gone. Safe when presses overlap. */
+async function takeSlot(store: AuthStore, day: string, from: number, perDay: number, at: string): Promise<boolean> {
+  for (let i = Math.max(0, from); i < perDay; i++) {
+    const res = (await store.setJSON(`news/day/${day}/${i}`, { at }, { onlyIfNew: true })) as { modified?: boolean } | undefined;
+    if (res?.modified !== false) return true;
+  }
+  return false;
 }
 
 function withHeaders(mail: Mail, link: string, owner: string): Mail {
@@ -167,8 +174,8 @@ export async function handleAnnounce(req: Request, ctx: AnnounceCtx): Promise<Re
   }
 
   // --- Everything else is for the owner only ---
-  const key = req.headers.get('x-stats-key') ?? '';
-  if (!key || !same(await sha256(key), ctx.keyHash)) return json({ error: 'wrong key' }, 401);
+  const denied = await checkAdmin(req, ctx.keyHash, store);
+  if (denied) return denied;
 
   if (req.method === 'GET') {
     if (url.searchParams.has('status')) return json((await overview(ctx)).body);
@@ -182,7 +189,17 @@ export async function handleAnnounce(req: Request, ctx: AnnounceCtx): Promise<Re
 
   const body = (await req.json().catch(() => null)) as { action?: string } | null;
   const action = body?.action;
-  if (action !== 'test' && action !== 'send') return json({ error: 'bad request' }, 400);
+  if (action !== 'test' && action !== 'send' && action !== 'retry') return json({ error: 'bad request' }, 400);
+
+  // Put the people from a failed batch back in the queue, so the next press sends to them.
+  if (action === 'retry') {
+    const failed = await keys(store, `news/${CAMPAIGN}/fail/`);
+    await Promise.all([...failed].map(async (uid) => {
+      await store.delete(`news/${CAMPAIGN}/claim/${uid}`);
+      await store.delete(`news/${CAMPAIGN}/fail/${uid}`);
+    }));
+    return json({ ...(await overview(ctx)).body, retried: failed.size });
+  }
   if (!ctx.send) return json({ error: 'Email is off: RESEND_API_KEY and a sender (AUTH_FROM or FEEDBACK_FROM) are needed in Netlify.' }, 503);
 
   const o = await overview(ctx);
@@ -193,8 +210,8 @@ export async function handleAnnounce(req: Request, ctx: AnnounceCtx): Promise<Re
   if (action === 'test') {
     if (!EMAIL.test(ctx.owner)) return json({ error: 'FEEDBACK_TO is not a valid email address.' }, 400);
     const me = o.all.find((p) => p.email.toLowerCase() === ctx.owner.toLowerCase());
-    const link = me ? await unsubUrl(store, me.uid) : `${SITE}/api/announce?u=test&t=test`;
-    await countToday(store, o.today, 1);
+    const link = await unsubUrl(store, me?.uid ?? 'owner-test');
+    if (!(await takeSlot(store, o.today, o.used, perDay, (ctx.now ?? new Date()).toISOString()))) return json({ ...o.body, error: `Today’s limit of ${perDay} announcement emails is reached. Press again tomorrow.` }, 429);
     const ok = await trySend(ctx, [{ to: ctx.owner, mail: withHeaders(announceEmail(me?.name ?? 'Krishna', link), link, '') }]);
     if (!ok) return json({ ok: false, error: 'Resend did not accept the test email. Check the Netlify function log.' }, 502);
     await store.setJSON(`news/${CAMPAIGN}/test`, { at: (ctx.now ?? new Date()).toISOString() });
@@ -204,19 +221,26 @@ export async function handleAnnounce(req: Request, ctx: AnnounceCtx): Promise<Re
   // action === 'send'
   if (ctx.canBroadcast === false) return json({ error: 'The sender is Resend’s test address, which only delivers to you. Verify pulsemoney.in in Resend and set AUTH_FROM (e.g. PULSE <hello@pulsemoney.in>) in Netlify first.' }, 503);
   if (!o.body.tested) return json({ error: 'Send yourself the test copy first, and check it in your inbox.' }, 409);
-  const take = Math.min(ctx.perRun ?? PER_RUN, room);
+  const take = Math.min(perRun(ctx), room);
   const at = (ctx.now ?? new Date()).toISOString();
   const batch: Person[] = [];
+  let full = false;
   for (const p of o.pending) {
     if (batch.length >= take) break;
     const res = (await store.setJSON(`news/${CAMPAIGN}/claim/${p.uid}`, { at }, { onlyIfNew: true })) as { modified?: boolean } | undefined;
-    if (res?.modified !== false) batch.push(p); // claimed by this press; skipped when another press got there first
+    if (res?.modified === false) continue; // another press got this person first
+    // Each email also needs one of today's slots; when they're gone, hand the person back and stop.
+    if (!(await takeSlot(store, o.today, o.used + batch.length, perDay, at))) {
+      await store.delete(`news/${CAMPAIGN}/claim/${p.uid}`);
+      full = true;
+      break;
+    }
+    batch.push(p);
   }
   if (!batch.length) {
     const now = await overview(ctx);
-    return json({ ...now.body, sent: 0, failed: 0 });
+    return full ? json({ ...now.body, sent: 0, failed: 0, error: `Today’s limit of ${perDay} announcement emails is reached. Press again tomorrow.` }, 429) : json({ ...now.body, sent: 0, failed: 0 });
   }
-  await countToday(store, o.today, batch.length);
   const mails = await Promise.all(
     batch.map(async (p) => {
       const link = await unsubUrl(store, p.uid);

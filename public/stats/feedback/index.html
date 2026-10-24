@@ -114,6 +114,7 @@
     fetch('/api/feedback', { headers: { 'x-stats-key': key }, cache: 'no-store' })
       .then(function (r) {
         if (r.status === 401) { setKey(''); login('That password is not right.'); return null; }
+        if (r.status === 429 || r.status === 503) return r.json().then(function (d) { setKey(''); login(d.error || 'Locked.'); return null; });
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })

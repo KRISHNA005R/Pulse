@@ -53,17 +53,20 @@ export function buildInsights(s: State): Insight[] {
     });
   }
 
-  // 2. Food month vs last month (same point in the month)
+  // 2. Food month vs last month, at the same point in the month (1–20 Oct against 1–20 Sept).
+  // Only once a week of the month has gone by and some food is logged, so it never says "down 100%"
+  // just because nothing is logged yet.
   const foodNow = spendBetween(s, mStart, today, ['food']);
-  const foodPrev = spendBetween(s, pStart, pEnd, ['food']);
-  if (foodPrev > 0) {
+  const samePoint = addDays(pStart, dayOfMonth - 1);
+  const foodPrev = spendBetween(s, pStart, samePoint < pEnd ? samePoint : pEnd, ['food']);
+  if (foodPrev > 0 && foodNow > 0 && dayOfMonth >= 7) {
     const ch = (foodNow - foodPrev) / foodPrev;
     out.push({
       id: 'food-month',
       text: ch >= 0 ? `You spent ${Math.round(ch * 100)}% more on food this month.` : `Food spending is down ${Math.round(-ch * 100)}% on last month.`,
       tone: ch > 0.1 ? 'heads-up' : 'neutral',
       priority: 40,
-      detail: { kind: 'bars', title: 'Food, month by month', rows: [{ label: monthShort(pStart), value: foodPrev }, { label: `${monthShort(today)} so far`, value: foodNow, highlight: true }] },
+      detail: { kind: 'bars', title: 'Food, month by month', rows: [{ label: `${monthShort(pStart)} 1–${Math.min(dayOfMonth, Number(pEnd.slice(8)))}`, value: foodPrev }, { label: `${monthShort(today)} so far`, value: foodNow, highlight: true }], note: 'Both counted up to the same day of the month.' },
     });
   }
 

@@ -41,10 +41,11 @@
 Not covered yet: sign-in (Google and email code), cloud sync between two devices, splits and settle up
 between two phones, plans and gullak, reminders, feedback, deleting an account.
 
-## Proof scripts (`tests-poc/`)
+## Security regression tests
 
-Scripts that demonstrate reported problems. They are **not** part of `npm test` and pass while the
-problem still exists. Run one with `npx vitest run --dir tests-poc --config /dev/null`.
+The problems found in security reviews have permanent tests, so they can't come back:
+`tests/announce.test.ts` ("fixed problems stay fixed": SEC-A to SEC-G) and `tests/admin.test.ts`
+(the private-page password: no built-in fallback, a limit on wrong guesses).
 
 ## Load tests
 

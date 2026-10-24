@@ -118,6 +118,7 @@
     return fetch('/api/announce' + (query || ''), { method: method, headers: { 'x-stats-key': getKey(), 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' })
       .then(function (r) {
         if (r.status === 401) { setKey(''); login('That password is not right.'); throw new Error('stop'); }
+        if (r.status === 429 || (r.status === 503 && method === 'GET')) return r.json().then(function (d) { setKey(''); login(d.error || 'Locked.'); throw new Error('stop'); });
         return r.json().then(function (d) { d._status = r.status; return d; });
       });
   }
@@ -140,8 +141,9 @@
     busy = true; msg = ''; render();
     api('POST', '', { action: action }).then(function (d) {
       busy = false;
-      if (action === 'test') msg = d.ok ? '✓ Test sent to ' + d.to + '. Check your inbox (and spam), then come back for step 2.' : '✗ ' + (d.error || 'Could not send the test.');
-      else msg = d.error ? '✗ ' + d.error : d.ok === false ? '✗ Resend didn’t accept this batch (' + d.failed + ' marked failed, they won’t be retried). Check the Netlify function log.' : d.sent ? '✓ Sent to ' + d.sent + ' people.' + (d.left ? ' ' + d.left + ' left: press again (tomorrow, if today’s limit is reached).' : ' That’s everyone. 🎉') : 'Nobody left to send to.';
+      if (action === 'retry') msg = '✓ ' + (d.retried || 0) + ' put back in the queue. Press “Send” to send to them again.';
+      else if (action === 'test') msg = d.ok ? '✓ Test sent to ' + d.to + '. Check your inbox (and spam), then come back for step 2.' : '✗ ' + (d.error || 'Could not send the test.');
+      else msg = d.error ? '✗ ' + d.error : d.ok === false ? '✗ Resend didn’t accept this batch (' + d.failed + ' marked failed). Check the Netlify function log, then use “Retry the failed ones”.' : d.sent ? '✓ Sent to ' + d.sent + ' people.' + (d.left ? ' ' + d.left + ' left: press again (tomorrow, if today’s limit is reached).' : ' That’s everyone. 🎉') : 'Nobody left to send to.';
       return api('GET', '?status=1').then(function (n) { s = n; render(); });
     }).catch(function (e) { busy = false; if (e.message !== 'stop') { msg = '✗ ' + e.message; render(); } });
   }
@@ -160,7 +162,7 @@
       warn +
       '<div class="grid kpis" style="margin-top:12px">' +
       '<div class="card kpi"><div class="l">People with an account</div><div class="n">' + fmt(s.total) + '</div></div>' +
-      '<div class="card kpi"><div class="l">Sent</div><div class="n">' + fmt(s.sent) + '</div>' + (s.failed ? '<div class="bad">' + fmt(s.failed) + ' failed</div>' : '') + '</div>' +
+      '<div class="card kpi"><div class="l">Sent</div><div class="n">' + fmt(s.sent) + '</div>' + (s.failed ? '<div class="bad">' + fmt(s.failed) + ' failed</div><button class="ghost" id="retry" style="margin-top:8px"' + (busy ? ' disabled' : '') + '>Retry the failed ones</button>' : '') + '</div>' +
       '<div class="card kpi"><div class="l">Still to send</div><div class="n">' + fmt(s.left) + '</div>' + (s.off ? '<div class="muted">' + fmt(s.off) + ' unsubscribed</div>' : '') + '</div>' +
       '<div class="card kpi"><div class="l">Sent today</div><div class="n">' + fmt(s.sentToday) + '<span class="muted" style="font-size:14px"> / ' + s.perDay + '</span></div><div class="muted">daily cap, so login codes still go out</div></div>' +
       '</div>' +
@@ -176,6 +178,8 @@
     document.getElementById('ref').onclick = load;
     document.getElementById('test').onclick = function () { act('test'); };
     document.getElementById('send').onclick = function () { act('send'); };
+    var rt = document.getElementById('retry');
+    if (rt) rt.onclick = function () { act('retry'); };
     var ok = document.getElementById('ok');
     if (ok) ok.onchange = function () { checked = ok.checked; render(); loadPreview(); };
   }

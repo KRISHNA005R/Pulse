@@ -12,7 +12,8 @@ import { handleAnnounce, type AnnounceCtx } from '../lib/announce';
 import type { AuthStore } from '../lib/auth';
 import type { Mail } from '../lib/emails';
 import { DEFAULT_TO } from './feedback';
-import { DEFAULT_KEY_HASH, json } from './stats';
+import { json } from './stats';
+import { adminKeyHash } from '../lib/admin';
 
 /** ANNOUNCE_FROM (e.g. "Krishna from PULSE <krishna@pulsemoney.in>") when set, else the sign-in sender. */
 const fromAddress = () => process.env.ANNOUNCE_FROM || process.env.AUTH_FROM || process.env.FEEDBACK_FROM || '';
@@ -41,7 +42,7 @@ export default async (req: Request) => {
       store: getStore({ name: 'pulse-accounts', consistency: 'strong' }) as unknown as AuthStore,
       send: sender(),
       owner: process.env.FEEDBACK_TO || DEFAULT_TO,
-      keyHash: process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH,
+      keyHash: adminKeyHash(),
       from,
       canBroadcast: !!from && !/@resend\.dev\b/i.test(from),
       perRun: Number(process.env.ANNOUNCE_PER_RUN) || undefined,

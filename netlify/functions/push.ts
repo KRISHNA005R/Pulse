@@ -16,7 +16,8 @@
 // See netlify/lib/push.ts for what is stored. The sender runs from netlify/functions/push-cron.ts.
 import { getStore } from '@netlify/blobs';
 import webpush from 'web-push';
-import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
+import { json } from './stats';
+import { adminKeyHash, checkAdmin } from '../lib/admin';
 import { getVapid, removeDevice, sendTest, status, syncDevice, type Sender, type StoreLike, type Vapid } from '../lib/push';
 import { createBlast, dailyOverview, deleteCustom, runBlasts, sendPreview, setCustom } from '../lib/daily';
 
@@ -47,14 +48,12 @@ export const pushStore = () => getStore({ name: 'pulse-push', consistency: 'stro
 export async function handle(req: Request, store: StoreLike, sender: Sender, keyHash: string, make = makeVapid): Promise<Response> {
   try {
     // The stats page proves who it is with the stats password.
-    const owner = async () => {
-      const key = req.headers.get('x-stats-key') ?? '';
-      return !!key && (await sha256(key)) === keyHash;
-    };
+    const owner = () => checkAdmin(req, keyHash, store);
     if (req.method === 'GET') {
       const url = new URL(req.url);
       if (url.searchParams.has('status') || url.searchParams.has('daily')) {
-        if (!(await owner())) return json({ error: 'wrong key' }, 401);
+        const denied = await owner();
+        if (denied) return denied;
         return json(url.searchParams.has('daily') ? await dailyOverview(store) : await status(store));
       }
       return json({ publicKey: (await getVapid(store, make)).publicKey });
@@ -82,7 +81,8 @@ export async function handle(req: Request, store: StoreLike, sender: Sender, key
         return json({ ok: true });
       }
       if (typeof body.action === 'string' && body.action.startsWith('daily-')) {
-        if (!(await owner())) return json({ error: 'wrong key' }, 401);
+        const denied = await owner();
+        if (denied) return denied;
         if (body.action === 'daily-set') {
           const res = await setCustom(store, body);
           return json(res, res.ok ? 200 : 400);
@@ -109,6 +109,6 @@ export async function handle(req: Request, store: StoreLike, sender: Sender, key
   }
 }
 
-export default async (req: Request) => handle(req, pushStore(), send, process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH);
+export default async (req: Request) => handle(req, pushStore(), send, adminKeyHash());
 
 // Reached at /.netlify/functions/push; public/_redirects maps /api/push to it.

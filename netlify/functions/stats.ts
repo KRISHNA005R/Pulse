@@ -8,6 +8,7 @@
 // day can't get pings any more (4+ days old), the stats page folds its `u/` blobs into one
 // `day/YYYY-MM-DD` blob ({ users: { id: summary } }) and removes them. Days saved before this
 // change are already in that shape.
+import { adminKeyHash, checkAdmin } from '../lib/admin';
 import { getStore } from '@netlify/blobs';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -28,8 +29,6 @@ const BOOLS2 = ['reminders', 'account'] as const;
 const PLATFORMS = ['ios', 'android', 'desktop', 'other'];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const ID = /^[0-9a-f]{32}$/;
-// SHA-256 of the dashboard key. Override with the STATS_KEY_HASH environment variable in Netlify.
-export const DEFAULT_KEY_HASH = '6351fdef5f531536c8631adf33a550635c115d89fce09cc9cacde44588d1f106';
 
 export interface Rec {
   since: string;
@@ -263,7 +262,7 @@ export function aggregate(days: { day: string; users: Record<string, Rec> }[], t
   };
 }
 
-export async function handle(req: Request, store: StoreLike, keyHash = DEFAULT_KEY_HASH): Promise<Response> {
+export async function handle(req: Request, store: StoreLike, keyHash: string): Promise<Response> {
   try {
     const url = new URL(req.url);
     if (req.method === 'POST') {
@@ -283,8 +282,9 @@ export async function handle(req: Request, store: StoreLike, keyHash = DEFAULT_K
     }
 
     if (req.method === 'GET') {
-      const key = req.headers.get('x-stats-key') ?? '';
-      if (!key || (await sha256(key)) !== keyHash) return json({ error: 'wrong key' }, 401);
+      const guard = { get: async (k: string) => (await store.getWithMetadata(k, { type: 'json' }))?.data ?? null, setJSON: (k: string, v: unknown, o?: { onlyIfNew?: boolean }) => store.setJSON(k, v, o), delete: (k: string) => store.delete(k) };
+      const denied = await checkAdmin(req, keyHash, guard);
+      if (denied) return denied;
       const n = Math.max(7, Math.min(120, Number(url.searchParams.get('days')) || 60));
       // The person's "today" is up to a day ahead of UTC (India is +5:30).
       const today = url.searchParams.get('today') && DAY.test(url.searchParams.get('today')!) ? url.searchParams.get('today')! : utcToday();
@@ -300,6 +300,6 @@ export async function handle(req: Request, store: StoreLike, keyHash = DEFAULT_K
 }
 
 export default async (req: Request) =>
-  handle(req, getStore({ name: 'pulse-stats', consistency: 'strong' }) as unknown as StoreLike, process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH);
+  handle(req, getStore({ name: 'pulse-stats', consistency: 'strong' }) as unknown as StoreLike, adminKeyHash());
 
 // Reached at /.netlify/functions/stats; public/_redirects maps /api/ping and /api/stats to it.

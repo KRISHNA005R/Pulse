@@ -17,13 +17,15 @@
 //                    Resend. It also switches the thank-you emails on: Resend's shared test sender
 //                    can only deliver to the account's own address, never to users.
 import { getStore } from '@netlify/blobs';
-import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
+import { json, sha256 } from './stats';
+import { adminKeyHash, checkAdmin } from '../lib/admin';
 import { EMAIL, ownerEmail, thanksEmail, TYPES, WANTS, type Mail } from '../lib/emails';
 
 declare const process: { env: Record<string, string | undefined> };
 
 type StoreLike = {
-  setJSON(key: string, value: unknown): Promise<unknown>;
+  setJSON(key: string, value: unknown, opts?: { onlyIfNew?: boolean }): Promise<unknown>;
+  delete(key: string): Promise<void>;
   get(key: string, opts: { type: 'json' }): Promise<unknown>;
   list(opts: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
 };
@@ -161,8 +163,8 @@ export async function handle(req: Request, store: StoreLike, env: Env): Promise<
     }
 
     if (req.method === 'GET') {
-      const key = req.headers.get('x-stats-key') ?? '';
-      if (!key || (await sha256(key)) !== env.keyHash) return json({ error: 'wrong key' }, 401);
+      const denied = await checkAdmin(req, env.keyHash, store);
+      if (denied) return denied;
       const { blobs } = await store.list({ prefix: 'fb/' });
       const keys = blobs.map((b) => b.key).sort().reverse();
       const items = (await Promise.all(keys.slice(0, 200).map((k) => store.get(k, { type: 'json' })))).filter(Boolean) as Feedback[];
@@ -185,7 +187,7 @@ export default async (req: Request) =>
     to: process.env.FEEDBACK_TO || DEFAULT_TO,
     from: process.env.FEEDBACK_FROM || DEFAULT_FROM,
     canThank: !!process.env.FEEDBACK_FROM,
-    keyHash: process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH,
+    keyHash: adminKeyHash(),
     fetch,
   });
 

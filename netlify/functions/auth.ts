@@ -18,7 +18,8 @@
 import { getStore } from '@netlify/blobs';
 import { authConfig, googleKeys, googleReturn, handleAuth, membersOverview, verifyGoogleJwt, type AuthCtx, type AuthStore } from '../lib/auth';
 import { codeEmail, type Mail } from '../lib/emails';
-import { DEFAULT_KEY_HASH, json, sha256 } from './stats';
+import { json } from './stats';
+import { adminKeyHash, checkAdmin } from '../lib/admin';
 
 function context(req: Request): AuthCtx {
   const clientId = (process.env.GOOGLE_CLIENT_ID ?? '').trim();
@@ -58,8 +59,8 @@ export default async (req: Request) => {
     const ctx = context(req);
     if (req.method === 'GET') {
       if (new URL(req.url).searchParams.has('members')) {
-        const key = req.headers.get('x-stats-key') ?? '';
-        if (!key || (await sha256(key)) !== (process.env.STATS_KEY_HASH || DEFAULT_KEY_HASH)) return json({ error: 'wrong key' }, 401);
+        const denied = await checkAdmin(req, adminKeyHash(), ctx.store);
+        if (denied) return denied;
         return json(await membersOverview(ctx.store));
       }
       return json(authConfig(ctx));

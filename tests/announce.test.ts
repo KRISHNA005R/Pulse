@@ -267,3 +267,81 @@ describe('unsubscribing', () => {
     expect(t.sentTo()).toContain('meera@example.com');
   });
 });
+
+// Regression tests for the problems found in the security review (SEC-A … SEC-G).
+describe('fixed problems stay fixed', () => {
+  const slow = (store: Record<string, unknown>) => {
+    const st = store as Record<string, (...a: never[]) => Promise<unknown>>;
+    for (const k of ['get', 'setJSON', 'list', 'delete']) {
+      const fn = st[k].bind(store);
+      st[k] = async (...a: never[]) => {
+        await new Promise((r) => setTimeout(r, 3 + Math.random() * 8));
+        return fn(...a);
+      };
+    }
+  };
+
+  it('SEC-A: two presses at the same moment never go past the daily cap', async () => {
+    const people: [string, string][] = Array.from({ length: 10 }, (_, i) => [`P${i}`, `p${i}@example.com`]);
+    for (let run = 0; run < 3; run++) {
+      const t = await setup({ people, perDay: 4, perRun: 3 });
+      await t.call('POST', '', { action: 'test' }); // 1 of 4 used
+      slow(t.store as unknown as Record<string, unknown>);
+      await Promise.all([t.call('POST', '', { action: 'send' }), t.call('POST', '', { action: 'send' })]);
+      const real = t.batches.slice(1).flat().map((x) => x.to);
+      expect(real.length).toBeLessThanOrEqual(3);
+      expect(new Set(real).size).toBe(real.length);
+      // Nobody who didn't get it is stuck as "sent": they're still waiting.
+      const s = await (await t.call('GET', '?status=1')).json();
+      expect(s.sent + s.left).toBe(10);
+    }
+  });
+
+  it('SEC-B: a batch never has more than 100 emails (Resend’s limit), whatever ANNOUNCE_PER_RUN says', async () => {
+    const people: [string, string][] = Array.from({ length: 150 }, (_, i) => [`P${i}`, `p${i}@example.com`]);
+    const t = await setup({ people, perRun: 150, perDay: 500 });
+    t.ctx.send = async (mails) => {
+      t.batches.push(mails as Sent[]);
+      return mails.length <= 100;
+    };
+    await t.call('POST', '', { action: 'test' });
+    const r = await (await t.call('POST', '', { action: 'send' })).json();
+    expect(r).toMatchObject({ sent: 100, failed: 0, left: 50 });
+    expect(Math.max(...t.batches.map((b) => b.length))).toBeLessThanOrEqual(100);
+  });
+
+  it('SEC-C: the unsubscribe link in the test copy works, even when the owner has no PULSE account', async () => {
+    const t = await setup();
+    await t.call('POST', '', { action: 'test' });
+    const link = t.batches[0][0].mail.text.match(/https:\/\/pulsemoney\.in\/api\/announce\?u=[^\s]+/)![0];
+    const r = await handleAnnounce(new Request(link), t.ctx);
+    expect(r.status).toBe(200);
+  });
+
+  it('SEC-D: a failed batch can be retried from the page, and then goes out', async () => {
+    const t = await setup();
+    let ok = false;
+    t.ctx.send = async (mails) => {
+      t.batches.push(mails as Sent[]);
+      return mails.length === 1 || ok;
+    };
+    await t.call('POST', '', { action: 'test' });
+    await t.call('POST', '', { action: 'send' });
+    expect(await (await t.call('GET', '?status=1')).json()).toMatchObject({ failed: 3, left: 0 });
+    const r = await (await t.call('POST', '', { action: 'retry' })).json();
+    expect(r).toMatchObject({ failed: 0, left: 3 });
+    ok = true;
+    expect(await (await t.call('POST', '', { action: 'send' })).json()).toMatchObject({ sent: 3, failed: 0, left: 0 });
+  });
+
+  it('SEC-D: retry needs the password', async () => {
+    const t = await setup();
+    expect((await t.call('POST', '', { action: 'retry' }, null)).status).toBe(401);
+  });
+
+  it('SEC-G: nobody is silently left out above 5,000 accounts', async () => {
+    const people: [string, string][] = Array.from({ length: 5003 }, (_, i) => [`P${i}`, `p${i}@example.com`]);
+    const t = await setup({ people });
+    expect((await (await t.call('GET', '?status=1')).json()).total).toBe(5003);
+  });
+});
