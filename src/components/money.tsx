@@ -4,7 +4,7 @@ import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '..
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
-import { addDays, addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, parseDate, relDay, rupees } from '../lib/format';
+import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
 import { streak } from '../lib/streak';
@@ -144,9 +144,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
     else if (!sameData) setDelta(null);
   }, [sts.safe, state.mode, state.user.fullName]);
   const hide = state.settings.hideBalances;
-  const days = Array.from({ length: sts.daysLeft }, (_, i) => addDays(state.today, i));
   const billDays = new Set(upcoming(state, sts.payday).map((b) => (b.date < state.today ? state.today : b.date)));
-  const W = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   // This pay cycle: from a month before payday (the last payday, or the 1st with no salary set) to payday.
   const prev = addMonths(sts.payday, -1);
   const cycleStart = prev < state.today ? prev : state.today;
@@ -213,35 +211,29 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         </div>
       </dl>
 
-      {/* 4. Runway to payday: one tick per day (a single track for long stretches) */}
-      {sts.daysLeft >= 2 && (
-        <div className="mt-4" role="img" aria-label={`${sts.daysLeft} days until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
-          {sts.daysLeft <= 14 ? (
-            <div className="flex gap-1">
-              {days.map((d, i) => (
-                <div key={d} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                  <span className={`h-1.5 w-full rounded-full ${i === 0 ? 'animate-pulse bg-accent' : 'bg-sunk'}`} />
-                  {sts.daysLeft <= 10 && <span className={`text-[11px] font-semibold leading-none ${i === 0 ? 'text-ink' : 'text-ink3'}`}>{W[parseDate(d).getDay()]}</span>}
-                  <span className={`h-1 w-1 rounded-full ${billDays.has(d) ? 'bg-ink2' : 'bg-transparent'}`} />
-                </div>
+      {/* 4. Runway to payday: one line for the whole pay cycle, all month. It fills and today's dot
+            moves right as the days go by; bill days are small dots under the line. */}
+      {sts.daysLeft >= 1 && (
+        <div className="mt-4" role="img" aria-label={`${sts.daysLeft} ${sts.daysLeft === 1 ? 'day' : 'days'} until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
+          <div data-testid="payday-line" data-progress={cycleDone.toFixed(3)}>
+            <div className="relative h-1.5 rounded-full bg-sunk">
+              <span className="absolute left-0 top-0 h-1.5 rounded-full bg-accent/70" style={{ width: `${cycleDone * 100}%` }} />
+              <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-accent ring-2 ring-surface" style={{ left: `${cycleDone * 100}%` }} />
+              {[...billDays].map((d) => (
+                <span key={d} data-bill={d} className="absolute -bottom-2.5 h-1 w-1 -translate-x-1/2 rounded-full bg-ink2" style={{ left: `${Math.min(1, daysBetween(cycleStart, d) / cycleDays) * 100}%` }} />
               ))}
             </div>
-          ) : (
-            <div>
-              {/* The pay cycle so far: from the last payday (or the 1st) to the next one, filling as the days go by. */}
-              <div className="relative h-1.5 rounded-full bg-sunk">
-                <span className="absolute left-0 top-0 h-1.5 rounded-full bg-accent/70" style={{ width: `${cycleDone * 100}%` }} />
-                <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-accent ring-2 ring-surface" style={{ left: `${cycleDone * 100}%` }} />
-                {[...billDays].map((d) => (
-                  <span key={d} className="absolute -bottom-2.5 h-1 w-1 -translate-x-1/2 rounded-full bg-ink2" style={{ left: `${(daysBetween(cycleStart, d) / cycleDays) * 100}%` }} />
-                ))}
-              </div>
-              <div className="mt-3.5 flex items-center justify-between gap-2 text-[11.5px] font-semibold text-ink3">
-                <span>{fmtDate(cycleStart)}</span>
-                <span>{fmtDate(sts.payday)}</span>
-              </div>
+            <div className="relative mt-3.5 h-4 text-[11.5px] font-semibold leading-4 text-ink3">
+              <span className="absolute left-0">{fmtDate(cycleStart)}</span>
+              {/* "Today" under the dot, only where it can't bump into the dates at either end */}
+              {cycleDone >= 0.2 && cycleDone <= 0.78 && (
+                <span className="absolute -translate-x-1/2 text-ink" style={{ left: `${cycleDone * 100}%` }}>
+                  Today
+                </span>
+              )}
+              <span className="absolute right-0 text-accent-ink">{fmtDate(sts.payday)}</span>
             </div>
-          )}
+          </div>
         </div>
       )}
 
