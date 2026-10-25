@@ -6,6 +6,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { buildInsights } from '../lib/insights';
 import { pickDaily } from '../lib/rotate';
+import { RewindOffer } from '../components/Rewind';
 import { detections, personBalances, socialTotals, upcoming } from '../lib/finance';
 import { FriendNewsCard } from '../components/Friends';
 import { addDays, daysBetween, fmtDate, greeting, relDay, rupees } from '../lib/format';
@@ -39,6 +40,7 @@ export function HomeScreen() {
   return (
     <div className="stagger flex flex-col gap-8">
       <PaydayCard />
+      <RewindOffer />
       <PaydayWin />
       <NewStuffCard />
       <InstallBanner />

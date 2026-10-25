@@ -678,10 +678,6 @@ export function AIChat({ compact, initial }: { compact?: boolean; initial?: stri
   const ask = (question: string) => {
     const text = question.trim();
     if (!text) return;
-    if (/weekend budget card|share.*budget/i.test(text)) {
-      ui.openSheet({ type: 'share-card', preset: 'weekend' });
-      return;
-    }
     if (state.mode === 'personal') track('ai');
     const answer = askPulse(state, text);
     const aiId = uid('m');

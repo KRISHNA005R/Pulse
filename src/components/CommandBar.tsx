@@ -99,7 +99,7 @@ export function CommandBar({ initial = '' }: { initial?: string; onClose?: () =>
       [/debt|loan|emi/, { id: 's-debt', icon: 'bank', label: 'Debt', run: go(() => ui.resetTo('you', { name: 'debt' })) }],
       [/income|salary|payday/, { id: 's-inc', icon: 'briefcase', label: 'Income', run: go(() => ui.resetTo('you', { name: 'income' })) }],
       ...(RECEIPT_SCAN_ON ? ([[/scan|receipt/, { id: 's-scan', icon: 'scan', label: 'Scan a receipt', run: go(() => ui.openSheet({ type: 'receipt' })) }]] as [RegExp, Cmd][]) : []),
-      [/share|loud/, { id: 's-share', icon: 'share', label: 'Share a budget card', run: go(() => ui.openSheet({ type: 'share-card' })) }],
+      [/rewind|wrapped|share|story/, { id: 's-rewind', icon: 'share', label: 'PULSE Rewind: your month in 5 slides', run: go(() => ui.openSheet({ type: 'rewind' })) }],
     ];
     screens.forEach(([re, c]) => re.test(lower) && out.push(c));
 

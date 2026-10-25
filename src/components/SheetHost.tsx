@@ -14,7 +14,7 @@ import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
 import { AuthNudge, MemberCardSheet } from './Auth';
 import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, DebtEarlyForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
-import { ShareCard } from './ShareCard';
+import { RewindStory } from './Rewind';
 import { CommandBar } from './CommandBar';
 import { MoneyRecap } from './MoneyRecap';
 
@@ -241,10 +241,10 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
           <DebtEarlyForm debtId={spec.debtId} onDone={close} />
         </Sheet>
       );
-    case 'share-card':
+    case 'rewind':
       return (
-        <Sheet title="Budget out loud" onClose={close} z={z}>
-          <ShareCard preset={spec.preset} />
+        <Sheet title="PULSE Rewind" onClose={close} z={z}>
+          <RewindStory month={spec.month} />
         </Sheet>
       );
     case 'command':

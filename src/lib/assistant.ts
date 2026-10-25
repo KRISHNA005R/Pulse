@@ -29,7 +29,7 @@ import { monthIn, parseAction, type AIAction } from './aiActions';
 import { buildRecap } from './insights';
 import { yearSummary } from './history';
 import { actionFromHinglish, askMore, fromHinglish, quickQuestions } from './assistantPlus';
-import { askNew } from './assistantNew';
+import { askNew, rewindQuestion } from './assistantNew';
 import { everyOtherDay } from './rotate';
 
 // PULSE AI: answers are computed from the app's own data, not generated text.
@@ -59,7 +59,10 @@ export interface AIAnswer {
 /** Starter questions that fit this person's data. */
 export function starterQuestions(s: State): string[] {
   // A new order every 2 days, so the AI opens with something fresh (lib/rotate.ts).
-  return everyOtherDay(quickQuestions(s), s.today);
+  const list = everyOtherDay(quickQuestions(s), s.today);
+  // Month end and the first week: the Rewind goes first.
+  const rw = rewindQuestion(s);
+  return rw ? [rw, ...list.filter((q) => q !== rw)] : list;
 }
 
 /** The older, plain-English starter list (kept for reference). */

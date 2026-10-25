@@ -399,6 +399,8 @@ export interface Settings {
   newTried?: string[];
   /** "Survived payday" card closed for this payday. */
   paydaySeen?: string;
+  /** PULSE Rewind offer dismissed: 'YYYY-MM' (last month's, shown in the first week) or 'YYYY-MM:soon' (month-end). */
+  rewindSeen?: string;
   /** Which reminders this person wants. Whether a device actually gets them is per device (lib/reminders.ts). */
   reminders?: ReminderPrefs;
 }

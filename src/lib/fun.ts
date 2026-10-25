@@ -6,7 +6,7 @@ import { addDays, parseDate, startOfWeek } from './format';
 // The small fun bits: guess the bill, survived payday, gullak.
 // All worked out on the phone from what's logged. Friendly, never mean.
 
-const FIXED = new Set(['rent', 'bills', 'subscriptions', 'insurance', 'emi', 'investments', 'transfer', 'fees', 'tax']);
+export const FIXED = new Set(['rent', 'bills', 'subscriptions', 'insurance', 'emi', 'investments', 'transfer', 'fees', 'tax']);
 /** Everyday spending: what people choose to spend on, day to day. */
 export const everyday = (t: Transaction) => t.type === 'expense' && !t.recurring && !t.subscriptionId && !t.debtId && !t.insuranceId && !FIXED.has(t.category) && !isAuto(t);
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;

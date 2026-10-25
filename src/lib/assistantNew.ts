@@ -5,6 +5,7 @@ import type { Plan, State } from '../types';
 import { chances, currentRound, inBowl, isDone, myStanding, pot } from './bhisi';
 import { gullakFull, gullakTarget, nextCoin } from './fun';
 import { categoryName, isBack, monthRange, prevMonth } from './finance';
+import { buildRewind, rewindPrompt } from './rewind';
 import { fmtDate, relDay, rupees } from './format';
 import type { AIAnswer } from './assistant';
 
@@ -17,6 +18,28 @@ const GULLAK_WORDS = /\b(gullak|gullaks|golak|piggy ?bank|coin a day)\b/;
 const BACK_ASK = /\b((get|got|getting) (it )?back|paid (me )?back|wapas|refunds?|cashback|reimburse\w*)\b/;
 
 export function askNew(s: State, q: string): AIAnswer | null {
+  // --- PULSE Rewind: the month as 5 story slides ---
+  if (/\b(rewind|wrapped|month (story|recap card)|my month in pulse)\b/.test(q)) {
+    const day = Number(s.today.slice(8, 10));
+    const last = /\blast month\b|pichle mahine/.test(q) || (!/\bso far\b|\bthis month\b/.test(q) && day <= 7);
+    const r = buildRewind(s, last ? monthRange(prevMonth(s.today))[0] : s.today);
+    if (!r.enough)
+      return { text: `Not enough logged in ${r.monthName} for a Rewind yet. Log a bit more and your next Rewind will be 🔥. It’s ready on the 1st of every month, and in the last days of the month you can see it so far.` };
+    return {
+      text: `${r.title} Here’s your ${r.monthName}${r.partial ? ' so far' : ''}:`,
+      blocks: [
+        { type: 'list', rows: [
+          ...r.top.map((t) => ({ label: `${t.emoji} ${t.name}`, value: `${t.pct}%` })),
+          { label: '🧘 No-spend days', value: String(r.noSpendDays) },
+          { label: '🔥 Longest streak', value: `${r.bestStreak} days` },
+          { label: '🏆 Biggest W', value: '', sub: r.win.text },
+        ] },
+        { type: 'link', label: `Open my ${r.monthName} Rewind 📼`, to: { kind: 'sheet', sheet: { type: 'rewind', month: r.month } } },
+      ],
+      followups: ['Show my monthly report', "What's new in PULSE?"],
+    };
+  }
+
   // --- What's new ---
   if (/\b(what['’]?s new|new features?|kya naya|naya kya|latest features?|what changed in pulse)\b/.test(q) && !/\b(spend|spent|month)\b/.test(q)) {
     return {
@@ -193,4 +216,11 @@ export function newQuickQuestions(s: State): string[] {
   if (s.transactions.some((t) => isBack(t) && t.date >= ms)) out.push('↩️ How much did I get back this month?');
   if (!b && !g) out.push('✨ What’s new in PULSE?');
   return out;
+}
+
+/** The Rewind suggestion, when it's time: shown first in PULSE AI. */
+export function rewindQuestion(s: State): string | null {
+  const p = rewindPrompt(s);
+  if (!p) return null;
+  return p.kind === 'ready' ? `📼 Share my ${p.monthName} Rewind` : `📼 Rewind my ${p.monthName} so far`;
 }

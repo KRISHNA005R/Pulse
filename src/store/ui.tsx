@@ -55,7 +55,7 @@ export type SheetSpec =
   | { type: 'person-merge'; personId: string }
   | { type: 'auth-nudge' }
   | { type: 'member-card' }
-  | { type: 'share-card'; preset?: 'weekend' | 'plan' }
+  | { type: 'rewind'; month?: string }
   | { type: 'receipt' }
   | { type: 'command'; query?: string }
   | { type: 'recap'; month?: string }

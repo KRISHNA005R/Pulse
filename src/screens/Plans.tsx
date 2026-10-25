@@ -364,9 +364,6 @@ export function PlanDetail({ id }: { id: string }) {
               <Icon name={plan.status === 'paused' ? 'play' : 'pause'} size={16} />
             </button>
           )}
-          <button type="button" className="btn-quiet shrink-0 px-3" onClick={() => ui.openSheet({ type: 'share-card', preset: 'plan' })} aria-label="Share a card" title="Share">
-            <Icon name="share" size={16} />
-          </button>
         </div>
       </section>
       )}

@@ -74,9 +74,9 @@ export function DemoGuideScreen() {
       run: () => ui.openSheet({ type: 'recap' }),
     },
     {
-      emoji: '🎟️', title: 'Budget out loud', go: 'Make a card',
-      body: 'Share a ticket, receipt or sticker card of your budget. Only the line you type is shown, never your balance.',
-      run: () => ui.openSheet({ type: 'share-card' }),
+      emoji: '📼', title: 'PULSE Rewind', go: 'Watch it',
+      body: 'Your month as 5 story slides: where it went, your habits, your biggest W. The last one is a card made for your story. No amounts, ever.',
+      run: () => ui.openSheet({ type: 'rewind' }),
     },
   ];
 
