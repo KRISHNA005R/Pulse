@@ -115,3 +115,21 @@ describe('guards', () => {
     expect(s.transactions.some((t) => t.debtId === s.debts[0].id && t.notes?.match(/early|extra|closed/i))).toBe(false);
   });
 });
+
+// LOAN-01: a typo in the closing amount (one extra zero) must not be saved without a question.
+import { closingCharge } from '../src/lib/finance';
+describe('closing charge check', () => {
+  it('a normal charge (up to 5% of what is left) needs no question', () => {
+    expect(closingCharge(186400, 186400)).toEqual({ charge: 0, big: false });
+    expect(closingCharge(186400, 186400 + 1500)).toEqual({ charge: 1500, big: false });
+    expect(closingCharge(186400, 186400 + 9320)).toEqual({ charge: 9320, big: false }); // exactly 5%
+  });
+  it('a big one (more than 5%), like a typo, asks first', () => {
+    expect(closingCharge(186400, 1864000)).toEqual({ charge: 1677600, big: true });
+    expect(closingCharge(186400, 186400 + 9321).big).toBe(true);
+  });
+  it('a small loan still allows a typical fixed fee without a question', () => {
+    expect(closingCharge(2000, 2500).big).toBe(false); // ₹500 fee on a tiny balance
+    expect(closingCharge(2000, 20000).big).toBe(true);
+  });
+});

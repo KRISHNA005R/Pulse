@@ -1,5 +1,5 @@
 import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
-import { hasCents, roundMoney } from './currency';
+import { hasCents, roundMoney, scaled } from './currency';
 import { bhisiDues } from './bhisi';
 import { INSURANCE_ON } from './features';
 import {
@@ -869,4 +869,13 @@ export function prepaySavings(d: Debt, amount: number): { months: number; intere
   const intBefore = payoffInterest(d.remaining, d.rate, d.minPayment);
   const intAfter = left <= 0 ? 0 : payoffInterest(left, d.rate, d.minPayment);
   return { months: Math.max(0, before - after), interest: roundMoney(Math.max(0, intBefore - intAfter)) };
+}
+
+/**
+ * Closing a loan: anything paid above what's left is a closing charge. A big one (more than 5% of
+ * what's left, and more than a typical fixed fee) is usually a typo, so the app asks before saving.
+ */
+export function closingCharge(remaining: number, amount: number): { charge: number; big: boolean } {
+  const charge = roundMoney(Math.max(0, amount - remaining));
+  return { charge, big: charge > Math.max(remaining * 0.05, scaled(1000)) };
 }

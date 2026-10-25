@@ -10,7 +10,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closingCharge, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -1628,6 +1628,8 @@ export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () =
   const [mode, setMode] = useState<'emi' | 'extra' | 'close'>('extra');
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  // LOAN-01: a big closing charge (often a typo, like one extra zero) is asked about before saving.
+  const [asking, setAsking] = useState(false);
   if (!d) return <p className="py-6 text-center text-ink3">This loan was removed.</p>;
   const emi = emiParts(d);
   const amt = parseFloat(amount) || 0;
@@ -1635,6 +1637,7 @@ export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () =
   const pick = (m: typeof mode) => {
     setMode(m);
     setError('');
+    setAsking(false);
     setAmount(m === 'close' ? String(d.remaining) : '');
   };
   const choices: { m: typeof mode; title: string; sub: string }[] = [
@@ -1642,7 +1645,9 @@ export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () =
     { m: 'extra', title: 'Paid extra', sub: 'A part payment. All of it comes off the loan.' },
     { m: 'close', title: 'Closed the loan', sub: `Paid off everything left: ${rupees(d.remaining)}.` },
   ];
-  const record = () => {
+  const check = mode === 'close' ? closingCharge(d.remaining, amt) : null;
+  const record = (sure = false) => {
+    if (check?.big && !sure) return setAsking(true);
     const problem = store.payDebtEarly(d.id, mode, mode === 'emi' ? undefined : amt);
     if (problem) return setError(problem);
     onDone();
@@ -1659,7 +1664,7 @@ export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () =
       </div>
       {mode !== 'emi' && (
         <div className="rounded-3xl border border-line bg-surface p-4">
-          <MoneyInput value={amount} onChange={(v) => { setAmount(v); setError(''); }} label="Amount you paid" size="md" id="debt-early-amount" autoFocus={mode === 'extra'} />
+          <MoneyInput value={amount} onChange={(v) => { setAmount(v); setError(''); setAsking(false); }} label="Amount you paid" size="md" id="debt-early-amount" autoFocus={mode === 'extra'} />
           {mode === 'close' && <p className="text-center text-[12.5px] text-ink3">Bank took a closing charge? Add it to the amount. Only {rupees(d.remaining)} comes off the loan.</p>}
           {save && (save.months > 0 || save.interest > 0) && (
             <p className="mt-1 text-center text-[13.5px] font-semibold text-pos">
@@ -1674,9 +1679,26 @@ export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () =
           {error}
         </p>
       )}
-      <button type="button" className="btn-accent w-full" disabled={mode !== 'emi' && amt <= 0} onClick={record}>
-        Record {mode === 'emi' ? rupees(emi.amount) : amt > 0 ? rupees(amt) : 'payment'}
-      </button>
+      {asking && check ? (
+        <div className="rounded-2xl bg-warn/15 p-4" role="alert">
+          <p className="text-[14.5px] font-semibold">
+            That’s {rupees(check.charge)} on top of the {rupees(d.remaining)} left. Is that right?
+          </p>
+          <p className="mt-1 text-[13px] text-ink2">It will be saved as a closing charge and taken from your account.</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <button type="button" className="btn-quiet min-h-[44px]" onClick={() => setAsking(false)}>
+              Change amount
+            </button>
+            <button type="button" className="btn-accent min-h-[44px]" onClick={() => record(true)}>
+              Yes, record it
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className="btn-accent w-full" disabled={mode !== 'emi' && amt <= 0} onClick={() => record()}>
+          Record {mode === 'emi' ? rupees(emi.amount) : amt > 0 ? rupees(amt) : 'payment'}
+        </button>
+      )}
     </div>
   );
 }
