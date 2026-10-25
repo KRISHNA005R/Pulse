@@ -24,8 +24,7 @@ export async function setState(p: Page, change: string, arg?: unknown) {
 export async function openDemo(p: Page, name = 'Krishna') {
   const errors: string[] = [];
   p.on('pageerror', (e) => errors.push(e.message));
-  await p.goto('/');
-  await p.getByText('Explore a demo first').click();
+  await p.goto('/?demo=1'); // opens the demo straight away (there's no demo button on the welcome screen)
   await p.waitForTimeout(1500);
   await setState(p, "s.mode = 'personal'; s.user.name = a; s.bhisis = []; s.settings.newStuffSeen = true; s.settings.soundsAsked = true;", name);
   return errors;

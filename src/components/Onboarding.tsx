@@ -5,7 +5,7 @@ import { useStore } from '../store/store';
 import { useBackSteps } from '../store/ui';
 import { createFresh, nextFirstOfMonth } from '../data/seed';
 import { safeToSpend } from '../lib/finance';
-import { fmtDate, ordinal, realToday, rupees } from '../lib/format';
+import { addDays, fmtDate, ordinal, realToday, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { MoneyInput } from './ui/bits';
 import { JoinWithCode } from '../screens/Sync';
@@ -29,8 +29,22 @@ const BILL_PICKS: BillPick[] = [
 ];
 const PRIORITIES = ['Save for something', 'Reduce unnecessary spending', 'Build emergency savings', 'Understand spending', 'Manage social expenses'];
 
-type Step = 'welcome' | 'join' | 'name' | 'reasons' | 'pay' | 'money' | 'bills' | 'priorities' | 'building' | 'done';
+type Step = 'welcome' | 'trust' | 'join' | 'name' | 'reasons' | 'pay' | 'money' | 'bills' | 'priorities' | 'building' | 'done';
 const FLOW: Step[] = ['name', 'reasons', 'pay', 'money', 'bills', 'priorities'];
+
+// Screen 1: what PULSE gives you, before any questions.
+const VALUE: { icon: 'wallet' | 'target' | 'users'; title: string; sub: string; accent?: boolean }[] = [
+  { icon: 'wallet', title: 'Know what’s safe to spend', sub: 'After rent, bills and savings. Every day till payday.', accent: true },
+  { icon: 'target', title: 'Plan goals that happen', sub: 'A trip, a phone, a gullak. PULSE keeps you on track.' },
+  { icon: 'users', title: 'Split with friends', sub: 'Who owes who, settled in one tap. Bhisi too.' },
+];
+// Screen 2: only promises that are true in PULSE today (each one has a test).
+const PROMISES: { icon: 'lock' | 'pencil' | 'trash' | 'zap'; title: string; sub: string; accent?: boolean }[] = [
+  { icon: 'lock', title: 'No bank login, ever', sub: 'PULSE never connects to your bank. It only knows the numbers you type.', accent: true },
+  { icon: 'pencil', title: 'Rough numbers are fine', sub: 'Not sure? Guess. You can skip anything and add it later.' },
+  { icon: 'trash', title: 'Delete everything, any time', sub: 'One button in You → Your account removes your account and all your data.' },
+  { icon: 'zap', title: 'About 60 seconds', sub: 'A few quick questions, then your dashboard is ready.' },
+];
 
 export function Onboarding() {
   const { startPersonal, startDemo, closeOnboarding, state } = useStore();
@@ -48,7 +62,7 @@ export function Onboarding() {
   // us the name, so that question is skipped.
   const moved = useRef(false);
   useEffect(() => {
-    if (auth.outcome !== 'new' || !auth.session || step !== 'welcome' || moved.current) return;
+    if (auth.outcome !== 'new' || !auth.session || (step !== 'welcome' && step !== 'trust') || moved.current) return;
     moved.current = true;
     const known = auth.session.account.name;
     if (known && !name.trim()) setName(known);
@@ -74,6 +88,17 @@ export function Onboarding() {
   const [currency, setCur] = useState<CurrencyCode>(() => detectCurrency());
   // Amounts typed during setup are shown in the currency being chosen here.
   setCurrency(currency);
+
+  // pulsemoney.in/?demo=1 opens the demo straight away (there's no demo button on the first screen).
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    if (q.get('demo') !== '1') return;
+    q.delete('demo');
+    const rest = q.toString();
+    history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    startDemo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Each step starts at the top of the page.
   useEffect(() => {
@@ -110,9 +135,9 @@ export function Onboarding() {
 
   const idx = FLOW.indexOf(step);
   const next = () => setStep(idx < FLOW.length - 1 ? FLOW[idx + 1] : 'building');
-  const back = () => setStep(idx > 0 ? FLOW[idx - 1] : 'welcome');
+  const back = () => setStep(step === 'trust' ? 'welcome' : step === 'join' ? 'trust' : idx > 0 ? FLOW[idx - 1] : 'trust');
   // The phone's back gesture goes back one step of setup rather than out of PULSE.
-  const DEPTH: Record<Step, number> = { welcome: 0, join: 1, name: 1, reasons: 2, pay: 3, money: 4, bills: 5, priorities: 6, building: 7, done: 7 };
+  const DEPTH: Record<Step, number> = { welcome: 0, trust: 1, join: 2, name: 2, reasons: 3, pay: 4, money: 5, bills: 6, priorities: 7, building: 8, done: 8 };
   useBackSteps(DEPTH[step], () => (step === 'building' || step === 'done' ? setStep('priorities') : back()));
 
   const Choice = ({ label, on, onClick, multi }: { label: string; on: boolean; onClick: () => void; multi?: boolean }) => (
@@ -132,13 +157,23 @@ export function Onboarding() {
     bills: 'What do you pay every month?',
     priorities: 'Pick up to 3 priorities',
   };
+  // Every question can be skipped ("You can skip anything" on screen 2). Setup fills sensible
+  // defaults for anything left empty (a name becomes "Friend", and so on).
   const canNext: Record<string, boolean> = {
-    name: name.trim().length > 0,
-    reasons: reasons.length > 0,
-    pay: !!pay,
+    name: true,
+    reasons: true,
+    pay: true,
     money: true,
     bills: noBills || bills.every((b) => b.name.trim() && parseFloat(b.amount) > 0),
-    priorities: prio.length > 0,
+    priorities: true,
+  };
+  const empty: Record<string, boolean> = {
+    name: !name.trim(),
+    reasons: reasons.length === 0,
+    pay: !pay && !income,
+    money: banks.every((b) => !b.balance) && !cash && !sip && !invested,
+    bills: !noBills && bills.length === 0,
+    priorities: false,
   };
 
   return (
@@ -150,17 +185,63 @@ export function Onboarding() {
         </p>
 
         {step === 'welcome' && (
-          <div className="flex flex-1 flex-col pt-12">
-            <h1 id="ob-title" className="display text-[36px] leading-[1.05]">
-              Know what you can spend, without doing the math.
+          <div className="flex flex-1 flex-col pt-8">
+            <h1 id="ob-title" className="display text-[32px] leading-[1.06]">
+              Know what you can spend, without the math.
             </h1>
-            <p className="mt-4 text-[16px] text-ink2">PULSE works out what's safe to spend until payday, keeps your plans on track and splits costs with friends.</p>
-            <div className="mt-auto flex flex-col gap-3 pt-10">
+            <p className="mt-3 text-[15.5px] text-ink2">Here’s what PULSE shows you every day:</p>
+            <WelcomePreview />
+            <ul className="mt-5 flex flex-col gap-3">
+              {VALUE.map((v) => (
+                <li key={v.title} className="flex items-start gap-3">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${v.accent ? 'bg-accent-soft text-accent-ink' : 'bg-sunk text-ink'}`} aria-hidden="true">
+                    <Icon name={v.icon} size={19} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-bold leading-snug">{v.title}</span>
+                    <span className="block text-[13px] leading-snug text-ink3">{v.sub}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto flex flex-col gap-3 pt-8">
               {hasOwnData && (
                 <p className="rounded-2xl bg-warn/15 p-3 text-[14px] text-ink" role="alert">
-                  Either option replaces the money you've already entered on this device. Copy a backup first from You → Export data.
+                  Setting up again replaces the money you've already entered on this device. Copy a backup first from You → Export data.
                 </p>
               )}
+              <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep('trust')} data-autofocus>
+                Get started
+              </button>
+              {hasOwnData && (
+                <button type="button" className="btn-ghost w-full" onClick={closeOnboarding}>
+                  Cancel, keep my data
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {step === 'trust' && (
+          <div className="flex flex-1 flex-col pt-8">
+            <p className="text-[12.5px] font-bold tracking-[.06em] text-accent-ink">BEFORE WE START</p>
+            <h1 id="ob-title" className="display mt-1 text-[30px] leading-tight">
+              Your money, your rules.
+            </h1>
+            <ul className="mt-5 flex flex-col gap-2.5">
+              {PROMISES.map((v) => (
+                <li key={v.title} className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
+                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${v.accent ? 'bg-accent-soft text-accent-ink' : 'bg-sunk text-ink'}`} aria-hidden="true">
+                    <Icon name={v.icon} size={19} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[15px] font-bold leading-snug">{v.title}</span>
+                    <span className="block text-[13px] leading-snug text-ink3">{v.sub}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto flex flex-col gap-3 pt-8">
               {auth.loading ? (
                 <div className="grid min-h-[112px] place-items-center" role="status" aria-label="Loading">
                   <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink/20 border-t-ink" aria-hidden="true" />
@@ -170,14 +251,8 @@ export function Onboarding() {
               ) : (
                 <>
                   <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
-                    Start with my own money
+                    Continue
                   </button>
-                  {/* With accounts on, the first screen is only about getting in. The demo is one tap away inside the app (Home, and You). */}
-                  {!auth.on && (
-                    <button type="button" className="btn-quiet w-full" onClick={startDemo}>
-                      Explore a demo first
-                    </button>
-                  )}
                   {!auth.on && (
                     <button type="button" className="btn-ghost w-full" onClick={() => setStep('join')}>
                       I use PULSE on another device
@@ -185,17 +260,12 @@ export function Onboarding() {
                   )}
                 </>
               )}
-              {hasOwnData && (
-                <button type="button" className="btn-ghost w-full" onClick={closeOnboarding}>
-                  Cancel, keep my data
-                </button>
-              )}
               {iosBrowser && !auth.on && (
                 <p className="rounded-2xl bg-sunk p-3 text-[13.5px] leading-snug text-ink2">
                   <b className="text-ink">On iPhone?</b> Add PULSE to your Home Screen first (tap Share, then <b className="text-ink">Add to Home Screen</b>) and set up there. The home-screen app keeps its own data.
                 </p>
               )}
-              {auth.loading ? null : needLogin ? <LoginLegal /> : <p className="text-center text-[12.5px] text-ink3">{auth.on ? 'No bank login needed. Your money is saved to your PULSE account.' : 'Your numbers stay in this browser on this device. No bank login needed.'}</p>}
+              {auth.loading ? null : needLogin ? <LoginLegal /> : <p className="text-center text-[12.5px] text-ink3">{auth.on ? 'Your money is saved to your PULSE account.' : 'Your numbers stay in this browser on this device.'}</p>}
             </div>
           </div>
         )}
@@ -241,7 +311,7 @@ export function Onboarding() {
                     value={name}
                     autoComplete="given-name"
                     onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && canNext.name && next()}
+                    onKeyDown={(e) => e.key === 'Enter' && next()}
                   />
                   <p className="text-[13px] text-ink3">Used in your greeting. Nothing else.</p>
                 </>
@@ -459,7 +529,7 @@ export function Onboarding() {
                 <Icon name="back" size={20} />
               </button>
               <button type="button" disabled={!canNext[step]} className="btn-primary flex-1 disabled:opacity-40" onClick={next}>
-                {step === 'priorities' ? 'Build my dashboard' : step === 'bills' && !noBills && bills.length === 0 ? 'Skip for now' : 'Continue'}
+                {step === 'priorities' ? 'Build my dashboard' : empty[step] ? 'Skip for now' : 'Continue'}
               </button>
             </div>
           </>
@@ -558,4 +628,39 @@ function bankInitials(name: string): string {
   if (!words.length) return n.slice(0, 2).toUpperCase();
   if (words.length === 1) return words[0].slice(0, words[0].length <= 3 ? 3 : 2).toUpperCase();
   return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+/** Screen 1's example: a small picture of the Safe to spend card inside a phone. It's a picture, not
+ *  something to tap: hidden from screen readers (the text around it says the same) and ignores taps. */
+function WelcomePreview() {
+  const today = realToday();
+  return (
+    <div data-testid="welcome-preview" aria-hidden="true" className="pointer-events-none mt-5 flex select-none flex-col items-center">
+      <div className="w-[250px] rounded-t-[30px] border-[6px] border-b-0 border-line bg-sunk px-3 pt-4">
+        <div className="origin-top scale-[.96] rounded-t-2xl bg-surface px-3 pb-2 pt-3 opacity-90">
+          <p className="display text-[28px] leading-none">{rupees(8420)}</p>
+          <p className="mt-1.5 text-[10px] font-bold tracking-[.16em] text-ink3">SAFE TO SPEND</p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-sunk px-2.5 py-2">
+              <p className="text-[10.5px] text-ink3">Per day</p>
+              <p className="display whitespace-nowrap text-[13px]">{rupees(420)}/day</p>
+            </div>
+            <div className="rounded-xl bg-accent-soft px-2.5 py-2">
+              <p className="text-[10.5px] text-accent-ink">Payday</p>
+              <p className="display whitespace-nowrap text-[13px] text-accent-ink">in 20 days</p>
+            </div>
+          </div>
+          <div className="relative mt-3 h-1.5 rounded-full bg-sunk">
+            <span className="absolute left-0 top-0 h-1.5 w-[35%] rounded-full bg-accent/75" />
+            <span className="absolute left-[35%] top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent ring-2 ring-surface" />
+          </div>
+          <div className="mt-2 flex justify-between text-[10px] font-semibold text-ink3">
+            <span>{fmtDate(addDays(today, -11))}</span>
+            <span className="text-accent-ink">{fmtDate(addDays(today, 20))}</span>
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[11.5px] font-semibold text-ink3">Preview · your numbers go here</p>
+    </div>
+  );
 }
