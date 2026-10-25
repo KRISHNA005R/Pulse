@@ -69,6 +69,7 @@ export type SheetSpec =
   | { type: 'install' }
   | { type: 'card-form'; cardId?: string }
   | { type: 'debt-form'; debtId?: string }
+  | { type: 'debt-early'; debtId: string }
   | { type: 'confirm'; title: string; body: string; confirm: string; run: () => void };
 
 export type PlansSegment = 'plans' | 'splits' | 'bhisi' | 'budgets';

@@ -859,3 +859,14 @@ export function incomeThisMonth(s: State): { sources: SourceMonth[]; expected: n
     total,
   };
 }
+
+/** What an extra payment saves on a loan: how many months sooner it ends, and the interest not paid. */
+export function prepaySavings(d: Debt, amount: number): { months: number; interest: number } {
+  const left = Math.max(0, d.remaining - Math.max(0, amount));
+  const before = payoffMonths(d.remaining, d.rate, d.minPayment);
+  const after = left <= 0 ? 0 : payoffMonths(left, d.rate, d.minPayment);
+  if (before == null || after == null) return { months: 0, interest: 0 };
+  const intBefore = payoffInterest(d.remaining, d.rate, d.minPayment);
+  const intAfter = left <= 0 ? 0 : payoffInterest(left, d.rate, d.minPayment);
+  return { months: Math.max(0, before - after), interest: roundMoney(Math.max(0, intBefore - intAfter)) };
+}

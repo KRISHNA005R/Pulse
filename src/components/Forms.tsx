@@ -10,7 +10,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, emiParts, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
@@ -1614,6 +1614,69 @@ export function CategoryForm({ categoryId, kind: kind0 = 'expense', name: name0,
             Remove category
           </button>
         ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Loans: "Paid early / extra"
+// ---------------------------------------------------------------------------------------------
+export function DebtEarlyForm({ debtId, onDone }: { debtId: string; onDone: () => void }) {
+  const store = useStore();
+  const { state } = store;
+  const d = state.debts.find((x) => x.id === debtId);
+  const [mode, setMode] = useState<'emi' | 'extra' | 'close'>('extra');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState('');
+  if (!d) return <p className="py-6 text-center text-ink3">This loan was removed.</p>;
+  const emi = emiParts(d);
+  const amt = parseFloat(amount) || 0;
+  const save = mode === 'extra' && amt > 0 && amt <= d.remaining ? prepaySavings(d, amt) : null;
+  const pick = (m: typeof mode) => {
+    setMode(m);
+    setError('');
+    setAmount(m === 'close' ? String(d.remaining) : '');
+  };
+  const choices: { m: typeof mode; title: string; sub: string }[] = [
+    { m: 'emi', title: 'This month’s EMI, paid early', sub: `${rupees(emi.amount)} due ${fmtDate(debtDue(state, d))}. It won’t be recorded again on that day.` },
+    { m: 'extra', title: 'Paid extra', sub: 'A part payment. All of it comes off the loan.' },
+    { m: 'close', title: 'Closed the loan', sub: `Paid off everything left: ${rupees(d.remaining)}.` },
+  ];
+  const record = () => {
+    const problem = store.payDebtEarly(d.id, mode, mode === 'emi' ? undefined : amt);
+    if (problem) return setError(problem);
+    onDone();
+  };
+  return (
+    <div className="flex flex-col gap-4">
+      <div role="radiogroup" aria-label="What did you pay?" className="flex flex-col gap-2">
+        {choices.map((c) => (
+          <button key={c.m} type="button" role="radio" aria-checked={mode === c.m} onClick={() => pick(c.m)} className={`tap rounded-2xl border px-4 py-3 text-left ${mode === c.m ? 'border-ink bg-ink text-bg' : 'border-line bg-surface hover:border-ink3/50'}`}>
+            <span className="block text-[15px] font-semibold">{c.title}</span>
+            <span className={`block text-[13px] ${mode === c.m ? 'opacity-80' : 'text-ink3'}`}>{c.sub}</span>
+          </button>
+        ))}
+      </div>
+      {mode !== 'emi' && (
+        <div className="rounded-3xl border border-line bg-surface p-4">
+          <MoneyInput value={amount} onChange={(v) => { setAmount(v); setError(''); }} label="Amount you paid" size="md" id="debt-early-amount" autoFocus={mode === 'extra'} />
+          {mode === 'close' && <p className="text-center text-[12.5px] text-ink3">Bank took a closing charge? Add it to the amount. Only {rupees(d.remaining)} comes off the loan.</p>}
+          {save && (save.months > 0 || save.interest > 0) && (
+            <p className="mt-1 text-center text-[13.5px] font-semibold text-pos">
+              {save.months > 0 ? `You’ll finish ${save.months} ${save.months === 1 ? 'month' : 'months'} sooner` : 'You’ll finish a little sooner'}
+              {save.interest > 0 ? ` and save about ${rupees(save.interest)} in interest.` : '.'}
+            </p>
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="text-[13.5px] font-medium text-warn" role="alert">
+          {error}
+        </p>
+      )}
+      <button type="button" className="btn-accent w-full" disabled={mode !== 'emi' && amt <= 0} onClick={record}>
+        Record {mode === 'emi' ? rupees(emi.amount) : amt > 0 ? rupees(amt) : 'payment'}
+      </button>
     </div>
   );
 }

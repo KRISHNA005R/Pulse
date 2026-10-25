@@ -646,6 +646,9 @@ export function DebtScreen() {
                     {part.interest > 0 ? `: ${rupees(part.principal)} comes off the loan and ${rupees(part.interest)} is interest.` : ' and takes it off the loan.'}
                   </p>
                 )}
+                <button type="button" className="btn-quiet mt-3 min-h-[40px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'debt-early', debtId: d.id })}>
+                  Paid early / extra
+                </button>
                 {paid.length > 0 && (
                   <p className="mt-2 text-ink3">
                     Last EMI {fmtDate(paid[0].date)}: {rupees(paid[0].amount)}. {paid.length} recorded in PULSE, {rupees(paid.reduce((a, t) => a + (t.principal ?? 0), 0))} off the loan so far.

@@ -1760,6 +1760,27 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** "Paid early / extra" on a loan. Returns a problem to show, or null when it's recorded. */
+  const payDebtEarly = useCallback(
+    (id: string, mode: EarlyMode, amount?: number): string | null => {
+      let r: ReturnType<typeof payDebtEarlyState> = { left: 0 };
+      const next = commit((s) => {
+        r = payDebtEarlyState(s, id, mode, amount);
+      });
+      if (r.error) return r.error;
+      haptic(12);
+      if (r.left <= 0) {
+        burst({ kind: 'coins', power: 1.6 });
+        toast({ text: 'Loan closed. You’re debt-free on this one!', tone: 'good', emoji: '🎉' });
+      } else if (mode === 'extra') {
+        toast({ text: `Extra ${rupees(r.tx!.amount)} recorded. ${rupees(r.left)} left on the loan.`, tone: 'good' });
+      } else {
+        toast({ text: `This month’s EMI recorded early. ${rupees(r.left)} left. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good' });
+      }
+      return null;
+    },
+    [commit, toast],
+  );
   const deleteDebt = useCallback((id: string) => commit((s) => void (s.debts = s.debts.filter((x) => x.id !== id))), [commit]);
 
   // ---------- paydays ----------
@@ -2081,6 +2102,7 @@ function useStoreImpl() {
     deleteCard,
     saveDebt,
     payDebt,
+    payDebtEarly,
     paySubscription,
     deleteDebt,
   };
@@ -2105,4 +2127,50 @@ export function useSel<T>(fn: (s: State) => T): T {
   const { state } = useStore();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return useMemo(() => fn(state), [state]);
+}
+
+// ---------- Loans: paid early or extra (the "Paid early / extra" sheet) ----------
+export type EarlyMode = 'emi' | 'extra' | 'close';
+
+/**
+ * Pay a loan outside its normal EMI:
+ *   'emi'   this month's EMI, paid before its date. Recorded today; the loan moves on to next
+ *           month's date, so the auto-debit on the old date doesn't record it again.
+ *   'extra' a part-prepayment: all of it comes off the loan. The EMI and its date stay the same.
+ *   'close' paying the loan off in one go. Everything left comes off; anything paid above that
+ *           (a closing charge) is spent but not owed. No EMIs after this.
+ */
+export function payDebtEarlyState(s: State, id: string, mode: EarlyMode, amount?: number): { tx?: Transaction; left: number; error?: string } {
+  const d = (s.debts ?? []).find((x) => x.id === id);
+  if (!d) return { left: 0, error: 'That loan isn’t here any more.' };
+  if (d.remaining <= 0) return { left: 0, error: 'This loan is already paid off.' };
+  if (!d.nextDate) d.nextDate = nextDayOfMonth(s.today, d.dueDay);
+  if (mode === 'emi') {
+    const tx = payEmi(s, d, s.today, 'Paid early');
+    return tx ? { tx, left: d.remaining } : { left: d.remaining, error: 'That EMI was already recorded.' };
+  }
+  const amt = roundMoney(Number(amount));
+  if (!Number.isFinite(amt) || amt <= 0) return { left: d.remaining, error: 'Enter how much you paid.' };
+  if (mode === 'extra' && amt > d.remaining) return { left: d.remaining, error: `That’s more than the ${rupees(d.remaining)} left. Choose “Closed the loan” instead.` };
+  if (mode === 'close' && amt < d.remaining) return { left: d.remaining, error: `That’s less than the ${rupees(d.remaining)} left. Choose “Paid extra” for a part payment.` };
+  const principal = mode === 'extra' ? amt : d.remaining;
+  const account = d.account && (s.accounts.some((a) => a.id === d.account) || s.cards.some((c) => c.id === d.account)) ? d.account : defaultAccount(s);
+  const charge = roundMoney(amt - principal);
+  const tx: Transaction = {
+    id: uid('t'),
+    merchant: mode === 'extra' ? `${d.name} · extra payment` : `${d.name} · closed early`,
+    amount: amt,
+    type: 'expense',
+    category: 'bills',
+    date: s.today,
+    account,
+    recurring: false,
+    status: 'completed',
+    debtId: d.id,
+    principal,
+    notes: mode === 'extra' ? 'Extra payment · all of it off the loan' : charge > 0 ? `Loan closed early · ${rupees(charge)} closing charge` : 'Loan closed early',
+  };
+  s.transactions.unshift(tx);
+  applyMoney(s, tx, 1);
+  return { tx, left: d.remaining };
 }

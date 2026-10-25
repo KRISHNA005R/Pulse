@@ -13,7 +13,7 @@ import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
 import { AuthNudge, MemberCardSheet } from './Auth';
-import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
+import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, DebtEarlyForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
 import { ShareCard } from './ShareCard';
 import { CommandBar } from './CommandBar';
 import { MoneyRecap } from './MoneyRecap';
@@ -233,6 +233,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title={spec.debtId ? 'Edit loan' : 'Add a loan'} onClose={close} size="sm" z={z}>
           <DebtForm debtId={spec.debtId} onDone={close} />
+        </Sheet>
+      );
+    case 'debt-early':
+      return (
+        <Sheet title="Paid early or extra" onClose={close} size="sm" z={z}>
+          <DebtEarlyForm debtId={spec.debtId} onDone={close} />
         </Sheet>
       );
     case 'share-card':
