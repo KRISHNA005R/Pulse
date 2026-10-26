@@ -37,7 +37,8 @@ export default defineConfig(({ mode }) => {
   const artifact = mode === 'artifact';
   return {
     publicDir: artifact ? false : 'public',
-    define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()) },
+    // __WALKER__: the walking buddy is being tried on beta. Netlify sets BRANCH; the live site builds from main.
+    define: { __BUILD_TIME__: JSON.stringify(new Date().toISOString()), __WALKER__: JSON.stringify(process.env.BRANCH !== 'main') },
     plugins: [
       react(),
       siteUrl(),

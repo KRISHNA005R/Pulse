@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
-import { INSURANCE_ON } from '../lib/features';
+import { INSURANCE_ON, WALKER_ON } from '../lib/features';
+import { walker, WALKER_ART } from '../lib/walker';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -150,6 +151,14 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const cycleStart = prev < state.today ? prev : state.today;
   const cycleDays = Math.max(1, daysBetween(cycleStart, sts.payday));
   const cycleDone = Math.min(1, daysBetween(cycleStart, state.today) / cycleDays);
+  // Beta: the walking buddy, on the payday line (default) or along the top of the card.
+  const buddyAt = WALKER_ON && state.mode === 'personal' && sts.daysLeft >= 1 ? (state.settings.walker ?? 'line') : 'off';
+  const buddy = walker(daysBetween(cycleStart, state.today), sts.daysLeft, cycleDone);
+  const buddyImg = (variant: 'line' | 'card', cls: string, style: React.CSSProperties) => (
+    <span className={`pointer-events-none absolute -translate-x-1/2 ${cls}`} style={style}>
+      <img key={buddy.pose} src={WALKER_ART[buddy.pose]} alt="" aria-hidden="true" decoding="async" data-testid="walker" data-variant={variant} data-stage={buddy.pose} className="block h-full w-auto max-w-none animate-toast" />
+    </span>
+  );
 
   const amount = rupees(Math.round(shown));
   const soon = sts.daysLeft <= 1;
@@ -158,7 +167,8 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const extra = paydaysBefore(state, sts.payday)[0];
 
   return (
-    <section aria-labelledby="sts-label" className="hero-card rounded-3xl border border-line bg-surface p-5 shadow-soft md:p-7">
+    <section aria-labelledby="sts-label" className={`hero-card relative rounded-3xl border border-line bg-surface p-5 shadow-soft md:p-7 ${buddyAt === 'card' ? 'mt-[62px]' : ''}`}>
+      {buddyAt === 'card' && buddyImg('card', 'bottom-full h-[60px]', { left: `calc(28px + ${buddy.at} * (100% - 56px))` })}
       {/* 1. Greeting and streak */}
       <div className="flex min-h-[32px] items-center justify-between gap-3">
         <p className="min-w-0 truncate text-[15px] text-ink2">
@@ -214,11 +224,15 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
       {/* 4. Runway to payday: one line for the whole pay cycle, all month. It fills and today's dot
             moves right as the days go by; bill days are small dots under the line. */}
       {sts.daysLeft >= 1 && (
-        <div className="mt-4" role="img" aria-label={`${sts.daysLeft} ${sts.daysLeft === 1 ? 'day' : 'days'} until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
+        <div className={buddyAt === 'line' ? 'mt-14' : 'mt-4'} role="img" aria-label={`${sts.daysLeft} ${sts.daysLeft === 1 ? 'day' : 'days'} until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
           <div data-testid="payday-line" data-progress={cycleDone.toFixed(3)}>
             <div className="relative h-1.5 rounded-full bg-sunk">
               <span className="absolute left-0 top-0 h-1.5 rounded-full bg-accent/70" style={{ width: `${cycleDone * 100}%` }} />
-              <span className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-accent ring-2 ring-surface" style={{ left: `${cycleDone * 100}%` }} />
+              {buddyAt === 'line' ? (
+                buddyImg('line', 'bottom-1/2 h-[46px]', { left: `${buddy.at * 100}%` })
+              ) : (
+                <span data-testid="payday-dot" className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 animate-pulse rounded-full bg-accent ring-2 ring-surface" style={{ left: `${cycleDone * 100}%` }} />
+              )}
               {[...billDays].map((d) => (
                 <span key={d} data-bill={d} className="absolute -bottom-2.5 h-1 w-1 -translate-x-1/2 rounded-full bg-ink2" style={{ left: `${Math.min(1, daysBetween(cycleStart, d) / cycleDays) * 100}%` }} />
               ))}

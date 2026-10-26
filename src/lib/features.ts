@@ -11,3 +11,10 @@ export const INSURANCE_ON = false;
  * hidden until it is. Turn this on only when ReceiptScanner reads the actual photo.
  */
 export const RECEIPT_SCAN_ON = false;
+
+/**
+ * Walking buddy on the Safe to spend card (being tried on beta). On for every build except the live
+ * site (Netlify's main branch), so beta and local tests have it and pulsemoney.in doesn't yet.
+ */
+declare const __WALKER__: boolean;
+export const WALKER_ON = typeof __WALKER__ === 'boolean' ? __WALKER__ : false;

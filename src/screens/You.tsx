@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
-import { INSURANCE_ON } from '../lib/features';
+import { INSURANCE_ON, WALKER_ON } from '../lib/features';
 import { remindersSummary } from './Reminders';
 import { cleanVpa, okVpa } from '../lib/upi';
 import { playSfx } from '../lib/sfx';
@@ -900,6 +900,21 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       )}
       {section === 'appearance' && (
         <div className="flex flex-col gap-5">
+        {WALKER_ON && (
+          <div>
+            <p className="eyebrow mb-2 px-1">Walking buddy · beta</p>
+            <div role="radiogroup" aria-label="Walking buddy" className="grid grid-cols-3 gap-2">
+              {([['line', 'On the line'], ['card', 'On the card'], ['off', 'Off']] as const).map(([v, label]) => {
+                const on = (s.walker ?? 'line') === v;
+                return (
+                  <button key={v} type="button" role="radio" aria-checked={on} onClick={() => updateSettings({ walker: v })} className={`tap min-h-[48px] rounded-2xl border px-2 text-[14px] font-medium ${on ? 'border-ink' : 'border-line'} bg-surface`}>
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div role="radiogroup" aria-label="Theme" className="flex flex-col gap-2">
           {(['system', 'light', 'dark'] as const).map((t) => (
             <button key={t} type="button" role="radio" aria-checked={s.theme === t} onClick={() => updateSettings({ theme: t })} className={`tap flex min-h-[56px] items-center gap-3 rounded-2xl border px-4 text-left ${s.theme === t ? 'border-ink' : 'border-line'} bg-surface`}>

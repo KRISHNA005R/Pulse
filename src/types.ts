@@ -378,6 +378,8 @@ export type InsightDetail =
 export interface Settings {
   buffer: number;
   theme: 'system' | 'light' | 'dark';
+  /** Beta: where the walking buddy goes on the Safe to spend card. Missing means 'line'. */
+  walker?: 'line' | 'card' | 'off';
   /** Currency the person tracks in (amounts are not converted). See lib/currency.ts. */
   currency: import('./lib/currency').CurrencyCode;
   notifications: { bills: boolean; moments: boolean; weekly: boolean; splits: boolean };
