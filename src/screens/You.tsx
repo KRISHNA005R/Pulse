@@ -588,7 +588,7 @@ export function DebtScreen() {
           </button>
         }
       />
-      {state.debts.length === 0 && <EmptyState icon="bank" title="No debts tracked." body="Add a loan to see when you'll be debt-free, and what paying a little extra saves." action={{ label: 'Add a loan', onClick: () => ui.openSheet({ type: 'debt-form' }) }} />}
+      {state.debts.length === 0 && <EmptyState icon="bank" art="/illustrations/debt-free.webp" title="No debts tracked." body="Add a loan to see when you'll be debt-free, and what paying a little extra saves." action={{ label: 'Add a loan', onClick: () => ui.openSheet({ type: 'debt-form' }) }} />}
       {state.debts.map((d) => {
         const base = payoffMonths(d.remaining, d.rate, d.minPayment);
         const faster = payoffMonths(d.remaining, d.rate, d.minPayment + extra);
@@ -613,6 +613,7 @@ export function DebtScreen() {
                 <Icon name="pencil" size={16} />
               </button>
             </div>
+            {paidOff && <img src="/illustrations/loan-paid-off.webp" alt="" aria-hidden="true" width={700} height={695} decoding="async" data-testid="loan-art" className="mx-auto mt-1 h-[180px] w-auto" />}
             <p className="num-hero mt-3 text-[33px] leading-none">{rupees(d.remaining)}</p>
             <p className="text-[13px] text-ink3">{paidOff ? 'Paid off. Nothing left to pay.' : 'remaining'}</p>
             <dl className="mt-4 grid grid-cols-3 gap-3 text-[13px]">

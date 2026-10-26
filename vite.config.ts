@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => {
               },
               workbox: {
                 globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,jpg,webp,webmanifest,mp3}'],
-                globIgnores: ['stats/**', 'founder/**', 'email/**', 'screenshots/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
+                globIgnores: ['stats/**', 'founder/**', 'email/**', 'screenshots/**', 'illustrations/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
                 // Reminders: the push and notification-tap handlers live in public/push-sw.js.
                 importScripts: ['/push-sw.js'],
                 navigateFallback: '/index.html',
@@ -94,6 +94,13 @@ export default defineConfig(({ mode }) => {
                 // GIF profile photos: an id never gets a different picture, so the phone keeps its copy
                 // and friends' photos still move without internet.
                 runtimeCaching: [
+                  // Illustrations (about 1 MB together): downloaded the first time a screen shows one,
+                  // not all at install, then kept for offline. A changed picture refreshes in the background.
+                  {
+                    urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/illustrations/'),
+                    handler: 'StaleWhileRevalidate',
+                    options: { cacheName: 'pulse-art', expiration: { maxEntries: 40 }, cacheableResponse: { statuses: [200] } },
+                  },
                   {
                     urlPattern: ({ url }: { url: URL }) => url.pathname === '/api/face',
                     handler: 'CacheFirst',

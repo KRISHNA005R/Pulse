@@ -345,3 +345,15 @@ describe('fixed problems stay fixed', () => {
     expect((await (await t.call('GET', '?status=1')).json()).total).toBe(5003);
   });
 });
+
+describe('announcement email picture', () => {
+  it('has the two-friends picture at the top: a PNG on pulsemoney.in, sized, decorative', async () => {
+    const { announceEmail } = await import('../netlify/lib/emails');
+    const m = announceEmail('Krishna', 'https://pulsemoney.in/unsub');
+    const img = m.html.match(/<img[^>]*email\/hero\.png[^>]*>/)?.[0] ?? '';
+    expect(img).toContain('src="https://pulsemoney.in/email/hero.png"');
+    expect(img).toContain('alt=""');
+    expect(img).toMatch(/width="\d+"/);
+    expect(m.html.indexOf('email/hero.png')).toBeLessThan(m.html.indexOf('Two new ways to save'));
+  });
+});

@@ -45,7 +45,7 @@ function PlansList() {
   if (!state.plans.length)
     return (
       <div className="flex flex-col gap-6">
-        <EmptyState icon="target" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
+        <EmptyState icon="target" art="/illustrations/empty-plans.webp" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
         <GullakBanner />
       </div>
     );
@@ -292,6 +292,8 @@ export function PlanDetail({ id }: { id: string }) {
           )}
         </>
       ) : (
+      <>
+      {plan.status === 'done' && <img src="/illustrations/goal-reached.webp" alt="" aria-hidden="true" width={700} height={697} decoding="async" data-testid="goal-art" className="mx-auto mb-2 h-[200px] w-auto" />}
       <section className="rounded-3xl border border-line bg-surface p-5 md:p-6" aria-label="Progress">
         <div className="flex items-center gap-5">
           <Ring value={m.progress} size={116} stroke={11} label={`${pct}% funded`}>
@@ -366,6 +368,7 @@ export function PlanDetail({ id }: { id: string }) {
           )}
         </div>
       </section>
+      </>
       )}
 
       <section className="mt-4 rounded-3xl border border-line bg-surface p-5" aria-labelledby="pm-h">

@@ -117,17 +117,15 @@ export function PaydayWin() {
           </span>
         ))}
       </div>
-      <div className="flex items-start gap-3 p-4">
-        <span className="pop-in grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent-soft text-[26px]" aria-hidden="true">
-          🏁
-        </span>
-        <div className="min-w-0 flex-1">
+      <div className="relative flex items-center gap-2 py-3 pl-4 pr-2">
+        <div className="min-w-0 flex-1 pr-1">
           <p className="display text-[18px] leading-tight">You survived payday</p>
           <p className="mt-0.5 text-[14px] text-ink2">
             Made it with <span className="num font-semibold text-pos">{rupees(w.left)}</span> left. {w.inARow > 1 ? `${w.inARow} paydays in a row. Built different.` : 'First one on the board.'}
           </p>
         </div>
-        <button type="button" className="tap -mr-1 -mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Close" onClick={() => store.updateSettings({ paydaySeen: w.date })}>
+        <img src="/illustrations/payday-win.webp" alt="" aria-hidden="true" width={700} height={694} decoding="async" data-testid="payday-art" className="pop-in h-[112px] w-[112px] shrink-0 object-contain" />
+        <button type="button" className="tap absolute right-1.5 top-1.5 grid h-9 w-9 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label="Close" onClick={() => store.updateSettings({ paydaySeen: w.date })}>
           <Icon name="x" size={16} />
         </button>
       </div>

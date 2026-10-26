@@ -120,7 +120,7 @@ export function HomeScreen() {
             ))}
           </div>
         ) : (
-          <EmptyState icon="target" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
+          <EmptyState icon="target" art="/illustrations/empty-plans.webp" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
         )}
       </section>
 

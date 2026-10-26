@@ -58,8 +58,7 @@ function Slide({ r, i }: { r: Rewind; i: number }) {
         <p className="text-[11px] font-extrabold tracking-[.16em]" style={{ color: NIGHT }}>
           PULSE REWIND
         </p>
-        <p className="mt-10 text-[44px] leading-none">📼</p>
-        <p className="display mt-3 text-[40px] leading-[.95] tracking-tight">
+        <p className="display mt-6 text-[40px] leading-[.95] tracking-tight">
           Your
           <br />
           {r.monthName},
@@ -71,7 +70,8 @@ function Slide({ r, i }: { r: Rewind; i: number }) {
           <br />
           Let’s see what kind of month it was.
         </p>
-        <div className="mt-auto flex items-center justify-between text-[11px] font-bold opacity-80">
+        <img src="/illustrations/rewind-opener.webp" alt="" aria-hidden="true" width={609} height={800} decoding="async" data-testid="rewind-art" className="mx-auto mt-3 min-h-0 w-auto flex-1 object-contain" style={{ maxHeight: 320 }} />
+        <div className="mt-3 flex items-center justify-between text-[11px] font-bold opacity-80">
           <Mark />
           <span>Tap to start →</span>
         </div>

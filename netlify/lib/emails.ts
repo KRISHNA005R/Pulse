@@ -292,6 +292,7 @@ export function announceEmail(name: string, unsubUrl: string): Mail {
   const bhisi = `${SITE}/?tab=bhisi&source=announce`;
   const gullak = `${SITE}/?action=gullak&source=announce`;
   const body =
+    `<img src="${SITE}/email/hero.png" width="508" alt="" style="display:block;width:100%;max-width:508px;height:auto;border:0;margin:0 auto 18px">` +
     p(`Hey ${esc(first)} 👋`, C.ink) +
     h1('Two new ways to save, made for us') +
     p('Krishna here, I build PULSE. Two new things just went live, and I’d love for you to try them.') +

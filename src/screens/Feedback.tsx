@@ -162,6 +162,7 @@ export function FeedbackScreen() {
       }}
     >
       <TopNavigation title="Spill the tea" onBack={ui.pop} sub="Roast us, hype us or tell us what broke. Every message gets read." />
+      <img src="/illustrations/feedback.webp" alt="" aria-hidden="true" width={692} height={700} decoding="async" data-testid="feedback-art" className="mx-auto -mt-1 mb-5 h-[170px] w-auto" />
 
       <div className="flex flex-col gap-7">
         {/* 1. Vibe check: one tap */}
