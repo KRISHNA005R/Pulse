@@ -8,7 +8,7 @@ import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot, rep
 import { bhisiUrl, type BhisiInvite } from '../lib/bhisiShare';
 import { Icon } from './ui/Icon';
 import { Field, MoneyInput, PersonAvatar, TopNavigation } from './ui/bits';
-import { MatkaDraw, Pot, type Chit } from './Matka';
+import { MatkaDraw, type Chit } from './Matka';
 
 const EMOJI = ['🏺', '💰', '🪙', '🎰', '🏠', '🎉', '🍜', '✨'];
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -306,8 +306,8 @@ export function BhisiDetail({ id }: { id: string }) {
             <p className="num-hero mt-2 break-all text-[clamp(28px,9vw,40px)] leading-none">{b.amount ? rupees(pot(b)) : '—'}</p>
             <p className="mt-1.5 text-[14px] text-[#FFFBF4]/75">{r ? (g.open ? 'in the pot. The draw is open!' : `in the pot · draw ${relDay(r.date, state.today).toLowerCase()}`) : 'Everyone got their turn. Iconic.'}</p>
           </div>
-          <div className="pointer-events-none -mr-1 -mt-2 shrink-0">
-            <Pot size={92} />
+          <div className="pointer-events-none -mr-1 -mt-1 shrink-0">
+            <img src={r ? '/illustrations/matka.webp' : '/illustrations/matka-empty.webp'} alt="" aria-hidden="true" width={600} height={593} decoding="async" data-testid="matka-art" className="h-[92px] w-[92px] object-contain" />
           </div>
         </div>
         {r && b.members.length > 1 && (
@@ -615,10 +615,8 @@ export function BhisiJoin({ invite, onDone }: { invite: BhisiInvite; onDone: () 
   const [err, setErr] = useState('');
   return (
     <div className="text-center">
-      <div className="mx-auto w-fit">
-        <Pot size={140} />
-      </div>
-      <p className="display mt-1 text-[22px] leading-tight">Join {invite.name || 'this bhisi'}?</p>
+      <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" data-testid="matka-art" className="mx-auto h-[140px] w-auto" />
+      <p className="display mt-2 text-[22px] leading-tight">Join {invite.name || 'this bhisi'}?</p>
       <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Your chit goes into the matka. Every month one chit comes out, picked by PULSE’s server: random and locked. You get a notification if it’s yours.</p>
       {err && <p className="mx-auto mt-3 max-w-[300px] rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">{err}</p>}
       <button

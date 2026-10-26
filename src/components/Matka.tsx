@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Person } from '../types';
 import { useStore } from '../store/store';
 import { burst } from '../lib/celebrate';
@@ -85,15 +85,6 @@ export function Pot({ size = 230 }: { size?: number }) {
   );
 }
 
-/** A rolled-up chit tied with a red thread. */
-function Scroll({ w = 16, h = 46 }: { w?: number; h?: number }) {
-  return (
-    <span className="relative block rounded-[5px] border" style={{ width: w, height: h, background: PAPER, borderColor: '#E3D6C2', boxShadow: `inset -4px 0 0 ${TINT}` }}>
-      <span className="absolute inset-x-[-2px] top-1/2 h-[3px] -translate-y-1/2 rounded-full" style={{ background: PERSIMMON }} />
-    </span>
-  );
-}
-
 type Stage = 'idle' | 'shaking' | 'rise' | 'hover' | 'unroll' | 'open';
 type DrawFn = () => string | undefined | Promise<{ winner?: string; error?: string }>;
 
@@ -109,17 +100,6 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
   const [error, setError] = useState('');
   const busy = useRef(false);
   const timers = useRef<number[]>([]);
-  // How the chits sit and jiggle is shuffled every time (just the look: the result comes from draw()).
-  const peek = useMemo(() => {
-    const shown = [...chits].sort(() => Math.random() - 0.5).slice(0, 10);
-    return shown.map((c, i, a) => ({
-      c,
-      left: 50 + (i - (a.length - 1) / 2) * 7.2 + (Math.random() * 3 - 1.5),
-      r: `${Math.round(Math.random() * 30 - 15)}deg`,
-      delay: `${(Math.random() * 0.9).toFixed(2)}s`,
-      h: 28 + Math.round(Math.random() * 16),
-    }));
-  }, [chits]);
   const [shake] = useState(() => ['matka-shaking', 'matka-shaking-b', 'matka-shaking-c'][Math.floor(Math.random() * 3)]);
   const [shakeMs] = useState(() => 1500 + Math.round(Math.random() * 700));
   const t = (ms: number, f: () => void) => timers.current.push(window.setTimeout(f, ms));
@@ -206,24 +186,16 @@ export function MatkaDraw({ chits, draw, round, rounds, pot, when, onRevealed, a
         className={`relative mt-[96px] outline-none transition-[opacity,transform] duration-500 ${revealed ? 'scale-90 opacity-0' : 'opacity-100'}`}
       >
         <div className={stage === 'shaking' ? shake : stage === 'idle' ? 'matka-idle' : ''} style={stage === 'shaking' ? { animationDuration: `${shakeMs}ms` } : undefined}>
-          <div className="absolute inset-x-0" style={{ top: 24, height: 52 }}>
-            {peek.map(({ c, left, r, delay, h }) =>
-              flying && winner?.id === c.id ? null : (
-                <span key={c.id} className="chit absolute" style={{ left: `${left}%`, bottom: 0, marginLeft: -7, ['--r' as string]: r, animationDelay: delay }}>
-                  <Scroll w={14} h={h} />
-                </span>
-              ),
-            )}
-          </div>
-          <Pot />
+          {/* The pot already shows its chits; the winning one flies out of it below. */}
+          <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" data-testid="matka-draw-art" className="relative block h-auto w-[230px]" />
         </div>
         {stage === 'shaking' &&
           [-1, 1].map((d) =>
             [0, 1, 2].map((k) => <span key={`${d}${k}`} className="puff absolute h-5 w-5 rounded-full" style={{ left: d < 0 ? 18 : 196, top: 200 + k * 10, background: TINT, ['--px' as string]: `${d * 22}px`, animationDelay: `${k * 0.18}s` }} aria-hidden="true" />),
           )}
         {flying && (
-          <span className={`absolute ${stage === 'rise' ? 'scroll-rise' : 'scroll-hover'}`} style={{ left: '50%', top: 22 }} aria-hidden="true">
-            <Scroll w={18} h={52} />
+          <span className={`absolute ${stage === 'rise' ? 'scroll-rise' : 'scroll-hover'}`} style={{ left: '50%', top: -6 }} aria-hidden="true">
+            <img src="/illustrations/chit.webp" alt="" width={200} height={195} decoding="async" data-testid="chit-art" className="block h-[52px] w-[54px] -translate-x-1/2" />
           </span>
         )}
       </button>

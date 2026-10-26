@@ -545,7 +545,8 @@ export function Onboarding() {
         )}
 
         {step === 'done' && (
-          <div className="flex flex-1 flex-col pt-10">
+          <div className="flex flex-1 flex-col pt-4">
+            <img src="/illustrations/onboarding-done.webp" alt="" aria-hidden="true" width={575} height={700} decoding="async" data-testid="done-art" className="mx-auto mb-2 w-auto object-contain" style={{ height: 'clamp(120px, calc(100svh - 600px), 210px)' }} />
             <h1 id="ob-title" className="display text-[30px] leading-tight">
               You're set, {fresh.user.name}.
             </h1>

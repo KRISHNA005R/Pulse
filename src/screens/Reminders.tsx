@@ -92,6 +92,8 @@ export function RemindersScreen() {
           )}
         </section>
       ) : (
+        <>
+        {!on && <img src="/illustrations/bell.webp" alt="" aria-hidden="true" width={328} height={420} decoding="async" data-testid="bell-art" className="mx-auto mb-3 h-[150px] w-auto" />}
         <section className="rounded-3xl border border-line bg-surface p-5" aria-live="polite">
           <div className="flex items-center gap-3">
             <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-[22px] ${on ? 'bg-pos/10' : 'bg-sunk'}`} aria-hidden="true">
@@ -123,6 +125,7 @@ export function RemindersScreen() {
             </button>
           )}
         </section>
+        </>
       )}
 
       <section className="mt-8" aria-labelledby="rem-which">
@@ -177,9 +180,7 @@ export function ReminderCard() {
   };
   return (
     <section aria-label="Reminders" className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-4">
-      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-accent-soft text-[22px]" aria-hidden="true">
-        🔔
-      </span>
+      <img src="/illustrations/bell.webp" alt="" aria-hidden="true" width={328} height={420} decoding="async" data-testid="bell-ask-art" className="h-[64px] w-[52px] shrink-0 object-contain" />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold leading-tight">Want a nudge to log your day?</p>
         <p className="mt-0.5 text-[13px] text-ink3">Plus a heads-up before bills and on payday. Change it any time.</p>

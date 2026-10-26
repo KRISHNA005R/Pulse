@@ -198,8 +198,10 @@ export function GullakHero({ plan }: { plan: Plan }) {
                 return <span key={i} className="shard absolute left-1/2 top-1/2 h-5 w-4" style={{ background: i % 2 ? PERSIMMON : DEEP, clipPath: 'polygon(50% 0, 100% 100%, 0 80%)', ['--dx' as string]: `${Math.cos(a) * 140}px`, ['--dy' as string]: `${Math.sin(a) * 140}px`, ['--rot' as string]: `${i * 70}deg` }} />;
               })}
             </div>
+          ) : g.broken ? (
+            <img src="/illustrations/gullak-broken.webp" alt="" aria-hidden="true" width={560} height={544} decoding="async" data-testid="gullak-broken-art" className="h-[190px] w-auto" />
           ) : (
-            <GullakArt level={level} size={190} broken={g.broken} />
+            <GullakArt level={level} size={190} />
           )}
         </div>
       </div>
@@ -255,7 +257,7 @@ export function GullakCard({ plan }: { plan: Plan }) {
     <div className="flex items-center gap-3 rounded-3xl border border-line bg-surface p-3.5">
       <button type="button" className="tap flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => ui.push({ name: 'plan', id: plan.id })}>
         <span className="shrink-0">
-          <GullakArt level={plan.target ? plan.saved / plan.target : 0} size={56} broken={g.broken} />
+          {g.broken ? <img src="/illustrations/gullak-broken.webp" alt="" aria-hidden="true" width={560} height={544} decoding="async" data-testid="gullak-broken-art" className="h-[56px] w-[56px] object-contain" /> : <GullakArt level={plan.target ? plan.saved / plan.target : 0} size={56} />}
         </span>
         <span className="min-w-0">
           <span className="display block truncate text-[16px]">{plan.name}</span>

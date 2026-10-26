@@ -552,7 +552,11 @@ export function AccountScreen() {
         <Icon name="share" size={16} /> Share my member card
       </button>
 
-      <ul className="mt-6 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-[14.5px] text-ink2">
+      <div className="mt-6 flex items-center gap-3 px-1">
+        <img src="/illustrations/padlock.webp" alt="" aria-hidden="true" width={349} height={360} decoding="async" data-testid="lock-art" className="h-[56px] w-[56px] shrink-0 object-contain" />
+        <p className="display text-[17px] leading-tight">Your money, locked to you.</p>
+      </div>
+      <ul className="mt-3 flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 text-[14.5px] text-ink2">
         <li className="flex gap-3">
           <Icon name="check" size={17} strokeWidth={2.4} className="mt-0.5 shrink-0 text-pos" /> {saved}
         </li>

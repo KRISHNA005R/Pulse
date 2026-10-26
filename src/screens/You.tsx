@@ -234,7 +234,7 @@ export function SubscriptionsScreen() {
       {view === 'calendar' ? (
         <RenewalCalendar />
       ) : state.subscriptions.length === 0 ? (
-        <EmptyState icon="repeat" title="No recurring payments detected yet." body="Add subscriptions and bills so they're set aside before payday." action={{ label: 'Add one', onClick: () => ui.openSheet({ type: 'sub-form' }) }} />
+        <EmptyState icon="repeat" art="/illustrations/calendar.webp" title="No recurring payments detected yet." body="Add subscriptions and bills so they're set aside before payday." action={{ label: 'Add one', onClick: () => ui.openSheet({ type: 'sub-form' }) }} />
       ) : (
         <>
           <section className="mt-6" aria-labelledby="subs-h">
@@ -461,7 +461,7 @@ export function IncomeScreen() {
       </div>
       <section className="mt-8" aria-labelledby="inc-src">
         <SectionHeader id="inc-src" title="Sources" />
-        {state.incomes.length === 0 && <p className="px-1 py-3 text-[14px] text-ink3">No income sources. Add one so PULSE knows when your next payday is.</p>}
+        {state.incomes.length === 0 && <EmptyState icon="briefcase" art="/illustrations/coins.webp" title="No income sources yet." body="Add one so PULSE knows when your next payday is." action={{ label: 'Add income', onClick: () => ui.openSheet({ type: 'income-form' }) }} />}
         {state.incomes.map((i) => (
           <NavRow key={i.id} icon={i.kind === 'salary' ? 'briefcase' : 'spark'} label={i.name} sub={sourceSub(i)} value={rupees(i.expected)} onClick={() => ui.openSheet({ type: 'income-form', incomeId: i.id })} />
         ))}
@@ -507,7 +507,7 @@ export function CardsScreen() {
           </button>
         }
       />
-      {state.cards.length === 0 && <EmptyState icon="card" title="No cards added." body="Add a credit card to track its balance, limit and due date. Only the last 4 digits, never the full number." action={{ label: 'Add a card', onClick: () => ui.openSheet({ type: 'card-form' }) }} />}
+      {state.cards.length === 0 && <EmptyState icon="card" art="/illustrations/card.webp" title="No cards added." body="Add a credit card to track its balance, limit and due date. Only the last 4 digits, never the full number." action={{ label: 'Add a card', onClick: () => ui.openSheet({ type: 'card-form' }) }} />}
       <div className="flex flex-col gap-4">
         {state.cards.map((c) => {
           const util = c.limit > 0 ? c.balance / c.limit : 0;
@@ -1046,7 +1046,7 @@ export function InvestmentsScreen() {
       />
 
       {list.length === 0 ? (
-        <EmptyState icon="trend" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month, keeps it aside before payday, and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
+        <EmptyState icon="trend" art="/illustrations/plant.webp" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month, keeps it aside before payday, and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
       ) : (
         <>
           <section className="rounded-3xl border border-line bg-surface p-5" aria-labelledby="inv-total">
