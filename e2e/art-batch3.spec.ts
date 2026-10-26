@@ -17,14 +17,14 @@ async function youRow(page: Page, label: RegExp) {
   await page.getByRole('button', { name: label }).first().click();
 }
 
-test('setup finished: "You\'re set" has the jumping girl', async ({ page }) => {
+test('setup finished: "You\'re set" stays without a picture', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Get started' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
   for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.getByRole('button', { name: 'Build my dashboard' }).click();
   await expect(page.getByText(/You.re set/)).toBeVisible({ timeout: 15000 });
-  await looksRight(page.getByTestId('done-art'), 'onboarding-done');
+  await expect(page.getByTestId('done-art')).toHaveCount(0);
 });
 
 test('empty lists in You: calendar (bills), card (credit cards), plant (SIPs), coins (income)', async ({ page }) => {
@@ -40,18 +40,20 @@ test('empty lists in You: calendar (bills), card (credit cards), plant (SIPs), c
   await looksRight(page.getByTestId('empty-art'), 'coins');
 });
 
-test('Activity with nothing logged has the chai and samosa; Home keeps the chai person', async ({ page }) => {
+test('nothing logged: Home and Activity both show the chai person', async ({ page }) => {
   await openDemo(page);
   await setState(page, 's.transactions = []; s.subscriptions = []; s.investments = []; s.debts = []; s.insurance = []; s.incomes = [];');
   await looksRight(page.getByTestId('empty-art'), 'empty-activity');
   await tab(page, 'Activity');
-  await looksRight(page.getByTestId('empty-art'), 'kulhad');
+  await looksRight(page.getByTestId('empty-art'), 'empty-activity');
 });
 
-test('Reminders off: the page shows the phone with the bell', async ({ page }) => {
+test('Reminders: no bell picture, the page stays as it was', async ({ page }) => {
   await openDemo(page);
   await youRow(page, /^Reminders/);
-  await looksRight(page.getByTestId('bell-art'), 'bell');
+  await expect(page.getByText('Reminders are off')).toBeVisible();
+  await expect(page.getByTestId('bell-art')).toHaveCount(0);
+  await expect(page.locator('img[src*="bell"]')).toHaveCount(0);
 });
 
 test('Your account: the padlock sits with "how your data is kept"', async ({ page }) => {
