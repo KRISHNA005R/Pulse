@@ -64,9 +64,7 @@ export function BhisiList() {
   if (!list.length)
     return (
       <section className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 pb-6 pt-4 text-center">
-        <div className="mx-auto w-fit">
-          <Pot size={150} />
-        </div>
+        <img src="/illustrations/bhisi.webp" alt="" aria-hidden="true" width={1000} height={558} decoding="async" data-testid="bhisi-art" className="-mx-2 mb-2 h-auto w-[calc(100%+16px)] max-w-none" />
         <h2 className="display mt-1 text-[23px] leading-tight">Bhisi, but make it digital</h2>
         <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Your gang chips in every month. A lucky chit picks who takes the whole pot. Everyone wins once.</p>
         <ol className="mx-auto mt-5 flex max-w-[340px] flex-col gap-2 text-left">

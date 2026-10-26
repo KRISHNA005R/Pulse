@@ -83,7 +83,7 @@ export function EmptyState({ icon, title, body, action, art }: { icon: string; t
   return (
     <div className={`flex flex-col items-center px-6 text-center ${art ? 'pb-10 pt-4' : 'py-10'}`}>
       {art ? (
-        <img src={art} alt="" aria-hidden="true" width={640} height={640} decoding="async" data-testid="empty-art" className="mb-3 h-[200px] w-auto max-w-full object-contain" />
+        <img src={art} alt="" aria-hidden="true" width={640} height={640} decoding="async" data-testid="empty-art" className="mb-3 h-[200px] w-full object-contain" />
       ) : (
         <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent-ink">
           <Icon name={icon} size={24} />

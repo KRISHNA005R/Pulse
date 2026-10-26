@@ -55,3 +55,28 @@ test('no gullak yet: the Gullak card on Plans shows the coin picture, opens the 
   await page.goBack();
   await expect(page.getByTestId('gullak-art')).toHaveCount(0);
 });
+
+test('no bhisi yet: the Bhisi tab shows the five friends around the matka', async ({ page }) => {
+  await openDemo(page); // the helper starts with no bhisis
+  await page.locator('nav').getByRole('button', { name: 'Plans' }).click();
+  await page.getByRole('radio', { name: 'Bhisi' }).or(page.getByRole('tab', { name: 'Bhisi' })).or(page.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
+  const art = page.getByTestId('bhisi-art');
+  await expect(art).toBeVisible();
+  await expect(art).toHaveAttribute('alt', '');
+  await expect(art).toHaveAttribute('src', /bhisi\.webp$/);
+  expect(await loaded(page, 'bhisi-art')).toBe(true);
+  await expect(page.getByRole('button', { name: /Start a bhisi/ })).toBeVisible();
+});
+
+test('no groups yet: Splits shows the six friends at the table', async ({ page }) => {
+  await openDemo(page);
+  await setState(page, 's.groups = []; s.splits = s.splits.filter((x) => !x.group);');
+  await page.locator('nav').getByRole('button', { name: 'Plans' }).click();
+  await page.getByRole('radio', { name: 'Splits' }).or(page.getByRole('tab', { name: 'Splits' })).or(page.getByRole('button', { name: 'Splits', exact: true })).first().click();
+  await expect(page.getByText('No groups yet.')).toBeVisible();
+  const art = page.getByTestId('empty-art');
+  await art.scrollIntoViewIfNeeded();
+  await expect(art).toBeVisible();
+  await expect(art).toHaveAttribute('src', /splits\.webp$/);
+  expect(await loaded(page, 'empty-art')).toBe(true);
+});

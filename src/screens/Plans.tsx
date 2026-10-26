@@ -188,7 +188,7 @@ function SplitsView() {
             ))}
           </div>
         ) : (
-          <EmptyState icon="users" title="No groups yet." body="Split a dinner, trip or weekend plan with friends." action={{ label: 'Create a group', onClick: () => ui.openSheet({ type: 'group-form' }) }} />
+          <EmptyState icon="users" art="/illustrations/splits.webp" title="No groups yet." body="Split a dinner, trip or weekend plan with friends." action={{ label: 'Create a group', onClick: () => ui.openSheet({ type: 'group-form' }) }} />
         )}
       </section>
     </div>
