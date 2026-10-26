@@ -78,12 +78,17 @@ export function Segmented<T extends string>({ value, onChange, options, label, s
 }
 
 // ---------- Empty state ----------
-export function EmptyState({ icon, title, body, action }: { icon: string; title: string; body: string; action?: { label: string; onClick: () => void } }) {
+/** `art`: an illustration (decoration only) shown instead of the icon. */
+export function EmptyState({ icon, title, body, action, art }: { icon: string; title: string; body: string; action?: { label: string; onClick: () => void }; art?: string }) {
   return (
-    <div className="flex flex-col items-center px-6 py-10 text-center">
-      <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent-ink">
-        <Icon name={icon} size={24} />
-      </div>
+    <div className={`flex flex-col items-center px-6 text-center ${art ? 'pb-10 pt-4' : 'py-10'}`}>
+      {art ? (
+        <img src={art} alt="" aria-hidden="true" width={640} height={640} decoding="async" data-testid="empty-art" className="mb-3 h-[200px] w-auto max-w-full object-contain" />
+      ) : (
+        <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-soft text-accent-ink">
+          <Icon name={icon} size={24} />
+        </div>
+      )}
       <p className="display text-[18px]">{title}</p>
       <p className="mt-1 max-w-[30ch] text-[14.5px] text-ink2">{body}</p>
       {action && (

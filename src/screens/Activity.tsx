@@ -4,7 +4,7 @@ import { useUI, type ActivityFilter } from '../store/ui';
 import { isBack, monthRange, netCost, prevMonth, spendBetween } from '../lib/finance';
 import { addDays, monthName, rupees } from '../lib/format';
 import { TransactionList } from '../components/money';
-import { FilterChip, TopNavigation } from '../components/ui/bits';
+import { EmptyState, FilterChip, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
 const CHIPS: { key: string; label: string }[] = [
@@ -118,7 +118,11 @@ export function ActivityScreen() {
       </div>
 
       <div className="mt-6">
-        <TransactionList txs={txs} emptyText={f.query ? `Nothing matches “${f.query}”.` : 'No transactions for this filter.'} />
+        {!state.transactions.length && !filtered ? (
+          <EmptyState icon="plus" art="/illustrations/empty-activity.webp" title="Nothing logged yet." body="Everything you spend or get shows up here. Tap + to log your first one." action={{ label: 'Add first expense', onClick: () => ui.openSheet({ type: 'composer' }) }} />
+        ) : (
+          <TransactionList txs={txs} emptyText={f.query ? `Nothing matches “${f.query}”.` : 'No transactions for this filter.'} />
+        )}
       </div>
       {filtered && (
         <div className="mt-6 text-center">

@@ -133,7 +133,7 @@ export function HomeScreen() {
             ))}
           </ul>
         ) : (
-          <EmptyState icon="plus" title="Nothing logged yet." body={`Tap + and type something like “${ex(180)} chai and samosa”. PULSE works out the rest.`} action={{ label: 'Add first expense', onClick: () => ui.openSheet({ type: 'composer' }) }} />
+          <EmptyState icon="plus" art="/illustrations/empty-activity.webp" title="Nothing logged yet." body={`Tap + and type something like “${ex(180)} chai and samosa”. PULSE works out the rest.`} action={{ label: 'Add first expense', onClick: () => ui.openSheet({ type: 'composer' }) }} />
         )}
       </section>
 

@@ -296,9 +296,7 @@ export function GullakBanner() {
   const ui = useUI();
   return (
     <button type="button" onClick={() => ui.openSheet({ type: 'gullak-form' })} className="tap relative flex w-full items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface p-4 text-left">
-      <span className="shrink-0">
-        <GullakArt level={0.55} size={78} />
-      </span>
+      <img src="/illustrations/gullak.webp" alt="" aria-hidden="true" width={633} height={640} decoding="async" data-testid="gullak-art" className="-my-2 h-[104px] w-[103px] shrink-0 object-contain" />
       <span className="min-w-0 flex-1">
         <span className="block text-[11.5px] font-bold tracking-[.16em] text-accent-ink">CHALLENGE</span>
         <span className="display block text-[18px] leading-tight">Gullak</span>
