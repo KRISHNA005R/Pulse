@@ -165,7 +165,7 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
                     onClick={async () => {
                       try {
                         await navigator.clipboard.writeText(code);
-                        store.toast({ text: 'Code copied. In the installed app, tap “I use PULSE on another device” and paste it.', emoji: '📋' });
+                        store.toast({ text: 'Code copied. In the installed app, go to You → Sync my devices and paste it.', emoji: '📋' });
                       } catch {
                         store.toast({ text: 'Copy is blocked here. Write the code down.' });
                       }
@@ -173,7 +173,7 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
                   >
                     <Icon name="copy" size={16} /> Copy my code
                   </button>
-                  <p className="mt-2 text-[12.5px] text-ink3">In the installed app: tap <b>I use PULSE on another device</b>, then paste it.</p>
+                  <p className="mt-2 text-[12.5px] text-ink3">In the installed app: go to <b>You → Sync my devices</b>, then paste it.</p>
                 </>
               ) : (
                 <button

@@ -39,11 +39,11 @@ const VALUE: { icon: 'wallet' | 'target' | 'users'; title: string; sub: string; 
   { icon: 'users', title: 'Split with friends', sub: 'Who owes who, settled in one tap. Bhisi too.' },
 ];
 // Screen 2: only promises that are true in PULSE today (each one has a test).
-const PROMISES: { icon: 'lock' | 'pencil' | 'trash' | 'zap'; title: string; sub: string; accent?: boolean }[] = [
-  { icon: 'lock', title: 'No bank login, ever', sub: 'PULSE never connects to your bank. It only knows the numbers you type.', accent: true },
-  { icon: 'pencil', title: 'Rough numbers are fine', sub: 'Not sure? Guess. You can skip anything and add it later.' },
-  { icon: 'trash', title: 'Delete everything, any time', sub: 'One button in You → Your account removes your account and all your data.' },
-  { icon: 'zap', title: 'About 60 seconds', sub: 'A few quick questions, then your dashboard is ready.' },
+// Screen 2: three short promises under the picture (the "60 seconds" line sits under the buttons).
+const PROMISES: { icon: 'lock' | 'pencil' | 'trash'; title: string; accent?: boolean }[] = [
+  { icon: 'lock', title: 'No bank login, ever', accent: true },
+  { icon: 'pencil', title: 'Skip anything, guess the rest' },
+  { icon: 'trash', title: 'Delete everything, any time' },
 ];
 
 export function Onboarding() {
@@ -223,25 +223,24 @@ export function Onboarding() {
         )}
 
         {step === 'trust' && (
-          <div className="flex flex-1 flex-col pt-8">
+          <div className="flex flex-1 flex-col pt-5">
             <p className="text-[12.5px] font-bold tracking-[.06em] text-accent-ink">BEFORE WE START</p>
             <h1 id="ob-title" className="display mt-1 text-[30px] leading-tight">
               Your money, your rules.
             </h1>
-            <ul className="mt-5 flex flex-col gap-2.5">
+            {/* Decoration only. Sized so the sign-in buttons still fit on the first screen. */}
+            <img src="/illustrations/onboarding-trust.webp" alt="" aria-hidden="true" width={800} height={1026} decoding="async" data-testid="trust-art" className="mx-auto mt-2 w-auto max-w-full object-contain" style={{ height: 'clamp(150px, calc(100svh - 510px), 300px)' }} />
+            <ul className="mt-4 flex flex-col divide-y divide-line rounded-2xl border border-line bg-surface">
               {PROMISES.map((v) => (
-                <li key={v.title} className="flex items-start gap-3 rounded-2xl border border-line bg-surface p-3.5">
-                  <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${v.accent ? 'bg-accent-soft text-accent-ink' : 'bg-sunk text-ink'}`} aria-hidden="true">
-                    <Icon name={v.icon} size={19} />
+                <li key={v.title} className="flex items-center gap-3 px-4 py-2.5 text-[15px] font-bold">
+                  <span className={v.accent ? 'text-accent-ink' : 'text-ink2'} aria-hidden="true">
+                    <Icon name={v.icon} size={18} />
                   </span>
-                  <span className="min-w-0">
-                    <span className="block text-[15px] font-bold leading-snug">{v.title}</span>
-                    <span className="block text-[13px] leading-snug text-ink3">{v.sub}</span>
-                  </span>
+                  {v.title}
                 </li>
               ))}
             </ul>
-            <div className="mt-auto flex flex-col gap-3 pt-8">
+            <div className="mt-auto flex flex-col gap-3 pt-5">
               {auth.loading ? (
                 <div className="grid min-h-[112px] place-items-center" role="status" aria-label="Loading">
                   <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink/20 border-t-ink" aria-hidden="true" />
@@ -253,11 +252,6 @@ export function Onboarding() {
                   <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
                     Continue
                   </button>
-                  {!auth.on && (
-                    <button type="button" className="btn-ghost w-full" onClick={() => setStep('join')}>
-                      I use PULSE on another device
-                    </button>
-                  )}
                 </>
               )}
               {iosBrowser && !auth.on && (
@@ -265,7 +259,7 @@ export function Onboarding() {
                   <b className="text-ink">On iPhone?</b> Add PULSE to your Home Screen first (tap Share, then <b className="text-ink">Add to Home Screen</b>) and set up there. The home-screen app keeps its own data.
                 </p>
               )}
-              {auth.loading ? null : needLogin ? <LoginLegal /> : <p className="text-center text-[12.5px] text-ink3">{auth.on ? 'Your money is saved to your PULSE account.' : 'Your numbers stay in this browser on this device.'}</p>}
+              {auth.loading ? null : needLogin ? <LoginLegal /> : <p className="text-center text-[12.5px] text-ink3">Takes about 60 seconds. {auth.on ? 'Your money is saved to your PULSE account.' : 'Your numbers stay in this browser on this device.'}</p>}
             </div>
           </div>
         )}

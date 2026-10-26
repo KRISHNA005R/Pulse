@@ -193,7 +193,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
             <ol className="mt-2 flex list-decimal flex-col gap-1.5 pl-5 text-[14px] text-ink2">
               <li>Open pulsemoney.in on the other phone, laptop or home-screen app.</li>
               <li>
-                On the welcome screen tap <b>I use PULSE on another device</b>, or go to You → Sync my devices.
+                Go to <b>You → Sync my devices</b> there.
               </li>
               <li>Type this code (or scan the QR). Done. Changes show up on both in a few seconds.</li>
             </ol>
