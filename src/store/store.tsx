@@ -30,6 +30,8 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
+import { cleanDemoMix } from '../lib/demoMix';
+import { loadSession } from '../lib/auth';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
@@ -324,9 +326,20 @@ function isState(x: unknown): x is State {
  * Personal mode follows the real calendar: move "today" forward, roll paydays and
  * renewals that have passed to their next date, and keep a monthly net-worth point.
  */
+/** Set when refresh() took a mixed-in demo back out (see lib/demoMix), so the app can say so once. */
+let demoMixFixed: null | { restored: boolean } = null;
+
 export function refresh(input: State): State {
-  const s = structuredClone(input);
+  let s = structuredClone(input);
   s.mode = s.mode ?? 'demo';
+  // Repair: the demo got mixed into this person's own data by an earlier bug. Take it out, and bring
+  // back what it dropped from the copy this phone parked when they opened the demo.
+  const parked = readStash();
+  const fixed = cleanDemoMix(s, parked, loadSession()?.account.name);
+  if (fixed) {
+    s = fixed;
+    demoMixFixed = { restored: !!parked && fixed.user.name === parked.user.name };
+  }
   // Older saves: add anything newer versions expect.
   s.investments = s.investments ?? [];
   s.insurance = s.insurance ?? [];
@@ -432,6 +445,19 @@ function useStoreImpl() {
     setToasts((xs) => [...xs.slice(-2), { ...t, id }]);
     window.setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), t.action ? 6000 : 4200);
   }, []);
+
+  // The demo had got mixed into this person's data and was just taken out (see refresh): say so once.
+  // With the parked copy used, it has done its job, so it goes (it would only bring back older data).
+  useEffect(() => {
+    const f = demoMixFixed;
+    if (!f) return;
+    demoMixFixed = null;
+    if (f.restored) {
+      writeStash(null);
+      setHasStash(false);
+      toast({ text: 'Fixed: demo data had got mixed into your money. It’s removed and your own entries are back.', tone: 'good', emoji: '✅' });
+    } else toast({ text: 'Fixed: we removed demo data that got mixed into your money. If older entries are missing, open PULSE on your other phone: it may bring them back.', tone: 'heads-up' });
+  }, [state, toast]);
 
   // A save the phone refused would otherwise be lost silently at the next reload. Say so once, until saving works again.
   const saveFailed = useRef(false);
@@ -1813,6 +1839,9 @@ function useStoreImpl() {
   /** Put merged data on screen without losing anything the person typed while we were online. */
   const applyMerged = useCallback((captured: State, merged: State) => {
     const now = ref.current;
+    // Opened the demo while this sync was on its way: the result belongs to their own data (parked),
+    // never to the demo. Leave both alone; the next sync, back in their own data, merges it properly.
+    if (now.mode !== 'personal') return null;
     const next = now === captured ? merged : merge3(captured, now, merged, true);
     if (sameData(next, now)) return now;
     const fresh = refresh(next);
@@ -1839,17 +1868,19 @@ function useStoreImpl() {
             saveBase(local);
             break;
           }
+          if (ref.current.mode !== 'personal') break; // went into the demo meanwhile
           if (!res.state) {
             cfg.rev = 0; // the online copy was removed; start it again from this device
             continue;
           }
           const merged = merge3(base, local, res.state, true);
-          applyMerged(local, merged);
+          if (!applyMerged(local, merged)) break;
           saveBase(res.state);
           cfg.rev = res.rev;
           continue; // push the merged result
         }
         const remote = await pull(cfg.code);
+        if (ref.current.mode !== 'personal') break; // went into the demo meanwhile
         if (!remote) {
           if (cfg.rev === 0) break;
           cfg.rev = 0;
@@ -1858,7 +1889,7 @@ function useStoreImpl() {
         }
         if (remote.rev === cfg.rev) break;
         const merged = merge3(base, local, remote.state, false);
-        applyMerged(local, merged);
+        if (!applyMerged(local, merged)) break;
         saveBase(remote.state);
         cfg.rev = remote.rev;
         if (sameData(merged, remote.state)) break;
