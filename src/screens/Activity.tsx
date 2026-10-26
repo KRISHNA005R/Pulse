@@ -119,7 +119,7 @@ export function ActivityScreen() {
 
       <div className="mt-6">
         {!state.transactions.length && !filtered ? (
-          <EmptyState icon="plus" art="/illustrations/empty-activity.webp" title="Nothing logged yet." body="Everything you spend or get shows up here. Tap + to log your first one." action={{ label: 'Add first expense', onClick: () => ui.openSheet({ type: 'composer' }) }} />
+          <EmptyState icon="plus" art="/illustrations/activity-chai.webp" title="Nothing logged yet." body="Everything you spend or get shows up here. Tap + to log your first one." action={{ label: 'Add first expense', onClick: () => ui.openSheet({ type: 'composer' }) }} />
         ) : (
           <TransactionList txs={txs} emptyText={f.query ? `Nothing matches “${f.query}”.` : 'No transactions for this filter.'} />
         )}

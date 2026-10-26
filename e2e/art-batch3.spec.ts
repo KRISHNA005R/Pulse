@@ -40,12 +40,12 @@ test('empty lists in You: calendar (bills), card (credit cards), plant (SIPs), c
   await looksRight(page.getByTestId('empty-art'), 'coins');
 });
 
-test('nothing logged: Home and Activity both show the chai person', async ({ page }) => {
+test('nothing logged: Home shows the chai person with his phone, Activity the chai-and-samosa one', async ({ page }) => {
   await openDemo(page);
   await setState(page, 's.transactions = []; s.subscriptions = []; s.investments = []; s.debts = []; s.insurance = []; s.incomes = [];');
   await looksRight(page.getByTestId('empty-art'), 'empty-activity');
   await tab(page, 'Activity');
-  await looksRight(page.getByTestId('empty-art'), 'empty-activity');
+  await looksRight(page.getByTestId('empty-art'), 'activity-chai');
 });
 
 test('Reminders: no bell picture, the page stays as it was', async ({ page }) => {
