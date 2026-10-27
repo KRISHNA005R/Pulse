@@ -5,6 +5,7 @@ import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './
 import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
+import { InvestDebits, InvestGrowth } from '../screens/You';
 import { Sheet } from './ui/Sheet';
 import { ExpenseComposer } from './ExpenseComposer';
 import { ReceiptScanner } from './ReceiptScanner';
@@ -215,6 +216,18 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title={spec.insuranceId ? 'Edit policy' : 'Add insurance'} onClose={close} z={z}>
           <InsuranceForm insuranceId={spec.insuranceId} onDone={close} />
+        </Sheet>
+      );
+    case 'inv-growth':
+      return (
+        <Sheet title="What this could grow to" onClose={close} z={z}>
+          <InvestGrowth />
+        </Sheet>
+      );
+    case 'inv-debits':
+      return (
+        <Sheet title="Recent debits" onClose={close} z={z}>
+          <InvestDebits />
         </Sheet>
       );
     case 'investment-form':

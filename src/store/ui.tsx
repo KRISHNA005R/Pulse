@@ -65,6 +65,8 @@ export type SheetSpec =
   | { type: 'erase' }
   | { type: 'category-form'; categoryId?: string; kind?: 'expense' | 'income'; name?: string; onSaved?: (id: string) => void }
   | { type: 'investment-form'; investmentId?: string }
+  | { type: 'inv-growth' }
+  | { type: 'inv-debits' }
   | { type: 'insurance-form'; insuranceId?: string }
   | { type: 'install' }
   | { type: 'card-form'; cardId?: string }

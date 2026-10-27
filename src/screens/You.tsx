@@ -11,7 +11,7 @@ import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
 import { debtDue, defaultAccount, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
-import { addMonths, daysBetween, endOfMonth, fmtDate, fmtMonthYear, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
+import { addMonths, daysBetween, endOfMonth, fmtDate, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
 import { BackupPanel } from '../components/Forms';
@@ -984,27 +984,14 @@ export function InvestmentsScreen() {
   const t = investmentTotals(state);
   const list = state.investments ?? [];
   const holdings = holdingAccounts(state);
-  const weighted = t.monthly > 0 ? list.filter((i) => i.status === 'active').reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / t.monthly : 12;
-  const [years, setYears] = useState(10);
-  const [rate, setRate] = useState(Math.round(weighted * 10) / 10);
-  const [withHoldings, setWithHoldings] = useState(true);
   const activeList = list.filter((i) => i.status === 'active');
-  // Each SIP grows with its own step-up; holdings are counted once.
-  const proj = activeList.reduce(
-    (acc, i) => {
-      const p = sipProjection(investmentMonthly(i), years, rate, 0, i.stepUp ?? 0);
-      return { invested: acc.invested + p.invested, value: acc.value + p.value, gain: acc.gain + p.gain };
-    },
-    (() => {
-      const h = sipProjection(0, years, rate, withHoldings ? t.holdings : 0);
-      return { invested: h.invested, value: h.value, gain: h.gain };
-    })(),
-  );
   const putIn = list.reduce((a, i) => a + investedTotal(state, i), 0);
-  const earliest = list.reduce<string | null>((a, i) => (!a || i.startDate < a ? i.startDate : a), null);
-  const recent = state.transactions.filter((x) => x.category === 'investments').slice(0, 8);
+  const gain = t.holdings - putIn;
+  const recent = state.transactions.filter((x) => x.category === 'investments');
+  const total = holdings.reduce((a, h) => a + h.balance, 0);
+  const shares = holdings.map((h, i) => ({ h, pct: total > 0 ? h.balance / total : 0, color: SPLIT_COLORS[i % SPLIT_COLORS.length] }));
+  const in10 = growthProjection(state, 10, defaultRate(state), true).value;
   const cycleLabel = (c: string) => (c === 'monthly' ? 'monthly' : c === 'quarterly' ? 'every 3 months' : 'yearly');
-  const investedPct = proj.value > 0 ? proj.invested / proj.value : 1;
 
   return (
     <div>
@@ -1019,151 +1006,228 @@ export function InvestmentsScreen() {
         }
       />
 
-      {list.length === 0 ? (
+      {list.length === 0 && holdings.length === 0 ? (
         <EmptyState icon="trend" art="/illustrations/plant.webp" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month, keeps it aside before payday, and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
       ) : (
-        <>
-          <section className="rounded-3xl border border-line bg-surface p-5" aria-labelledby="inv-total">
-            <p id="inv-total" className="eyebrow">
-              Going into investments
+        <div className="flex flex-col gap-4">
+          {/* 1. What it's worth, and how it's split */}
+          <section className="rounded-3xl border border-line bg-surface p-5" aria-labelledby="inv-hold">
+            <div className="flex items-center justify-between gap-3">
+              <p id="inv-hold" className="eyebrow">
+                Your portfolio
+              </p>
+              <button type="button" className="tap -mr-1 text-[13.5px] font-semibold text-accent-ink" onClick={() => ui.openSheet({ type: 'account-form', holding: true })}>
+                Add holding
+              </button>
+            </div>
+            <p data-testid="portfolio-value" className="num-hero mt-1 text-[38px] leading-none">
+              {rupees(t.holdings)}
             </p>
-            <p className="num-hero mt-1 text-[36px] leading-none">
-              {rupees(t.monthly)}
-              <span className="text-[18px] font-medium text-ink3">/month</span>
-            </p>
-            {t.next && (
-              <p className="mt-2 text-[14px] text-ink2">
-                Next: {rupees(t.next.amount)} for {t.next.name} on {fmtDate(t.next.nextDate)}
+            {putIn > 0 && (
+              <p className={`mt-1.5 text-[14px] ${gain >= 0 ? 'text-pos' : 'text-ink2'}`}>
+                {gain >= 0 ? '▲' : '▼'} {rupees(Math.abs(gain))} on {rupees(putIn)} put in
               </p>
             )}
-            <dl className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-4">
+            {total > 0 && (
+              <div className="mt-4 flex h-2.5 gap-1 overflow-hidden rounded-full" role="img" aria-label={shares.map((x) => `${x.h.name} ${Math.round(x.pct * 100)}%`).join(', ')}>
+                {shares.map((x) => (
+                  <span key={x.h.id} className="h-full rounded-full" style={{ width: `${x.pct * 100}%`, background: x.color }} />
+                ))}
+              </div>
+            )}
+            <ul className="mt-2">
+              {shares.map((x) => (
+                <li key={x.h.id}>
+                  <button type="button" className="tap -mx-2 flex min-h-[44px] w-[calc(100%+16px)] items-center gap-2.5 rounded-xl px-2 text-left text-[14px] hover:bg-sunk" onClick={() => ui.openSheet({ type: 'account-form', accountId: x.h.id, holding: true })}>
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: x.color }} aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {x.h.name}
+                      {x.h.institution && <span className="text-ink3"> · {x.h.institution}</span>}
+                    </span>
+                    <span className="num font-semibold">{rupees(x.h.balance)}</span>
+                    <span className="w-9 text-right text-[12.5px] text-ink3">{Math.round(x.pct * 100)}%</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <dl className="mt-3 grid grid-cols-3 gap-3 border-t border-line pt-4">
               <div>
                 <dt className="text-[12.5px] text-ink3">Total put in</dt>
-                <dd className="num text-[18px] font-semibold">{rupeesShort(putIn)}</dd>
+                <dd className="num text-[17px] font-semibold">{rupeesShort(putIn)}</dd>
               </div>
               <div>
                 <dt className="text-[12.5px] text-ink3">Current value</dt>
-                <dd className="num text-[18px] font-semibold">{rupeesShort(t.holdings)}</dd>
+                <dd className="num text-[17px] font-semibold">{rupeesShort(t.holdings)}</dd>
               </div>
               <div>
                 <dt className="text-[12.5px] text-ink3">Per year now</dt>
-                <dd className="num text-[18px] font-semibold">{rupeesShort(t.yearly)}</dd>
+                <dd className="num text-[17px] font-semibold">{rupeesShort(t.yearly)}</dd>
               </div>
             </dl>
-            {earliest && putIn > 0 && (
-              <p className="mt-3 text-[13px] text-ink3">
-                Total put in since {fmtMonthYear(earliest)}, including instalments from before you used PULSE. Current value is what your holdings below are worth; update it from your app now and then.
+          </section>
+
+          {/* 2. The monthly habit */}
+          {activeList.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              <div data-testid="tile-monthly" className="rounded-2xl bg-sunk p-4">
+                <p className="text-[12.5px] text-ink3">Every month</p>
+                <p className="num mt-0.5 text-[20px] font-bold">{rupees(t.monthly)}</p>
+                <p className="text-[12.5px] text-ink3">
+                  {activeList.length} {activeList.length === 1 ? 'SIP' : 'SIPs'}
+                </p>
+              </div>
+              <div data-testid="tile-next" className="rounded-2xl bg-accent-soft p-4">
+                <p className="text-[12.5px] text-accent-ink">Next debit</p>
+                <p className="num mt-0.5 text-[20px] font-bold text-accent-ink">{t.next ? rupees(t.next.amount) : '—'}</p>
+                <p className="truncate text-[12.5px] text-accent-ink">{t.next ? `${fmtDate(t.next.nextDate)} · ${t.next.name}` : ''}</p>
+              </div>
+            </div>
+          )}
+
+          {/* 3. The SIPs */}
+          {list.length === 0 && <EmptyState icon="trend" art="/illustrations/plant.webp" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />}
+          {list.length > 0 && (
+            <section aria-labelledby="inv-list">
+              <p id="inv-list" className="eyebrow mb-1 px-1">
+                Your SIPs
               </p>
-            )}
-          </section>
-
-          <section className="mt-8" aria-labelledby="inv-list">
-            <SectionHeader id="inv-list" title="Your SIPs" />
-            {list.map((inv) => {
-              const put = investedTotal(state, inv);
-              return (
-                <button key={inv.id} type="button" className={`row-btn min-h-[64px] ${inv.status === 'stopped' ? 'opacity-60' : ''}`} onClick={() => ui.openSheet({ type: 'investment-form', investmentId: inv.id })}>
-                  <CategoryMark state={state} category="investments" size={40} />
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-[15px] font-semibold">{inv.name}</span>
-                      {inv.status !== 'active' && <StatusPill status="neutral">{inv.status === 'paused' ? 'Paused' : 'Stopped'}</StatusPill>}
-                    </span>
-                    <span className="block truncate text-[13px] text-ink3">
-                      {[inv.platform, `${ordinal(parseDate(inv.nextDate).getDate())} ${cycleLabel(inv.cycle)}`, inv.stepUp ? `step-up ${inv.stepUp}%/yr` : null].filter(Boolean).join(' · ')}
-                    </span>
-                    {put > 0 && (
-                      <span className="block truncate text-[13px] font-medium text-ink2">
-                        {rupees(put)} put in since {fmtMonthYear(inv.startDate)}
+              <ul className="divide-y divide-line rounded-3xl border border-line bg-surface px-2">
+                {list.map((inv) => (
+                  <li key={inv.id}>
+                    <button type="button" className={`row-btn min-h-[64px] ${inv.status === 'stopped' ? 'opacity-60' : ''}`} onClick={() => ui.openSheet({ type: 'investment-form', investmentId: inv.id })}>
+                      <CategoryMark state={state} category="investments" size={40} />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2">
+                          <span className="truncate text-[15px] font-semibold">{inv.name}</span>
+                          {inv.status !== 'active' && <StatusPill status="neutral">{inv.status === 'paused' ? 'Paused' : 'Stopped'}</StatusPill>}
+                        </span>
+                        <span className="block truncate text-[13px] text-ink3">{[inv.platform, `${ordinal(parseDate(inv.nextDate).getDate())} ${cycleLabel(inv.cycle)}`, inv.stepUp ? `step-up ${inv.stepUp}%/yr` : null].filter(Boolean).join(' · ')}</span>
                       </span>
-                    )}
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <span className="num block text-[15px] font-semibold">{rupees(inv.amount)}</span>
-                    <span className="block text-[12px] text-ink3">{inv.status === 'active' ? relDay(inv.nextDate, state.today) : '—'}</span>
-                  </span>
-                </button>
-              );
-            })}
-            <p className="mt-2 px-1 text-[13px] text-ink3">SIPs due before payday are already kept out of safe-to-spend, and each one is recorded automatically on its date.</p>
-          </section>
+                      <span className="shrink-0 text-right">
+                        <span className="num block text-[15px] font-semibold">{rupees(inv.amount)}</span>
+                        <span className="block text-[12px] text-ink3">{inv.status === 'active' ? relDay(inv.nextDate, state.today) : '—'}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 px-1 text-[12.5px] text-ink3">SIPs due before payday are kept out of safe-to-spend and recorded on their date.</p>
+            </section>
+          )}
 
-          <section className="mt-8 rounded-3xl border border-line bg-surface p-5" aria-labelledby="inv-proj">
-            <h2 id="inv-proj" className="display text-[18px]">
-              What this could grow to
-            </h2>
-            <div className="mt-4 flex flex-col gap-3">
-              <label htmlFor="proj-years" className="flex justify-between text-[14px] text-ink2">
-                <span>Keep going for</span>
-                <span className="num font-semibold text-ink">{years} years</span>
-              </label>
-              <input id="proj-years" type="range" min={1} max={30} value={years} onChange={(e) => setYears(Number(e.target.value))} className="w-full accent-[rgb(var(--accent))]" />
-              <label htmlFor="proj-rate" className="flex justify-between text-[14px] text-ink2">
-                <span>Assumed return</span>
-                <span className="num font-semibold text-ink">{rate}% a year</span>
-              </label>
-              <input id="proj-rate" type="range" min={4} max={16} step={0.5} value={rate} onChange={(e) => setRate(Number(e.target.value))} className="w-full accent-[rgb(var(--accent))]" />
-              <label className="flex items-center gap-2.5 text-[14px]">
-                <input type="checkbox" className="h-5 w-5 accent-[rgb(var(--accent))]" checked={withHoldings} onChange={(e) => setWithHoldings(e.target.checked)} />
-                Include the {rupeesShort(t.holdings)} you already hold
-              </label>
-            </div>
-            <div className="mt-5 grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-[12.5px] text-ink3">You put in</p>
-                <p className="num text-[18px] font-semibold">{rupeesShort(proj.invested)}</p>
-              </div>
-              <div>
-                <p className="text-[12.5px] text-ink3">Growth</p>
-                <p className="num text-[18px] font-semibold text-pos">+{rupeesShort(proj.gain)}</p>
-              </div>
-              <div>
-                <p className="text-[12.5px] text-ink3">Could be worth</p>
-                <p className="num text-[18px] font-semibold text-accent-ink">{rupeesShort(proj.value)}</p>
-              </div>
-            </div>
-            <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-sunk" role="img" aria-label={`${Math.round(investedPct * 100)}% of the final value is money you put in, ${100 - Math.round(investedPct * 100)}% is growth`}>
-              <span className="h-full bg-ink/70" style={{ width: `${investedPct * 100}%` }} />
-              <span className="h-full bg-accent" style={{ width: `${(1 - investedPct) * 100}%` }} />
-            </div>
-            <p className="mt-2 flex gap-4 text-[12px] text-ink3">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-ink/70" /> Put in
+          {/* 4. Inside: the growth calculator and the recent debits */}
+          {activeList.length > 0 && (
+            <button type="button" className="tap flex items-center gap-4 rounded-3xl border border-line bg-surface p-4 text-left" onClick={() => ui.openSheet({ type: 'inv-growth' })}>
+              <img src="/illustrations/plant.webp" alt="" aria-hidden="true" width={412} height={420} decoding="async" className="h-[64px] w-[64px] shrink-0 object-contain" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] text-ink3">Keep going 10 years and it could be</span>
+                <span className="num block text-[22px] font-bold text-accent-ink">{rupeesShort(in10)}</span>
+                <span className="block text-[13px] font-semibold text-ink2">Try other years and returns</span>
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-accent" /> Growth
-              </span>
-            </p>
-            <p className="mt-3 text-[12.5px] text-ink3">An estimate using the return you choose. Real returns go up and down and aren't guaranteed. PULSE isn't a financial advisor.</p>
-          </section>
-        </>
-      )}
-
-      <section className="mt-8" aria-labelledby="inv-hold">
-        <SectionHeader id="inv-hold" title="Holdings" action={{ label: 'Add holding', onClick: () => ui.openSheet({ type: 'account-form', holding: true }) }} />
-        {holdings.length ? (
-          holdings.map((a) => (
-            <NavRow key={a.id} icon="trend" label={a.name} sub={a.institution} value={rupees(a.balance)} onClick={() => ui.openSheet({ type: 'account-form', accountId: a.id, holding: true })} />
-          ))
-        ) : (
-          <p className="px-1 text-[14px] text-ink3">No holdings yet. Adding a SIP creates one for you.</p>
-        )}
-        <p className="mt-2 px-1 text-[13px] text-ink3">SIP debits add to these automatically. Tap one to update its current value from your app.</p>
-        {holdings.length > 0 && (
-          <button type="button" className="btn-quiet mt-3 w-full" onClick={() => ui.openSheet({ type: 'composer', preset: { type: 'transfer', toAccount: holdings[0].id } })}>
-            <Icon name="plus" size={16} /> Invest a lump sum
-          </button>
-        )}
-      </section>
-
-      {recent.length > 0 && (
-        <section className="mt-8" aria-labelledby="inv-recent">
-          <SectionHeader id="inv-recent" title="Recent debits" />
-          <TransactionList txs={recent} />
-        </section>
+              <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
+            </button>
+          )}
+          {recent.length > 0 && <NavRow icon="receipt" label="Recent debits" sub={`${recent.length} recorded · last on ${fmtDate(recent[0].date)}`} onClick={() => ui.openSheet({ type: 'inv-debits' })} />}
+          {holdings.length > 0 && (
+            <button type="button" className="btn-quiet w-full" onClick={() => ui.openSheet({ type: 'composer', preset: { type: 'transfer', toAccount: holdings[0].id } })}>
+              <Icon name="plus" size={16} /> Invest a lump sum
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
+}
+
+const SPLIT_COLORS = ['rgb(var(--accent))', 'rgb(var(--ink) / .72)', 'rgb(var(--ink3))', '#E9A23B', 'rgb(var(--pos))'];
+
+/** The return PULSE assumes to start with: the SIPs' own expected returns, weighted by amount. */
+function defaultRate(state: ReturnType<typeof useStore>['state']) {
+  const t = investmentTotals(state);
+  const act = (state.investments ?? []).filter((i) => i.status === 'active');
+  const w = t.monthly > 0 ? act.reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / t.monthly : 12;
+  return Math.round(w * 10) / 10;
+}
+
+/** What the active SIPs (each with its own step-up), plus what's already held, could grow to. */
+function growthProjection(state: ReturnType<typeof useStore>['state'], years: number, rate: number, withHoldings: boolean) {
+  const t = investmentTotals(state);
+  const h = sipProjection(0, years, rate, withHoldings ? t.holdings : 0);
+  return (state.investments ?? [])
+    .filter((i) => i.status === 'active')
+    .reduce(
+      (acc, i) => {
+        const p = sipProjection(investmentMonthly(i), years, rate, 0, i.stepUp ?? 0);
+        return { invested: acc.invested + p.invested, value: acc.value + p.value, gain: acc.gain + p.gain };
+      },
+      { invested: h.invested, value: h.value, gain: h.gain },
+    );
+}
+
+/** Sheet: "What this could grow to", with the years and return sliders. */
+export function InvestGrowth() {
+  const { state } = useStore();
+  const t = investmentTotals(state);
+  const [years, setYears] = useState(10);
+  const [rate, setRate] = useState(() => defaultRate(state));
+  const [withHoldings, setWithHoldings] = useState(true);
+  const proj = growthProjection(state, years, rate, withHoldings);
+  const investedPct = proj.value > 0 ? proj.invested / proj.value : 1;
+  return (
+    <div>
+      <div className="flex flex-col gap-3">
+        <label htmlFor="proj-years" className="flex justify-between text-[14px] text-ink2">
+          <span>Keep going for</span>
+          <span className="num font-semibold text-ink">{years} years</span>
+        </label>
+        <input id="proj-years" type="range" min={1} max={30} value={years} onChange={(e) => setYears(Number(e.target.value))} className="w-full accent-[rgb(var(--accent))]" />
+        <label htmlFor="proj-rate" className="flex justify-between text-[14px] text-ink2">
+          <span>Assumed return</span>
+          <span className="num font-semibold text-ink">{rate}% a year</span>
+        </label>
+        <input id="proj-rate" type="range" min={4} max={16} step={0.5} value={rate} onChange={(e) => setRate(Number(e.target.value))} className="w-full accent-[rgb(var(--accent))]" />
+        {t.holdings > 0 && (
+          <label className="flex items-center gap-2.5 text-[14px]">
+            <input type="checkbox" className="h-5 w-5 accent-[rgb(var(--accent))]" checked={withHoldings} onChange={(e) => setWithHoldings(e.target.checked)} />
+            Include the {rupeesShort(t.holdings)} you already hold
+          </label>
+        )}
+      </div>
+      <div className="mt-5 grid grid-cols-3 gap-3">
+        <div>
+          <p className="text-[12.5px] text-ink3">You put in</p>
+          <p className="num text-[18px] font-semibold">{rupeesShort(proj.invested)}</p>
+        </div>
+        <div>
+          <p className="text-[12.5px] text-ink3">Growth</p>
+          <p className="num text-[18px] font-semibold text-pos">+{rupeesShort(proj.gain)}</p>
+        </div>
+        <div>
+          <p className="text-[12.5px] text-ink3">Could be worth</p>
+          <p className="num text-[18px] font-semibold text-accent-ink">{rupeesShort(proj.value)}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-sunk" role="img" aria-label={`${Math.round(investedPct * 100)}% of the final value is money you put in, ${100 - Math.round(investedPct * 100)}% is growth`}>
+        <span className="h-full bg-ink/70" style={{ width: `${investedPct * 100}%` }} />
+        <span className="h-full bg-accent" style={{ width: `${(1 - investedPct) * 100}%` }} />
+      </div>
+      <p className="mt-2 flex gap-4 text-[12px] text-ink3">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-ink/70" /> Put in
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-accent" /> Growth
+        </span>
+      </p>
+      <p className="mt-3 text-[12.5px] text-ink3">An estimate using the return you choose. Real returns go up and down and aren't guaranteed. PULSE isn't a financial advisor.</p>
+    </div>
+  );
+}
+
+/** Sheet: every SIP debit and lump sum PULSE has recorded. */
+export function InvestDebits() {
+  const { state } = useStore();
+  return <TransactionList txs={state.transactions.filter((x) => x.category === 'investments')} emptyText="No investment debits yet." />;
 }
 
 // ------------------------------------------------------------------
