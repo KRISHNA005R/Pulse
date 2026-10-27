@@ -15,16 +15,16 @@ async function openAdd(page: Page) {
 
 test('the add button says "Add investment" and offers every type', async ({ page }) => {
   const sheet = await openAdd(page);
-  for (const t of ['Mutual fund SIP', 'Recurring deposit', 'Fixed deposit', 'PPF', 'NPS', 'Gold', 'Other']) {
-    await expect(sheet.getByRole('radio', { name: new RegExp(t) })).toBeVisible();
-  }
+  const opts = await sheet.getByLabel('Type', { exact: true }).locator('option').allTextContents();
+  for (const t of ['Mutual fund SIP', 'Recurring deposit', 'Fixed deposit', 'PPF', 'NPS', 'Gold', 'Other']) expect(opts.some((o) => o.includes(t))).toBe(true);
+  await expect(sheet.getByRole('radio')).toHaveCount(0); // a dropdown, not big cards
 });
 
 test('SIP keeps the step-up; RD has no step-up and no "Repeats"', async ({ page }) => {
   const sheet = await openAdd(page);
-  await sheet.getByRole('radio', { name: /Mutual fund SIP/ }).click();
+  await sheet.getByLabel('Type', { exact: true }).selectOption('sip');
   await expect(sheet.getByText('Step-up every year')).toBeVisible();
-  await sheet.getByRole('radio', { name: /Recurring deposit/ }).click();
+  await sheet.getByLabel('Type', { exact: true }).selectOption('rd');
   await expect(sheet.getByText('Step-up every year')).toHaveCount(0);
   await expect(sheet.getByLabel('Repeats')).toHaveCount(0);
   await expect(sheet.getByText('Monthly deposit', { exact: true })).toBeVisible();
@@ -33,7 +33,7 @@ test('SIP keeps the step-up; RD has no step-up and no "Repeats"', async ({ page 
 
 test('add an FD: one deposit, a tenure, and the maturity amount shown before saving', async ({ page }) => {
   const sheet = await openAdd(page);
-  await sheet.getByRole('radio', { name: /Fixed deposit/ }).click();
+  await sheet.getByLabel('Type', { exact: true }).selectOption('fd');
   await expect(sheet.getByText('Step-up every year')).toHaveCount(0);
   await expect(sheet.getByLabel('Next debit date')).toHaveCount(0);
   await sheet.getByLabel('Name').fill('SBI FD');
@@ -42,7 +42,7 @@ test('add an FD: one deposit, a tenure, and the maturity amount shown before sav
   await sheet.getByLabel('Interest rate, % a year').fill('7');
   await sheet.getByRole('group', { name: 'Tenure' }).getByRole('button', { name: '1 year' }).click();
   await expect(sheet.getByTestId('inv-maturity')).toContainText('₹1,07,186');
-  await sheet.getByRole('radio', { name: /Already have it/ }).click();
+  await sheet.getByLabel('Where is the money from?').selectOption('have');
   await sheet.getByRole('button', { name: 'Add FD' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const s = await state(page);

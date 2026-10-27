@@ -1210,23 +1210,15 @@ function lastAnniversary(start: ISODate, today: ISODate): ISODate {
 /** Step one of adding an investment: what kind is it? Each kind gets its own short form. */
 function KindPicker({ value, onChange }: { value: InvestmentKind; onChange: (k: InvestmentKind) => void }) {
   return (
-    <div role="radiogroup" aria-label="Type of investment" className="grid grid-cols-2 gap-2">
-      {INV_KIND_ORDER.map((k) => {
-        const m = INV_META[k];
-        const on = value === k;
-        return (
-          <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)} className={`tap flex min-h-[64px] items-start gap-2.5 rounded-2xl border p-3 text-left transition-colors ${on ? 'border-accent bg-accent-soft' : 'border-line bg-surface hover:border-ink3'}`}>
-            <span className="text-[20px] leading-none" aria-hidden="true">
-              {m.emoji}
-            </span>
-            <span className="min-w-0">
-              <span className={`block text-[14px] font-semibold leading-tight ${on ? 'text-accent-ink' : ''}`}>{m.label}</span>
-              <span className="mt-0.5 block text-[12px] leading-snug text-ink3">{m.blurb}</span>
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <Field label="Type" htmlFor="inv-kind">
+      <select id="inv-kind" className="field" value={value} onChange={(e) => onChange(e.target.value as InvestmentKind)}>
+        {INV_KIND_ORDER.map((k) => (
+          <option key={k} value={k}>
+            {INV_META[k].emoji} {INV_META[k].label}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }
 
@@ -1324,20 +1316,12 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
       )}
 
       {isFd && !ex && (
-        <div className="flex flex-col gap-2">
-          <p className="text-[13px] font-semibold text-ink2">Where is the money from?</p>
-          <div role="radiogroup" aria-label="Where is the money from?" className="grid grid-cols-2 gap-2">
-            {([
-              ['now', 'Paying it now', 'From one of your accounts, today'],
-              ['have', 'Already have it', 'Opened before, just track it'],
-            ] as const).map(([v, label, sub]) => (
-              <button key={v} type="button" role="radio" aria-checked={fdSource === v} onClick={() => setFdSource(v)} className={`tap rounded-2xl border p-3 text-left ${fdSource === v ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
-                <span className={`block text-[14px] font-semibold ${fdSource === v ? 'text-accent-ink' : ''}`}>{label}</span>
-                <span className="block text-[12px] text-ink3">{sub}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <Field label="Where is the money from?" htmlFor="inv-source">
+          <select id="inv-source" className="field" value={fdSource} onChange={(e) => setFdSource(e.target.value as 'now' | 'have')}>
+            <option value="now">Paying it now, from an account</option>
+            <option value="have">Already have it, just track it</option>
+          </select>
+        </Field>
       )}
 
       <div className="grid grid-cols-2 gap-3">
