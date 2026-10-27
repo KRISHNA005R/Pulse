@@ -352,3 +352,14 @@ body {
 /* Spending history: this month's bar is still filling, so it's drawn hatched. The donut draws in. */
 .bar-hatch { background: repeating-linear-gradient(-45deg, rgb(var(--ink) / .2) 0 3px, rgb(var(--ink) / .08) 3px 6px); }
 @media (prefers-reduced-motion: reduce) { .donut-seg { transition: none !important; } }
+
+/* Rolling numbers: each digit is a wheel of 0–9 (twice), turned by --p. Drawn with CSS so the text stays the real amount. */
+.roll { display: inline-flex; white-space: nowrap; }
+.roll-wheel, .roll-ch { display: inline-block; height: 1.12em; line-height: 1.12em; overflow: hidden; }
+.roll-wheel::before { content: "0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9\A 0\A 1\A 2\A 3\A 4\A 5\A 6\A 7\A 8\A 9"; display: block; white-space: pre; text-align: center; transform: translateY(calc(var(--p, 0) * -1.12em)); }
+.roll-ch::before { content: attr(data-ch); white-space: pre; }
+
+/* The stamp for a big win. */
+.win-stamp { position: fixed; left: 50%; top: 38%; z-index: 2147482500; pointer-events: none; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; border: 6px solid rgb(var(--accent)); color: rgb(var(--accent)); background: rgb(var(--surface) / .92); display: grid; place-items: center; text-align: center; box-shadow: 0 0 0 6px rgb(var(--surface) / .92), inset 0 0 0 4px rgb(var(--surface)), inset 0 0 0 7px rgb(var(--accent) / .55); }
+.win-stamp::before { content: attr(data-stamp); font-family: var(--font-display, inherit); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: -.02em; text-transform: uppercase; max-width: 180px; }
+.win-stamp::after { content: attr(data-sub); position: absolute; bottom: 44px; left: 0; right: 0; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgb(var(--ink3)); }

@@ -3,6 +3,7 @@ import type { Plan } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { burst } from '../lib/celebrate';
+import { stamp } from '../lib/motion';
 import { addDays, haptic, rupees } from '../lib/format';
 import { playSfx } from '../lib/sfx';
 import { gullakFull, gullakTarget, nextCoin } from '../lib/fun';
@@ -176,6 +177,7 @@ export function GullakHero({ plan }: { plan: Plan }) {
     playSfx('huge', state.settings.sounds);
     window.setTimeout(() => {
       burst({ kind: 'confetti', power: 2 });
+      stamp('Saved!', rupees(plan.saved));
       store.breakGullak(plan.id);
       store.toast({ text: `Gullak broken. ${rupees(plan.saved)} saved, one coin at a time.`, tone: 'good', emoji: '🏺' });
     }, 700);

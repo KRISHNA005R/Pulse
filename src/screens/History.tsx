@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { gsap, reducedMotion } from '../lib/motion';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { activeYears, monthStat, yearSummary, type MonthStat } from '../lib/history';
@@ -6,6 +7,7 @@ import { categoryName, spendByCategory } from '../lib/finance';
 import { endOfMonth, monthName, monthShort, rupees, rupeesShort } from '../lib/format';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
+import { RollingNumber } from '../components/ui/RollingNumber';
 
 /** Colours for categories in a chart, biggest first. The rest share a quiet grey. */
 export const CAT_COLORS = ['rgb(var(--accent))', 'rgb(var(--ink) / .78)', '#E9A23B', 'rgb(var(--pos))', 'rgb(var(--ink3) / .8)'];
@@ -20,22 +22,40 @@ export function MonthBars({ months, selected, onSelect, compact, avg }: { months
   const room = compact ? 0 : 26; // space above the tallest bar for its amount
   const plot = h - room;
   const avgPct = avg && avg > 0 ? Math.min(1, avg / max) : 0;
+  const ref = useRef<HTMLDivElement>(null);
+  const first = useRef(true);
+  // The bars spring up one after another (again when the year changes).
+  useLayoutEffect(() => {
+    const bars = ref.current?.querySelectorAll('[data-bar]');
+    if (!bars?.length || reducedMotion()) return;
+    const tw = gsap.fromTo(bars, { scaleY: 0 }, { scaleY: 1, duration: 1.1, ease: 'elastic.out(1, 0.55)', stagger: 0.045, transformOrigin: '50% 100%', clearProps: 'transform' });
+    return () => void tw.kill();
+  }, [months[0]?.month]);
+  // A new pick: its amount pops up and the bar gives a little bounce.
+  useLayoutEffect(() => {
+    if (first.current) return void (first.current = false);
+    if (reducedMotion()) return;
+    const label = ref.current?.querySelector('[data-testid="bar-label"]');
+    const bar = ref.current?.querySelector('[aria-checked="true"] [data-bar]');
+    if (label) gsap.fromTo(label, { scale: 0.3, y: 12, opacity: 0 }, { scale: 1, y: 0, opacity: 1, duration: 0.5, ease: 'back.out(3)', clearProps: 'transform,opacity' });
+    if (bar) gsap.fromTo(bar, { scaleY: 0.82 }, { scaleY: 1, duration: 0.7, ease: 'elastic.out(1.1, 0.4)', transformOrigin: '50% 100%', clearProps: 'transform' });
+  }, [selected]);
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <div className="relative flex items-end gap-[3px]" style={{ height: h }} role={onSelect ? 'radiogroup' : 'img'} aria-label={onSelect ? 'Months' : `Monthly spending: ${months.filter((m) => !m.future).map((m) => `${monthShort(m.month)} ${rupees(m.spent)}`).join(', ')}`}>
         {avgPct > 0 && !compact && (
           <div className="pointer-events-none absolute inset-x-0 z-[1] border-t border-dashed border-ink/25" style={{ bottom: avgPct * plot }} aria-hidden="true">
             <span className="absolute -top-[10px] left-0 rounded-full bg-surface px-1.5 text-[10.5px] font-semibold text-ink3 ring-1 ring-line">avg {rupeesShort(avg!)}</span>
           </div>
         )}
-        {months.map((m, idx) => {
+        {months.map((m) => {
           const on = selected === m.month;
           const px = m.future ? 0 : Math.max(m.spent > 0 ? 4 : 2, (m.spent / max) * plot);
           const bar = (
             <span className="relative block w-full" style={{ height: px }}>
               <span
-                className={`block h-full w-full origin-bottom animate-grow ${compact ? 'rounded-t-[3px]' : 'rounded-[6px]'} transition-colors ${on ? 'bg-accent' : m.current ? 'bar-hatch' : 'bg-ink/[.13] group-hover:bg-ink/[.2]'}`}
-                style={{ animationDelay: `${idx * 35}ms` }}
+                data-bar=""
+                className={`block h-full w-full origin-bottom ${compact ? 'rounded-t-[3px]' : 'rounded-[6px]'} transition-colors ${on ? 'bg-accent' : m.current ? 'bar-hatch' : 'bg-ink/[.13] group-hover:bg-ink/[.2]'}`}
               />
               {on && !compact && (
                 <span data-testid="bar-label" className="num absolute bottom-full left-1/2 z-[2] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-2 py-[3px] text-[11px] font-semibold text-surface">
@@ -105,8 +125,18 @@ function Donut({ parts, size = 136, stroke = 20, center }: { parts: { key: strin
   }, []);
   let at = 0;
   const gap = parts.length > 1 ? 2.5 : 0;
+  const spin = useRef<HTMLDivElement>(null);
+  const mid = useRef<HTMLDivElement>(null);
+  // The ring swings round into place while it draws, then the total pops in the middle.
+  useLayoutEffect(() => {
+    if (reducedMotion() || !spin.current || !mid.current) return;
+    const tl = gsap.timeline();
+    tl.fromTo(spin.current, { rotate: -160, scale: 0.7 }, { rotate: 0, scale: 1, duration: 1.2, ease: 'expo.out', clearProps: 'transform' }).fromTo(mid.current, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(2.5)', clearProps: 'transform,opacity' }, 0.45);
+    return () => void tl.kill();
+  }, []);
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }} data-testid="cat-donut">
+      <div ref={spin} className="h-full w-full">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgb(var(--sunk))" strokeWidth={stroke} />
         {parts.map((p, i) => {
@@ -131,7 +161,8 @@ function Donut({ parts, size = 136, stroke = 20, center }: { parts: { key: strin
           );
         })}
       </svg>
-      <div className="absolute inset-0 grid place-items-center text-center">{center}</div>
+      </div>
+      <div ref={mid} className="absolute inset-0 grid place-items-center text-center">{center}</div>
     </div>
   );
 }
@@ -205,7 +236,9 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
             </button>
           </div>
         </div>
-        <p className="num-hero mt-1 text-[38px] leading-none">{rupees(y.spent)}</p>
+        <p className="num-hero mt-1 text-[38px] leading-none">
+          <RollingNumber text={rupees(y.spent)} />
+        </p>
         <p className="mt-2 text-[13.5px] text-ink3">{y.avgSpent ? `${rupees(y.avgSpent)} a month on average` : 'Nothing logged this year yet.'}</p>
 
         <div className="mt-6">
@@ -228,8 +261,8 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
           {selParts.length > 0 && (
             <>
               <div className="mt-3 flex h-2.5 gap-[2px] overflow-hidden rounded-full" data-testid="month-split" role="img" aria-label={selParts.map((p) => `${p.name} ${rupees(p.value)}`).join(', ')}>
-                {selParts.map((p) => (
-                  <span key={p.key} data-cat={p.key} className="h-full origin-left animate-grow-x first:rounded-l-full last:rounded-r-full" style={{ width: `${(p.value / selTotal) * 100}%`, background: p.color }} />
+                {selParts.map((p, i) => (
+                  <span key={sel + p.key} data-cat={p.key} className="h-full origin-left animate-grow-x first:rounded-l-full last:rounded-r-full" style={{ width: `${(p.value / selTotal) * 100}%`, background: p.color, animationDelay: `${i * 110}ms` }} />
                 ))}
               </div>
               <ul className="mt-2.5 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[12.5px]" aria-hidden="true">

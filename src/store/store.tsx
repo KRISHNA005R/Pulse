@@ -25,6 +25,7 @@ import type {
 import { CATEGORIES, createSeed } from '../data/seed';
 import { roundMoney, setCurrency } from '../lib/currency';
 import { burst } from '../lib/celebrate';
+import { stamp } from '../lib/motion';
 import { INSURANCE_ON } from '../lib/features';
 import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
@@ -715,6 +716,7 @@ function useStoreImpl() {
       burst({ kind: m.tone === 'done' ? 'confetti' : 'mini', power: m.tone === 'done' ? 1.7 : 0.9 });
       // A milestone crossed with this top-up gets its own line, once.
       const mile = [0.75, 0.5, 0.25].find((x) => before.progress < x && m.progress >= x);
+      if (m.tone === 'done') stamp('Goal done!', p2.name);
       if (m.tone === 'done') toast({ text: `Your ${p2.name} plan is fully funded!`, tone: 'good', emoji: '🎉' });
       else if (mile) toast({ text: mile === 0.5 ? `Halfway to ${p2.name}. Keep cooking.` : mile === 0.75 ? `75% there. ${p2.name} is so close.` : `A quarter of ${p2.name} done. Solid start.`, tone: 'good', emoji: mile === 0.5 ? '🔥' : mile === 0.75 ? '🚀' : '✨' });
       else if (m.tone === 'ahead') toast({ text: `${rupees(amount)} added. You're ${m.daysAhead} days ahead on ${p2.name}.`, tone: 'good' });
@@ -1783,7 +1785,10 @@ function useStoreImpl() {
       haptic(12);
       const paid = tx as Transaction | null;
       if (!paid) return void toast({ text: 'That EMI was already recorded.' });
-      if (left <= 0) burst({ kind: 'coins', power: 1.4 });
+      if (left <= 0) {
+        burst({ kind: 'confetti', power: 1.8 });
+        stamp('Debt-free!', 'Loan closed');
+      }
       toast({ text: left <= 0 ? `${paid.merchant} recorded. This loan is paid off!` : `${paid.merchant} recorded. ${rupees(left)} left on the loan. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good', emoji: left <= 0 ? '🎉' : undefined });
     },
     [commit, toast],
@@ -1798,7 +1803,8 @@ function useStoreImpl() {
       if (r.error) return r.error;
       haptic(12);
       if (r.left <= 0) {
-        burst({ kind: 'coins', power: 1.6 });
+        burst({ kind: 'confetti', power: 1.8 });
+        stamp('Debt-free!', 'Loan closed');
         toast({ text: 'Loan closed. You’re debt-free on this one!', tone: 'good', emoji: '🎉' });
       } else if (mode === 'extra') {
         toast({ text: `Extra ${rupees(r.tx!.amount)} recorded. ${rupees(r.left)} left on the loan.`, tone: 'good' });

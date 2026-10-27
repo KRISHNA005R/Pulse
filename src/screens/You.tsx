@@ -16,6 +16,7 @@ import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, Em
 import { SubscriptionRow, TransactionList } from '../components/money';
 import { BackupPanel } from '../components/Forms';
 import { Icon } from '../components/ui/Icon';
+import { RollingNumber } from '../components/ui/RollingNumber';
 import { useInstall } from '../lib/pwa';
 import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
@@ -359,7 +360,9 @@ export function NetWorthScreen() {
         <p id="nw-total" className="eyebrow">
           Total net worth
         </p>
-        <p className="num-hero mt-1 text-[39px] leading-none">{rupees(nw.total)}</p>
+        <p className="num-hero mt-1 text-[39px] leading-none">
+          <RollingNumber text={rupees(nw.total)} />
+        </p>
         {h.length < 2 ? (
           <p className="mt-2 text-[14px] text-ink2">Your trend line starts after your first full month. PULSE saves a snapshot each month.</p>
         ) : (
@@ -594,7 +597,9 @@ export function DebtScreen() {
               </button>
             </div>
             {paidOff && <img src="/illustrations/loan-paid-off.webp" alt="" aria-hidden="true" width={700} height={695} decoding="async" data-testid="loan-art" className="mx-auto mt-1 h-[180px] w-auto" />}
-            <p className="num-hero mt-1 text-[36px] leading-none">{rupees(d.remaining)}</p>
+            <p className="num-hero mt-1 text-[36px] leading-none">
+              <RollingNumber text={rupees(d.remaining)} testId="debt-left" />
+            </p>
             <p className="mt-1 text-[13px] text-ink3">
               {paidOff ? 'Paid off. Nothing left to pay.' : 'left to pay'}
               {!paidOff && paidDown > 0 && <span className="font-semibold text-pos"> · {rupees(paidDown)} paid off</span>}
@@ -1043,8 +1048,8 @@ export function InvestmentsScreen() {
                 Add holding
               </button>
             </div>
-            <p data-testid="portfolio-value" className="num-hero mt-1 text-[38px] leading-none">
-              {rupees(t.holdings)}
+            <p className="num-hero mt-1 text-[38px] leading-none">
+              <RollingNumber text={rupees(t.holdings)} testId="portfolio-value" />
             </p>
             {putIn > 0 && (
               <p className={`mt-1.5 text-[14px] ${gain >= 0 ? 'text-pos' : 'text-ink2'}`}>

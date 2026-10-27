@@ -7,6 +7,7 @@ import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, payda
 import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
+import { RollingNumber } from './ui/RollingNumber';
 import { streak } from '../lib/streak';
 import { AvatarStack, CategoryMark, ProgressBar, Ring, StatusPill } from './ui/bits';
 
@@ -129,7 +130,6 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const { state } = useStore();
   const ui = useUI();
   const sts = useMemo(() => safeToSpend(state), [state]);
-  const shown = useRolling(sts.safe);
   const shownDaily = useRolling(sts.daily, 900);
   // A floating "−₹450" chip whenever safe-to-spend moves.
   const last = useRef({ v: sts.safe, who: `${state.mode}:${state.user.fullName}` });
@@ -151,7 +151,6 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const cycleDays = Math.max(1, daysBetween(cycleStart, sts.payday));
   const cycleDone = Math.min(1, daysBetween(cycleStart, state.today) / cycleDays);
 
-  const amount = rupees(Math.round(shown));
   const soon = sts.daysLeft <= 1;
   const paydayIn = sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
   // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
@@ -176,8 +175,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
           aria-live="polite"
           aria-atomic="true"
         >
-          <span className="sr-only">{rupees(sts.safe)}</span>
-          <span aria-hidden="true">{amount}</span>
+          <RollingNumber text={rupees(sts.safe)} />
         </p>
         {delta && !hide && (
           <span key={`d${delta.id}`} className={`num pointer-events-none absolute -top-5 left-1 animate-floatup rounded-full px-2 py-0.5 text-[13px] font-bold ${delta.v < 0 ? 'bg-accent text-on-accent' : 'bg-pos text-white'}`} aria-hidden="true">

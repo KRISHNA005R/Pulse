@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { revealIn } from './lib/motion';
 import { HistoryScreen } from './screens/History';
 import { SyncScreen } from './screens/Sync';
 import { takeSyncLink } from './lib/sync';
@@ -380,9 +381,9 @@ function Shell() {
               </button>
             </div>
           )}
-          <div className="animate-rise">
+          <ScreenReveal>
             <Screen />
-          </div>
+          </ScreenReveal>
         </div>
       </main>
       <ContextPanel />
@@ -392,6 +393,13 @@ function Shell() {
       <Toasts />
     </div>
   );
+}
+
+/** The screen's cards rise in one after another; the ones further down wait until you scroll to them. */
+function ScreenReveal({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => (ref.current ? revealIn(ref.current) : undefined), []);
+  return <div ref={ref}>{children}</div>;
 }
 
 export default function App() {
