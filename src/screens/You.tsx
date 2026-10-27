@@ -4,13 +4,12 @@ import { BrandSignature } from '../components/ui/BrandSignature';
 import { NetWorthChart } from '../components/NetWorthChart';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { INSURANCE_ON } from '../lib/features';
-import { remindersSummary } from './Reminders';
+import { remindersShort } from './Reminders';
 import { cleanVpa, okVpa } from '../lib/upi';
 import { playSfx } from '../lib/sfx';
-import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { debtDue, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { debtDue, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -19,7 +18,6 @@ import { Icon } from '../components/ui/Icon';
 import { RollingNumber } from '../components/ui/RollingNumber';
 import { kindMeta, maturityDate, maturityValue } from '../lib/invest';
 import { useInstall } from '../lib/pwa';
-import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
 import { PhotoEditor } from '../components/PhotoEditor';
 import { okPhoto } from '../lib/photo';
@@ -32,7 +30,7 @@ export function YouScreen() {
   const account = state.mode === 'personal' ? auth.session?.account : undefined;
   const nw = useMemo(() => netWorth(state), [state]);
   const rec = recurringTotals(state);
-  const ins = insuranceTotals(state);
+  const debtLeft = state.debts.reduce((a, d) => a + Math.max(0, d.remaining), 0);
   const go = (r: Route) => ui.push(r);
   return (
     <div>
@@ -55,78 +53,82 @@ export function YouScreen() {
         </div>
       </div>
 
-      <button type="button" onClick={() => ui.openSheet({ type: 'recap' })} className="tap mb-8 flex w-full items-center gap-4 rounded-3xl bg-accent p-5 text-left text-on-accent">
-        <span className="min-w-0 flex-1">
+      {/* Your month: the recap and the shareable Rewind, side by side */}
+      <div className="mb-6 grid grid-cols-[1.35fr_1fr] gap-2.5">
+        <button type="button" onClick={() => ui.openSheet({ type: 'recap' })} className="tap flex min-h-[92px] flex-col justify-between rounded-3xl bg-accent p-4 text-left text-on-accent">
           <span className="eyebrow block !text-current opacity-75">Monthly recap</span>
-          <span className="display mt-1 block text-[24px]">Your {monthName(state.today)}</span>
-          <span className="mt-0.5 block text-[14px] opacity-85">Wins, things to notice and one easy change</span>
-        </span>
-        <Icon name="chevron" size={22} />
-      </button>
+          <span className="flex items-end justify-between gap-2">
+            <span className="display block text-[19px] leading-tight">Your {monthName(state.today)}</span>
+            <Icon name="chevron" size={18} className="shrink-0" />
+          </span>
+        </button>
+        <button type="button" onClick={() => ui.openSheet({ type: 'rewind' })} className="tap flex min-h-[92px] flex-col justify-between rounded-3xl bg-ink p-4 text-left text-bg">
+          <span className="eyebrow block !text-current opacity-70">PULSE Rewind</span>
+          <span className="flex items-end justify-between gap-2">
+            <span className="block text-[14px] font-semibold leading-tight">5 slides to share</span>
+            <Icon name="share" size={17} className="shrink-0" />
+          </span>
+        </button>
+      </div>
 
-      <section aria-labelledby="you-money" className="mb-8">
+      <section aria-labelledby="you-money" className="mb-6">
         <SectionHeader id="you-money" title="Money" />
-        <NavRow icon="chart" label="Spending history" sub="Yearly report, month by month" onClick={() => go({ name: 'history' })} />
-        <NavRow icon="trend" label="Net worth" sub="Everything you own minus what you owe" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
-        <NavRow icon="piggy" label="Investments" sub={(state.investments ?? []).length ? `${(state.investments ?? []).filter((i) => i.status === 'active').length} active · SIP, RD, FD and more` : 'SIP, RD, FD, PPF, NPS or gold'} value={investmentTotals(state).monthly ? `${rupees(investmentTotals(state).monthly)}/mo` : undefined} onClick={() => go({ name: 'investments' })} />
-        {INSURANCE_ON && <NavRow icon="shield" label="Insurance" sub={ins.count ? `${ins.count} ${ins.count === 1 ? 'policy' : 'policies'}${ins.next ? ` · next due ${fmtDate(ins.next.nextDate)}` : ''}` : 'Health, term life, bike or car premiums'} value={ins.yearly ? `${rupeesShort(ins.yearly)}/yr` : undefined} onClick={() => go({ name: 'insurance' })} />}
-        <NavRow icon="repeat" label="Subscriptions & bills" sub={`${rec.count} recurring payments`} value={`${rupees(rec.monthly)}/mo`} onClick={() => go({ name: 'subscriptions' })} />
-        <NavRow icon="briefcase" label="Income" sub="Salary, freelance and side income" onClick={() => go({ name: 'income' })} />
-        <NavRow icon="card" label="Credit cards" sub={`${state.cards.length} cards`} onClick={() => go({ name: 'cards' })} />
-        <NavRow icon="bank" label="Debt" sub="Loans and payoff plans" onClick={() => go({ name: 'debt' })} />
-        <NavRow icon="wallet" label="Accounts" sub={state.accounts.map((a) => a.name).slice(0, 3).join(', ')} onClick={() => go({ name: 'accounts' })} />
-        <NavRow icon="share" label="PULSE Rewind" sub="Your month in 5 slides, made to share" onClick={() => ui.openSheet({ type: 'rewind' })} />
+        <div className="grid grid-cols-2 gap-2.5">
+          <MoneyTile icon="trend" label="Net worth" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
+          <MoneyTile icon="piggy" label="Investments" value={investmentTotals(state).monthly ? `${rupeesShort(investmentTotals(state).monthly)}/mo` : (state.investments ?? []).length ? `${(state.investments ?? []).length} added` : 'Add one'} onClick={() => go({ name: 'investments' })} />
+          <MoneyTile icon="repeat" label="Subscriptions & bills" short="Bills & subs" value={`${rupeesShort(rec.monthly)}/mo`} onClick={() => go({ name: 'subscriptions' })} />
+          <MoneyTile icon="bank" label="Debt" value={debtLeft > 0 ? `${rupeesShort(debtLeft)} left` : state.debts.length ? 'Paid off' : 'None'} onClick={() => go({ name: 'debt' })} />
+        </div>
+        <div className={`mt-2.5 grid gap-2.5 ${INSURANCE_ON ? 'grid-cols-5' : 'grid-cols-4'}`}>
+          <MiniTile icon="chart" label="Spending history" onClick={() => go({ name: 'history' })} />
+          <MiniTile icon="briefcase" label="Income" onClick={() => go({ name: 'income' })} />
+          <MiniTile icon="card" label="Credit cards" onClick={() => go({ name: 'cards' })} />
+          <MiniTile icon="wallet" label="Accounts" onClick={() => go({ name: 'accounts' })} />
+          {INSURANCE_ON && <MiniTile icon="shield" label="Insurance" onClick={() => go({ name: 'insurance' })} />}
+        </div>
       </section>
 
-      <section aria-labelledby="you-prefs" className="mb-8">
+      <section aria-labelledby="you-prefs" className="mb-6">
         <SectionHeader id="you-prefs" title="Preferences" />
-        <NavRow icon="user" label="Profile" onClick={() => go({ name: 'settings', section: 'profile' })} />
-        <NavRow icon="tags" label="Categories" sub={`${state.categories.filter((c) => c.kind === 'expense').length} categories`} onClick={() => go({ name: 'categories' })} />
-        <NavRow icon="sliders" label="Budget preferences" sub={`Safety buffer ${rupees(state.settings.buffer)}`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
-        <NavRow icon="bell" label="Reminders" sub={remindersSummary()} onClick={() => go({ name: 'reminders' })} />
-        <NavRow icon="palette" label="Appearance" sub={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
-        <NavRow icon="rupee" label="Currency" sub={`${currencyOf(state.settings.currency).name} (${currencyOf(state.settings.currency).symbol})`} onClick={() => go({ name: 'settings', section: 'currency' })} />
+        <div className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface">
+          <SetRow icon="user" label="Profile" onClick={() => go({ name: 'settings', section: 'profile' })} />
+          <SetRow icon="tags" label="Categories" value={String(state.categories.filter((c) => c.kind === 'expense').length)} onClick={() => go({ name: 'categories' })} />
+          <SetRow icon="sliders" label="Budget preferences" value={`${rupees(state.settings.buffer)} buffer`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
+          <SetRow icon="bell" label="Reminders" value={remindersShort()} onClick={() => go({ name: 'reminders' })} />
+          <SetRow icon="palette" label="Appearance" value={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
+          <SetRow icon="rupee" label="Currency" value={`${currencyOf(state.settings.currency).symbol} ${currencyOf(state.settings.currency).code ?? ''}`.trim()} onClick={() => go({ name: 'settings', section: 'currency' })} />
+        </div>
       </section>
-
-      <section aria-labelledby="you-learn" className="mb-8">
-        <SectionHeader id="you-learn" title="Learn PULSE" />
-        {state.mode === 'demo' ? (
-          <NavRow emoji="🧭" label="Demo tour" sub="What to try, step by step" onClick={() => go({ name: 'demo-guide' })} />
-        ) : (
-          <NavRow emoji="🧭" label="Explore demo data" sub="Try every feature with a sample month" onClick={() => go({ name: 'demo-guide' })} />
-        )}
-      </section>
-
-      <InstallCard />
 
       <section aria-labelledby="you-privacy" className="mb-8">
-        <SectionHeader id="you-privacy" title="Privacy & data" />
-        <NavRow icon="shield" label="Data & privacy" onClick={() => go({ name: 'settings', section: 'privacy' })} />
-        {account ? (
-          <NavRow icon="user" label="Your account" sub={`${account.email} · member #${account.n}`} onClick={() => go({ name: 'account' })} />
-        ) : auth.on && state.mode === 'personal' ? (
-          <NavRow icon="user" label="Sign in" sub="Save your money to an account, so it's on every device" onClick={() => ui.openSheet({ type: 'auth-nudge' })} />
-        ) : (
-          <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
-        )}
-        <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
-        <NavRow icon="message" label="Send feedback" sub="Spill the tea: bugs, ideas, vibes" onClick={() => go({ name: 'feedback' })} />
-        <a href="/about/" className="row-btn min-h-[56px]">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sunk text-ink2" aria-hidden="true">
-            <Icon name="help" size={18} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-medium">How PULSE works</span>
-            <span className="block text-[13px] text-ink3">FAQ, privacy and how safe-to-spend is calculated</span>
-          </span>
-          <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
-        </a>
-        <button type="button" onClick={() => ui.openSheet({ type: 'erase' })} className="row-btn min-h-[56px] text-neg">
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-neg/10" aria-hidden="true">
-            <Icon name="trash" size={18} />
-          </span>
-          <span className="flex-1 text-[15px] font-semibold">Erase all data</span>
-        </button>
+        <SectionHeader id="you-privacy" title="Help & data" />
+        <div className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface">
+          <SetRow emoji="🧭" label={state.mode === 'demo' ? 'Demo tour' : 'Explore demo data'} onClick={() => go({ name: 'demo-guide' })} />
+          <InstallRow />
+          <SetRow icon="shield" label="Data & privacy" onClick={() => go({ name: 'settings', section: 'privacy' })} />
+          {account ? (
+            <SetRow icon="user" label="Your account" value={account.email} onClick={() => go({ name: 'account' })} />
+          ) : auth.on && state.mode === 'personal' ? (
+            <SetRow icon="user" label="Sign in" value="Use on every device" onClick={() => ui.openSheet({ type: 'auth-nudge' })} />
+          ) : (
+            <SetRow icon="reset" label="Sync my devices" onClick={() => go({ name: 'sync' })} />
+          )}
+          <SetRow icon="download" label="Backup code & export" onClick={() => go({ name: 'settings', section: 'export' })} />
+          <SetRow icon="message" label="Send feedback" onClick={() => go({ name: 'feedback' })} />
+          <a href="/about/" className="tap flex min-h-[50px] w-full items-center gap-3 px-4 text-left hover:bg-sunk/60">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-sunk text-ink2" aria-hidden="true">
+              <Icon name="help" size={16} />
+            </span>
+            <span className="min-w-0 flex-1 text-[14.5px] font-medium">How PULSE works</span>
+            <Icon name="chevron" size={16} className="shrink-0 text-ink3" />
+          </a>
+          <button type="button" onClick={() => ui.openSheet({ type: 'erase' })} className="tap flex min-h-[50px] w-full items-center gap-3 px-4 text-left text-neg hover:bg-neg/5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-neg/10" aria-hidden="true">
+              <Icon name="trash" size={16} />
+            </span>
+            <span className="flex-1 text-[14.5px] font-semibold">Erase all data</span>
+          </button>
+        </div>
       </section>
 
       <BrandSignature />
@@ -1275,55 +1277,61 @@ export function InvestDebits() {
 // ------------------------------------------------------------------
 // Install as an app (PWA)
 // ------------------------------------------------------------------
-function InstallCard() {
+/** A money tile on the You tab: what it is and its number. */
+function MoneyTile({ icon, label, short, value, onClick }: { icon: string; label: string; short?: string; value: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-label={`${label}, ${value}`} className="tap flex min-h-[84px] flex-col justify-between rounded-2xl border border-line bg-surface p-3.5 text-left hover:border-ink3/40">
+      <span className="flex items-center justify-between gap-2">
+        <span className="truncate text-[13px] font-medium text-ink2">{short ?? label}</span>
+        <Icon name={icon} size={16} className="shrink-0 text-ink3" />
+      </span>
+      <span className="num block truncate text-[19px] font-bold">{value}</span>
+    </button>
+  );
+}
+
+/** A small square shortcut: icon over a short label. */
+function MiniTile({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="tap flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-2xl bg-sunk/70 px-1 text-center hover:bg-sunk">
+      <Icon name={icon} size={19} className="text-ink2" />
+      <span className="text-[11.5px] font-semibold leading-tight">{label}</span>
+    </button>
+  );
+}
+
+/** One short settings row inside a card: icon, label, the current value. */
+function SetRow({ icon, emoji, label, value, onClick }: { icon?: string; emoji?: string; label: string; value?: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="tap flex min-h-[50px] w-full items-center gap-3 px-4 text-left hover:bg-sunk/60">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-sunk text-ink2" aria-hidden="true">
+        {emoji ? <span className="text-[15px]">{emoji}</span> : <Icon name={icon!} size={16} />}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[14.5px] font-medium">{label}</span>
+      {value && <span className="max-w-[46%] shrink-0 truncate text-[13px] text-ink3">{value}</span>}
+      <Icon name="chevron" size={16} className="shrink-0 text-ink3" />
+    </button>
+  );
+}
+
+/** Install PULSE as one row: installs straight away where the browser allows, otherwise shows how. */
+function InstallRow() {
   const inst = useInstall();
   const { toast } = useStore();
   const ui = useUI();
-  // Always shown. Once PULSE runs from the home screen it switches to an "installed" state
-  // and offers the guide for helping a friend, instead of disappearing.
-  const installed = inst.installed;
+  if (inst.installed) return <SetRow icon="check" label="PULSE is installed" value="Help a friend" onClick={() => ui.push({ name: 'install' })} />;
   return (
-    <section aria-labelledby="install-h" className="mb-8 rounded-3xl border border-line bg-surface p-5">
-      <div className="flex items-center gap-4">
-        <Submark size={56} className="shrink-0 rounded-[30%] ring-1 ring-line" />
-        <div className="min-w-0 flex-1">
-          <h2 id="install-h" className="display flex items-center gap-2 text-[18px]">
-            {installed ? 'PULSE is installed' : 'Install PULSE'}
-            {installed && (
-              <span className="grid h-5 w-5 place-items-center rounded-full bg-pos text-bg" aria-hidden="true">
-                <Icon name="check" size={13} />
-              </span>
-            )}
-          </h2>
-          <p className="text-[13.5px] text-ink2">{installed ? 'You are using the app from your home screen. It works offline.' : 'Opens full screen from your home screen and works offline.'}</p>
-        </div>
-      </div>
-      {installed ? (
-        <button type="button" className="btn-quiet mt-4 w-full" onClick={() => ui.push({ name: 'install' })}>
-          <Icon name="share" size={17} /> Help a friend install
-        </button>
-      ) : (
-        <>
-          <button
-            type="button"
-            className="btn-primary mt-4 w-full"
-            onClick={async () => {
-              if (inst.canPrompt) {
-                const r = await inst.prompt();
-                if (r === 'accepted') toast({ text: 'PULSE is on your home screen.', tone: 'good' });
-              } else ui.push({ name: 'install' });
-            }}
-          >
-            <Icon name="download" size={17} /> {inst.canPrompt ? 'Install app' : 'How to install'}
-          </button>
-          {inst.canPrompt && (
-            <button type="button" className="mt-2.5 w-full text-center text-[13px] font-semibold text-accent-ink" onClick={() => ui.push({ name: 'install' })}>
-              Steps for iPhone and Android
-            </button>
-          )}
-        </>
-      )}
-    </section>
+    <SetRow
+      icon="download"
+      label="Install PULSE"
+      value="Works offline"
+      onClick={async () => {
+        if (inst.canPrompt) {
+          const r = await inst.prompt();
+          if (r === 'accepted') toast({ text: 'PULSE is on your home screen.', tone: 'good' });
+        } else ui.push({ name: 'install' });
+      }}
+    />
   );
 }
 

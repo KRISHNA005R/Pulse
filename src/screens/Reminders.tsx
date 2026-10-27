@@ -25,6 +25,13 @@ export function remindersSummary(): string {
   return remindersOn() ? 'On for this device' : 'Bills, payday and a nudge to log your day';
 }
 
+/** The same, in a word or two, for the You tab. */
+export function remindersShort(): string {
+  if (!pushSupported()) return isIOS() && !isStandalone() ? 'Install first' : 'Not available';
+  if (pushPermission() === 'denied') return 'Blocked';
+  return remindersOn() ? 'On' : 'Off';
+}
+
 export function RemindersScreen() {
   const store = useStore();
   const { state, updateSettings } = store;
