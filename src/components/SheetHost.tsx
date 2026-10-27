@@ -189,8 +189,8 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       );
     case 'account-form':
       return (
-        <Sheet title={spec.accountId ? 'Edit account' : 'Add account'} onClose={close} size="sm" z={z}>
-          <AccountForm accountId={spec.accountId} onDone={close} />
+        <Sheet title={spec.holding ? (spec.accountId ? 'Edit holding' : 'Add holding') : spec.accountId ? 'Edit account' : 'Add account'} onClose={close} size="sm" z={z}>
+          <AccountForm accountId={spec.accountId} holding={spec.holding} onDone={close} />
         </Sheet>
       );
     case 'category-form':

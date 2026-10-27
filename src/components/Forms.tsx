@@ -680,14 +680,16 @@ function DeleteRow({ label, onDelete }: { label: string; onDelete: () => void })
   );
 }
 
-export function AccountForm({ accountId, onDone }: { accountId?: string; onDone: () => void }) {
+/** `holding`: an investment (Investments → Holdings). It is never counted in safe-to-spend, so there's no choice to make. */
+export function AccountForm({ accountId, holding, onDone }: { accountId?: string; holding?: boolean; onDone: () => void }) {
   const store = useStore();
   const ex = store.state.accounts.find((a) => a.id === accountId);
   const [name, setName] = useState(ex?.name ?? '');
   const [institution, setInstitution] = useState(ex?.institution ?? '');
-  const [type, setType] = useState(ex?.type ?? 'bank');
+  const [type, setType] = useState(ex?.type ?? (holding ? 'investment' : 'bank'));
   const [balance, setBalance] = useState(ex ? String(ex.balance) : '');
-  const [spendable, setSpendable] = useState(ex?.spendable ?? true);
+  const [spendable, setSpendable] = useState(holding ? false : (ex?.spendable ?? true));
+  const isHolding = holding || type === 'investment';
   // In use = money has moved through it, or something is set to pay from it or into it.
   const st = store.state;
   const used = ex
@@ -702,7 +704,8 @@ export function AccountForm({ accountId, onDone }: { accountId?: string; onDone:
       <Field label="Name" htmlFor="acct-name">
         <input id="acct-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="SBI Savings, Paytm wallet…" />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className={holding ? '' : 'grid grid-cols-2 gap-3'}>
+        {!holding && (
         <Field label="Type" htmlFor="acct-type">
           <select
             id="acct-type"
@@ -721,27 +724,30 @@ export function AccountForm({ accountId, onDone }: { accountId?: string; onDone:
             <option value="investment">Investments</option>
           </select>
         </Field>
-        <Field label="Balance" htmlFor="acct-bal">
+        )}
+        <Field label={holding ? 'Current value' : 'Balance'} htmlFor="acct-bal">
           <input id="acct-bal" inputMode="decimal" className="field num" value={balance} onChange={(e) => setBalance(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
       </div>
       <Field label="Bank or app (optional)" htmlFor="acct-inst">
         <input id="acct-inst" className="field" value={institution} onChange={(e) => setInstitution(e.target.value)} placeholder="HDFC, Groww, Zerodha…" />
       </Field>
-      <label className="flex items-center gap-3 text-[14.5px]">
-        <input type="checkbox" className="h-5 w-5 accent-[rgb(var(--accent))]" checked={spendable} onChange={(e) => setSpendable(e.target.checked)} />
-        Count this toward safe-to-spend
-      </label>
+      {!isHolding && (
+        <label className="flex items-center gap-3 text-[14.5px]">
+          <input type="checkbox" className="h-5 w-5 accent-[rgb(var(--accent))]" checked={spendable} onChange={(e) => setSpendable(e.target.checked)} />
+          Count this toward safe-to-spend
+        </label>
+      )}
       <button
         type="button"
         disabled={!name.trim()}
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
-          store.saveAccount({ id: ex?.id, name: name.trim(), institution: institution.trim() || (type === 'cash' ? 'Wallet' : 'Added by you'), type, balance: roundMoney(parseFloat(balance) || 0), spendable });
+          store.saveAccount({ id: ex?.id, name: name.trim(), institution: institution.trim() || (type === 'cash' ? 'Wallet' : 'Added by you'), type, balance: roundMoney(parseFloat(balance) || 0), spendable: isHolding ? false : spendable });
           onDone();
         }}
       >
-        {ex ? 'Save account' : 'Add account'}
+        {holding ? (ex ? 'Save holding' : 'Add holding') : ex ? 'Save account' : 'Add account'}
       </button>
       {ex && !used && store.state.accounts.length > 1 && (
         <DeleteRow
@@ -752,7 +758,11 @@ export function AccountForm({ accountId, onDone }: { accountId?: string; onDone:
           }}
         />
       )}
-      {ex && used && <p className="text-[12.5px] text-ink3">This account has transactions, or a SIP, bill or EMI uses it, so it can't be removed. You can stop counting it toward safe-to-spend.</p>}
+      {ex && used && (
+        <p className="text-[12.5px] text-ink3">
+          {isHolding ? "A SIP or a past payment uses this holding, so it can't be removed." : "This account has transactions, or a SIP, bill or EMI uses it, so it can't be removed. You can stop counting it toward safe-to-spend."}
+        </p>
+      )}
     </div>
   );
 }

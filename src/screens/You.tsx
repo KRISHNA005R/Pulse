@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { CURRENCIES, currencyOf, scaled, sym } from '../lib/currency';
+import { CURRENCIES, currencyOf, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
+import { NetWorthChart } from '../components/NetWorthChart';
 import { BUILD_TIME, checkForUpdate, updateReady } from '../lib/update';
 import { INSURANCE_ON } from '../lib/features';
 import { remindersSummary } from './Reminders';
@@ -350,15 +351,6 @@ export function NetWorthScreen() {
   const ui = useUI();
   const nw = useMemo(() => netWorth(state), [state]);
   const h = nw.history;
-  const W = 320,
-    H = 120,
-    P = 8;
-  const min = Math.min(...h.map((x) => x.value), 0);
-  const max = Math.max(...h.map((x) => x.value), 0);
-  const x = (i: number) => P + (i * (W - 2 * P)) / Math.max(1, h.length - 1);
-  const y = (v: number) => P + ((max - v) * (H - 2 * P)) / Math.max(1, max - min);
-  const path = h.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-  const area = `${path} L${x(h.length - 1)},${H - P} L${x(0)},${H - P} Z`;
   const change = nw.total - h[0].value;
   return (
     <div>
@@ -375,25 +367,7 @@ export function NetWorthScreen() {
             {change >= 0 ? '▲' : '▼'} {rupees(Math.abs(change))} since {monthName(h[0].month + '-01')}
           </p>
         )}
-        {h.length >= 2 && <figure className="mt-5">
-          <svg viewBox={`0 0 ${W} ${H + 18}`} className="w-full" role="img" aria-label={`Net worth by month: ${h.map((p) => `${monthName(p.month + '-01')} ${rupees(p.value)}`).join(', ')}`}>
-            <line x1={P} x2={W - P} y1={y(0)} y2={y(0)} stroke="rgb(var(--line))" strokeDasharray="3 3" />
-            <path d={area} fill="rgb(var(--accent) / 0.1)" />
-            <path d={path} fill="none" stroke="rgb(var(--accent))" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-            {h.map((p, i) => (
-              <g key={p.month}>
-                {i === h.length - 1 && <circle cx={x(i)} cy={y(p.value)} r="4.5" fill="rgb(var(--accent))" stroke="rgb(var(--surface))" strokeWidth="2" />}
-                <text x={x(i)} y={H + 14} textAnchor={i === 0 ? 'start' : i === h.length - 1 ? 'end' : 'middle'} fontSize="10.5" fill="rgb(var(--ink3))">
-                  {monthName(p.month + '-01').slice(0, 3)}
-                </text>
-              </g>
-            ))}
-            <text x={W - P} y={y(0) - 4} textAnchor="end" fontSize="10" fill="rgb(var(--ink3))">
-              {sym()}0
-            </text>
-          </svg>
-          <figcaption className="sr-only">Net worth by month, from {monthName(h[0].month + '-01')} to now.</figcaption>
-        </figure>}
+        {h.length >= 2 && <NetWorthChart history={h} />}
       </section>
       <section className="mt-8" aria-labelledby="nw-break">
         <SectionHeader id="nw-break" title="Breakdown" />
@@ -1166,10 +1140,10 @@ export function InvestmentsScreen() {
       )}
 
       <section className="mt-8" aria-labelledby="inv-hold">
-        <SectionHeader id="inv-hold" title="Holdings" action={{ label: 'Add holding', onClick: () => ui.openSheet({ type: 'account-form' }) }} />
+        <SectionHeader id="inv-hold" title="Holdings" action={{ label: 'Add holding', onClick: () => ui.openSheet({ type: 'account-form', holding: true }) }} />
         {holdings.length ? (
           holdings.map((a) => (
-            <NavRow key={a.id} icon="trend" label={a.name} sub={a.institution} value={rupees(a.balance)} onClick={() => ui.openSheet({ type: 'account-form', accountId: a.id })} />
+            <NavRow key={a.id} icon="trend" label={a.name} sub={a.institution} value={rupees(a.balance)} onClick={() => ui.openSheet({ type: 'account-form', accountId: a.id, holding: true })} />
           ))
         ) : (
           <p className="px-1 text-[14px] text-ink3">No holdings yet. Adding a SIP creates one for you.</p>

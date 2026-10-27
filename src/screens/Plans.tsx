@@ -113,9 +113,9 @@ function SplitsView() {
   const everyone = state.people
     .filter((p) => (t.balances.get(p.id) ?? 0) !== 0 || p.link || together(p.id))
     .map((p) => [p.id, t.balances.get(p.id) ?? 0] as [string, number]);
-  // With a lot of friends this page shows the few that matter most (the biggest balances). The rest are one tap away.
-  const TOP = 5;
-  const people = (everyone.length > TOP + 1 ? [...everyone].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, TOP) : everyone).sort((a, b) => a[1] - b[1]);
+  // Only the three that matter most show here (the biggest balances). Everyone else is one tap away.
+  const TOP = 3;
+  const people = (everyone.length > TOP ? [...everyone].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, TOP) : everyone).sort((a, b) => a[1] - b[1]);
   const more = state.people.length - people.length;
   return (
     <div className="flex flex-col gap-8">
@@ -168,14 +168,9 @@ function SplitsView() {
           </button>
         )}
         {state.mode === 'personal' && (
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-invite' })}>
-              <Icon name="users" size={16} /> Invite friends
-            </button>
-            <button type="button" className="btn-quiet min-h-[42px] text-[14px]" onClick={() => ui.openSheet({ type: 'friend-join' })}>
-              I have a link
-            </button>
-          </div>
+          <button type="button" className="btn-quiet mt-3 min-h-[42px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'friend-invite' })}>
+            <Icon name="users" size={16} /> Invite friends
+          </button>
         )}
       </section>
 

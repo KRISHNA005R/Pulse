@@ -61,7 +61,7 @@ export type SheetSpec =
   | { type: 'recap'; month?: string }
   | { type: 'ai'; ask?: string }
   | { type: 'income-form'; incomeId?: string }
-  | { type: 'account-form'; accountId?: string }
+  | { type: 'account-form'; accountId?: string; holding?: boolean }
   | { type: 'erase' }
   | { type: 'category-form'; categoryId?: string; kind?: 'expense' | 'income'; name?: string; onSaved?: (id: string) => void }
   | { type: 'investment-form'; investmentId?: string }

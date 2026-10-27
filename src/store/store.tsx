@@ -38,7 +38,7 @@ import { notePayday, nextCoin, gullakFull } from '../lib/fun';
 import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
 import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
-import { mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { holdingAccounts, mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
 // (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
@@ -357,6 +357,8 @@ export function refresh(input: State): State {
   });
   for (const c of s.categories) if (!c.emoji) c.emoji = CATEGORIES.find((d) => d.id === c.id)?.emoji ?? suggestEmoji(c.name);
   repairHoldings(s);
+  // Holdings are investments: they never count toward safe-to-spend (some were saved that way before).
+  for (const a of holdingAccounts(s)) a.spendable = false;
   refillReserves(s);
   if (s.mode !== 'personal') return s;
   const today = realToday();
