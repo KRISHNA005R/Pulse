@@ -10,7 +10,7 @@ import { playSfx } from '../lib/sfx';
 import { Submark } from '../components/ui/Submark';
 import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
-import { debtDue, defaultAccount, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
+import { debtDue, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
 import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
@@ -550,12 +550,13 @@ export function DebtScreen() {
   const { state } = store;
   const ui = useUI();
   const [extra, setExtra] = useState(0);
+  const [whatIf, setWhatIf] = useState<string | null>(null);
   return (
     <div>
       <TopNavigation
         title="Debt"
         onBack={ui.pop}
-        sub="Optional. Only you see this."
+        sub="Only you see this."
         right={
           <button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => ui.openSheet({ type: 'debt-form' })}>
             <Icon name="plus" size={16} /> Loan
@@ -564,10 +565,12 @@ export function DebtScreen() {
       />
       {state.debts.length === 0 && <EmptyState icon="bank" art="/illustrations/debt-free.webp" title="No debts tracked." body="Add a loan to see when you'll be debt-free, and what paying a little extra saves." action={{ label: 'Add a loan', onClick: () => ui.openSheet({ type: 'debt-form' }) }} />}
       {state.debts.map((d) => {
+        const open = whatIf === d.id;
+        const add = open ? extra : 0;
         const base = payoffMonths(d.remaining, d.rate, d.minPayment);
-        const faster = payoffMonths(d.remaining, d.rate, d.minPayment + extra);
+        const faster = payoffMonths(d.remaining, d.rate, d.minPayment + add);
         const intBase = payoffInterest(d.remaining, d.rate, d.minPayment);
-        const intFast = payoffInterest(d.remaining, d.rate, d.minPayment + extra);
+        const intFast = payoffInterest(d.remaining, d.rate, d.minPayment + add);
         const done = faster ? addMonths(state.today, faster) : null;
         const paidOff = d.remaining <= 0;
         const due = debtDue(state, d);
@@ -575,92 +578,112 @@ export function DebtScreen() {
         const dueNow = due <= state.today;
         const overdue = manual && due < state.today;
         const part = emiParts(d);
-        const paidFrom = state.accounts.find((a) => a.id === d.account)?.name ?? state.accounts.find((a) => a.id === defaultAccount(state))?.name ?? 'your account';
         const paid = state.transactions.filter((t) => t.debtId === d.id);
+        const paidDown = paid.reduce((a, t) => a + (t.principal ?? 0), 0);
+        const pPct = part.amount > 0 ? (part.principal / part.amount) * 100 : 100;
+        const personal = state.mode === 'personal';
+        const chip = 'num inline-flex items-center gap-1.5 rounded-full bg-sunk px-3 py-1.5 text-[13px] font-semibold';
         return (
           <article key={d.id} className="mb-4 rounded-3xl border border-line bg-surface p-5">
             <div className="flex items-start justify-between gap-2">
-              <p className="display text-[18px]">
+              <p className="text-[15px] font-semibold text-ink2">
                 {d.name} · {d.lender}
               </p>
-              <button type="button" className="tap -mr-2 -mt-1 grid h-9 w-9 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label={`Edit ${d.name}`} onClick={() => ui.openSheet({ type: 'debt-form', debtId: d.id })}>
+              <button type="button" className="tap -mr-2 -mt-2 grid h-9 w-9 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label={`Edit ${d.name}`} onClick={() => ui.openSheet({ type: 'debt-form', debtId: d.id })}>
                 <Icon name="pencil" size={16} />
               </button>
             </div>
             {paidOff && <img src="/illustrations/loan-paid-off.webp" alt="" aria-hidden="true" width={700} height={695} decoding="async" data-testid="loan-art" className="mx-auto mt-1 h-[180px] w-auto" />}
-            <p className="num-hero mt-3 text-[33px] leading-none">{rupees(d.remaining)}</p>
-            <p className="text-[13px] text-ink3">{paidOff ? 'Paid off. Nothing left to pay.' : 'remaining'}</p>
-            <dl className="mt-4 grid grid-cols-3 gap-3 text-[13px]">
-              <div>
-                <dt className="text-ink3">EMI</dt>
-                <dd className="num text-[15px] font-semibold">{rupees(d.minPayment)}</dd>
-              </div>
-              <div>
-                <dt className="text-ink3">{paidOff ? 'Due' : overdue ? 'Was due' : 'Next EMI'}</dt>
-                <dd className="text-[15px] font-semibold">{paidOff ? 'Done' : state.mode === 'personal' ? fmtDate(due) : `${ordinal(d.dueDay)} monthly`}</dd>
-              </div>
-              <div>
-                <dt className="text-ink3">Interest</dt>
-                <dd className="num text-[15px] font-semibold">{d.rate}% p.a.</dd>
-              </div>
-            </dl>
-            {!paidOff && state.mode === 'personal' && (
-              <div className="mt-4 rounded-2xl bg-sunk/70 p-4 text-[13.5px]">
-                {manual ? (
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="min-w-0 flex-1 text-ink2">
-                      {dueNow ? `This EMI of ${rupees(part.amount)} is due. Mark it once you've paid.` : `You mark each EMI paid yourself. Next: ${rupees(part.amount)} on ${fmtDate(due)}.`}
-                    </p>
-                    <button type="button" className={`${dueNow ? 'btn-accent' : 'btn-quiet'} min-h-[40px] px-4 text-[14px]`} onClick={() => store.payDebt(d.id)}>
-                      Mark as paid
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-ink2">
-                    On {fmtDate(due)}, PULSE records {rupees(part.amount)} from {paidFrom}
-                    {part.interest > 0 ? `: ${rupees(part.principal)} comes off the loan and ${rupees(part.interest)} is interest.` : ' and takes it off the loan.'}
-                  </p>
-                )}
-                <button type="button" className="btn-quiet mt-3 min-h-[40px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'debt-early', debtId: d.id })}>
-                  Paid early / extra
-                </button>
-                {paid.length > 0 && (
-                  <p className="mt-2 text-ink3">
-                    Last EMI {fmtDate(paid[0].date)}: {rupees(paid[0].amount)}. {paid.length} recorded in PULSE, {rupees(paid.reduce((a, t) => a + (t.principal ?? 0), 0))} off the loan so far.
-                  </p>
-                )}
+            <p className="num-hero mt-1 text-[36px] leading-none">{rupees(d.remaining)}</p>
+            <p className="mt-1 text-[13px] text-ink3">
+              {paidOff ? 'Paid off. Nothing left to pay.' : 'left to pay'}
+              {!paidOff && paidDown > 0 && <span className="font-semibold text-pos"> · {rupees(paidDown)} paid off</span>}
+            </p>
+
+            {!paidOff && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className={chip} data-testid="chip-emi">
+                  <span className="font-normal text-ink3">EMI</span> {rupees(d.minPayment)}
+                </span>
+                <span className={`${chip} ${overdue ? 'bg-warn/15 text-warn' : ''}`} data-testid="chip-next">
+                  <Icon name="calendar" size={14} className={overdue ? '' : 'text-ink3'} />
+                  {overdue ? 'Was due ' : ''}
+                  {personal ? fmtDate(due) : `${ordinal(d.dueDay)} monthly`}
+                </span>
+                <span className={chip} data-testid="chip-rate">
+                  {d.rate}% <span className="font-normal text-ink3">a year</span>
+                </span>
               </div>
             )}
+
+            {!paidOff && personal && (
+              <>
+                <div className="mt-5" data-testid="emi-split">
+                  <div className="flex h-3 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={`Next EMI ${rupees(part.amount)}: ${rupees(part.principal)} off the loan, ${rupees(part.interest)} interest`}>
+                    <span className="h-full origin-left animate-grow-x rounded-l-full bg-accent" style={{ width: `${pPct}%` }} />
+                    {part.interest > 0 && <span className="h-full flex-1 origin-left animate-grow-x rounded-r-full bg-ink/20" style={{ animationDelay: '.15s' }} />}
+                  </div>
+                  <div className="mt-2 flex justify-between gap-3 text-[12.5px]">
+                    <span className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-accent" aria-hidden="true" />
+                      <span className="text-ink2">Off the loan</span> <span className="num font-semibold">{rupees(part.principal)}</span>
+                    </span>
+                    {part.interest > 0 && (
+                      <span className="flex items-center gap-1.5">
+                        <span className="h-2 w-2 rounded-full bg-ink/20" aria-hidden="true" />
+                        <span className="text-ink2">Interest</span> <span className="num font-semibold">{rupees(part.interest)}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={`mt-4 grid gap-2 ${manual ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {manual && (
+                    <button type="button" className={`${dueNow ? 'btn-accent' : 'btn-quiet'} min-h-[42px] px-3 text-[14px]`} onClick={() => store.payDebt(d.id)}>
+                      Mark as paid
+                    </button>
+                  )}
+                  <button type="button" className="btn-quiet min-h-[42px] px-3 text-[14px]" onClick={() => ui.openSheet({ type: 'debt-early', debtId: d.id })}>
+                    Paid early / extra
+                  </button>
+                </div>
+              </>
+            )}
+
             {!paidOff && (
-            <div className="mt-5 rounded-2xl bg-sunk/70 p-4">
-              <p className="text-[14px] font-semibold">Payoff projection</p>
-              <label htmlFor={`extra-${d.id}`} className="mt-3 flex justify-between text-[13.5px] text-ink2">
-                <span>Extra each month</span>
-                <span className="num font-semibold text-ink">+{rupees(extra)}</span>
-              </label>
-              <input id={`extra-${d.id}`} type="range" min={0} max={5000} step={250} value={extra} onChange={(e) => setExtra(Number(e.target.value))} className="mt-2 w-full accent-[rgb(var(--accent))]" />
-              {faster ? (
-                <p className="mt-3 text-[15px]">
-                  Debt-free in <span className="num font-semibold">{faster} months</span>
-                  {done && <> ({monthName(done)} {done.slice(0, 4)})</>}.
-                </p>
-              ) : (
-                <p className="mt-3 text-[15px]">At this payment the interest grows faster than you pay it off. Try a bigger amount.</p>
-              )}
-              {extra > 0 && base && faster && (
-                <p className="mt-1 text-[14px] text-pos">
-                  {base - faster} months sooner and about {rupees(intBase - intFast)} less interest.
-                </p>
-              )}
-              <p className="mt-1 text-[12.5px] text-ink3">Estimate assumes a fixed rate and on-time payments.</p>
-            </div>
+              <div className="mt-5 border-t border-line pt-4">
+                <div className="flex items-center gap-3">
+                  <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent-ink" aria-hidden="true">
+                    <Icon name="target" size={18} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12.5px] text-ink3">Debt-free by</span>
+                    <span className="block text-[17px] font-semibold" data-testid="debt-free-date">
+                      {done ? `${monthName(done)} ${done.slice(0, 4)}` : 'EMI is below the interest'}
+                    </span>
+                  </span>
+                  {faster != null && <span className="num shrink-0 rounded-full bg-sunk px-2.5 py-1 text-[12.5px] font-semibold">{faster} months</span>}
+                </div>
+                {open ? (
+                  <div className="mt-4 rounded-2xl bg-sunk/70 p-4">
+                    <label htmlFor={`extra-${d.id}`} className="flex justify-between text-[13.5px] text-ink2">
+                      <span>Extra each month</span>
+                      <span className="num font-semibold text-ink">+{rupees(extra)}</span>
+                    </label>
+                    <input id={`extra-${d.id}`} type="range" min={0} max={5000} step={250} value={extra} onChange={(e) => setExtra(Number(e.target.value))} className="mt-2 w-full accent-[rgb(var(--accent))]" />
+                    <p className={`mt-2 text-[14px] font-semibold ${extra > 0 && base && faster ? 'text-pos' : 'text-ink3'}`}>
+                      {extra > 0 && base && faster ? `${base - faster} months sooner · ${rupees(intBase - intFast)} less interest` : 'Slide to see what changes.'}
+                    </p>
+                  </div>
+                ) : (
+                  <button type="button" className="mt-3 flex items-center gap-1 text-[13.5px] font-semibold text-accent-ink" onClick={() => { setExtra(1000); setWhatIf(d.id); }}>
+                    What if I pay extra? <Icon name="chevron" size={15} />
+                  </button>
+                )}
+              </div>
             )}
           </article>
         );
       })}
-      <p className="mt-6 px-1 text-[13.5px] text-ink3">
-        {state.cards.length > 0 ? `Card balances (${rupees(state.cards.reduce((a, c) => a + c.balance, 0))}) are tracked under Credit cards.` : 'Credit cards are tracked separately under Credit cards.'}
-      </p>
     </div>
   );
 }
