@@ -142,9 +142,9 @@ export interface Plan {
   contributions: { date: ISODate; amount: number }[];
 }
 
-export type InvestmentKind = 'sip' | 'rd' | 'ppf' | 'nps' | 'other';
+export type InvestmentKind = 'sip' | 'rd' | 'fd' | 'ppf' | 'nps' | 'gold' | 'other';
 
-/** A recurring investment such as a mutual fund SIP, recurring deposit, PPF or NPS. */
+/** An investment: a mutual fund SIP, RD, PPF, NPS or gold that repeats, or a one-time fixed deposit (FD). */
 export interface Investment {
   id: ID;
   name: string;
@@ -169,6 +169,8 @@ export interface Investment {
   lastStepUp?: ISODate;
   /** Money put in before the person started using PULSE (older instalments). */
   priorInvested?: number;
+  /** RD and FD: how long it runs, in months, from startDate. */
+  tenureMonths?: number;
 }
 
 export type InsuranceKind = 'health' | 'life' | 'vehicle' | 'travel' | 'other';

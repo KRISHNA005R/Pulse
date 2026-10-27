@@ -11,6 +11,7 @@ import { isAuto } from './auto';
 import { mainIncome, upcoming } from './finance';
 import { addDays, rupees } from './format';
 import { streak } from './streak';
+import { INV_PREFIX } from './invest';
 
 export const DEFAULT_REMINDERS: ReminderPrefs = { daily: true, dailyAt: '21:00', payday: true, bills: true, streak: true, weekly: true, details: false, message: true };
 export const prefsOf = (s: State): ReminderPrefs => ({ ...DEFAULT_REMINDERS, ...(s.settings.reminders ?? {}) });
@@ -72,7 +73,7 @@ export function buildReminders(s: State, p: ReminderPrefs = prefsOf(s), now = ne
     const byDate = new Map<string, { name: string; amount: number }[]>();
     for (const u of upcoming(s, addDays(today, 32))) {
       if (u.date <= today) continue;
-      byDate.set(u.date, [...(byDate.get(u.date) ?? []), { name: u.name.replace(/^SIP · /, ''), amount: u.amount }]);
+      byDate.set(u.date, [...(byDate.get(u.date) ?? []), { name: u.name.replace(INV_PREFIX, ''), amount: u.amount }]);
     }
     for (const [date, items] of byDate) {
       const total = items.reduce((a, x) => a + x.amount, 0);

@@ -2,6 +2,7 @@ import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSou
 import { hasCents, roundMoney, scaled } from './currency';
 import { bhisiDues } from './bhisi';
 import { INSURANCE_ON } from './features';
+import { investmentLabel, kindMeta } from './invest';
 import {
   addDays,
   addMonths,
@@ -160,9 +161,9 @@ export function upcoming(s: State, until: ISODate, includeIncome = false): Upcom
     if (due < until) out.push({ id: d.id, name: emiName(d), amount: emiParts(d).amount, date: due, kind: 'loan', ref: d.id, auto: d.autoDebit !== false });
   }
   for (const inv of s.investments ?? []) {
-    if (inv.status !== 'active') continue;
+    if (inv.status !== 'active' || !kindMeta(inv.kind).recurring) continue;
     if (inv.nextDate >= s.today && inv.nextDate < until)
-      out.push({ id: inv.id, name: `SIP · ${inv.name}`, amount: inv.amount, date: inv.nextDate, kind: 'investment', ref: inv.id });
+      out.push({ id: inv.id, name: investmentLabel(inv), amount: inv.amount, date: inv.nextDate, kind: 'investment', ref: inv.id });
   }
   for (const p of INSURANCE_ON ? (s.insurance ?? []) : []) {
     // A premium that's past due and not recorded yet still has to be paid, so it stays on the list.
@@ -685,12 +686,13 @@ export function payoffInterest(balance: number, ratePct: number, payment: number
 export const CYCLE_MONTHS: Record<Investment['cycle'], number> = { monthly: 1, quarterly: 3, yearly: 12 };
 
 export function investmentMonthly(inv: Investment): number {
+  if (!kindMeta(inv.kind).recurring) return 0; // an FD is one deposit, not a monthly debit
   return inv.amount / CYCLE_MONTHS[inv.cycle];
 }
 
 export function investmentTotals(s: State) {
   const list = s.investments ?? [];
-  const active = list.filter((i) => i.status === 'active');
+  const active = list.filter((i) => i.status === 'active' && kindMeta(i.kind).recurring);
   const monthly = Math.round(active.reduce((a, i) => a + investmentMonthly(i), 0));
   const holdings = holdingAccounts(s).reduce((a, x) => a + x.balance, 0);
   const next = active.slice().sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0];

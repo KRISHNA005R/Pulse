@@ -26,6 +26,7 @@ import { CATEGORIES, createSeed } from '../data/seed';
 import { roundMoney, setCurrency } from '../lib/currency';
 import { burst } from '../lib/celebrate';
 import { stamp } from '../lib/motion';
+import { investmentLabel, kindMeta, maturityDate } from '../lib/invest';
 import { INSURANCE_ON } from '../lib/features';
 import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
@@ -121,8 +122,15 @@ export function processDueInvestments(s: State): Transaction[] {
   const made: Transaction[] = [];
   for (const inv of s.investments ?? []) {
     if (inv.status !== 'active' || !inv.autoDeduct) continue;
+    const meta = kindMeta(inv.kind);
+    const ends = maturityDate(inv);
     let guard = 0;
     while (inv.nextDate <= s.today && guard++ < 24) {
+      // An RD stops once its term is over; nothing more is debited.
+      if (meta.recurring && ends && inv.kind === 'rd' && inv.nextDate >= ends) {
+        inv.status = 'stopped';
+        break;
+      }
       // Yearly step-up: on each anniversary of the start date, the instalment grows by stepUp %.
       if (inv.stepUp && inv.stepUp > 0) {
         let base = inv.lastStepUp ?? inv.startDate;
@@ -136,7 +144,7 @@ export function processDueInvestments(s: State): Transaction[] {
       const tx: Transaction = {
         // Same id on every device, so two synced phones recording the same debit don't double it.
         id: `sip-${inv.id}-${inv.nextDate}`,
-        merchant: `SIP · ${inv.name}`,
+        merchant: investmentLabel(inv),
         amount: inv.amount,
         type: 'transfer',
         direction: 'out',
@@ -152,7 +160,13 @@ export function processDueInvestments(s: State): Transaction[] {
       s.transactions.unshift(tx);
       applyMoney(s, tx, 1);
       made.push(tx);
+      // An FD is paid in once: after that it just sits there until it matures.
+      if (!meta.recurring) {
+        inv.autoDeduct = false;
+        break;
+      }
       inv.nextDate = addMonths(inv.nextDate, CYCLE_MONTHS[inv.cycle]);
+      if (inv.kind === 'rd' && ends && inv.nextDate >= ends) inv.status = 'stopped';
     }
   }
   return made;
@@ -1627,7 +1641,7 @@ function useStoreImpl() {
         const x = s.investments.find((y) => y.id === id);
         if (x) x.status = status;
       });
-      toast({ text: status === 'active' ? 'SIP resumed.' : status === 'paused' ? 'SIP paused. Nothing will be deducted until you resume.' : 'SIP stopped.' });
+      toast({ text: status === 'active' ? 'Resumed.' : status === 'paused' ? 'Paused. Nothing will be deducted until you resume.' : 'Stopped.' });
     },
     [commit, toast],
   );

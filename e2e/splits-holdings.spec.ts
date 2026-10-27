@@ -34,7 +34,7 @@ test('Splits with 4 people: still 3 on top plus "See all"', async ({ page }) => 
 test('Add holding: no safe-to-spend option, and the new holding never counts as spendable', async ({ page }) => {
   await openDemo(page);
   await tab(page, 'You');
-  await page.getByRole('button', { name: /Investments & SIPs/ }).click();
+  await page.getByRole('button', { name: /^Investments/ }).click();
   await page.getByRole('button', { name: 'Add holding' }).click();
   const sheet = page.getByRole('dialog').last();
   await expect(sheet.getByRole('heading', { name: 'Add holding' })).toBeVisible();
@@ -49,7 +49,7 @@ test('Add holding: no safe-to-spend option, and the new holding never counts as 
 test('Edit a holding: no safe-to-spend option either', async ({ page }) => {
   await openDemo(page);
   await tab(page, 'You');
-  await page.getByRole('button', { name: /Investments & SIPs/ }).click();
+  await page.getByRole('button', { name: /^Investments/ }).click();
   await page.locator('section[aria-labelledby="inv-hold"]').getByRole('button', { name: /Mutual funds/ }).click();
   const sheet = page.getByRole('dialog').last();
   await expect(sheet.getByRole('heading', { name: 'Edit holding' })).toBeVisible();

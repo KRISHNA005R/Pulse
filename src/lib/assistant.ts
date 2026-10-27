@@ -25,6 +25,7 @@ import {
 } from './finance';
 import { addDays, fmtDate, monthName, monthShort, parseDate, relDay, rupees } from './format';
 import { guessCategory } from './parse';
+import { kindMeta, maturityDate, maturityValue } from './invest';
 import { monthIn, parseAction, type AIAction } from './aiActions';
 import { buildRecap } from './insights';
 import { yearSummary } from './history';
@@ -79,7 +80,7 @@ export function plainStarters(s: State): string[] {
     'How much can I spend this weekend?',
     'What changed from last month?',
     'What are my biggest recurring expenses?',
-    ...(s.investments?.length ? ['How much am I investing in SIPs?'] : []),
+    ...(s.investments?.length ? ['How much am I investing?'] : []),
     'How did I spend this year?',
   ];
   if (!s.transactions.length) return [`Add ${ex(450)} dinner`, `Got salary ${ex(40000)}`, `Add Netflix ${ex(199)} monthly`, 'How much can I spend today?', `Can I afford ${ex(3000)}?`, 'How much can I spend this weekend?', ...(plan ? [`When will I reach my ${plan.name} goal?`] : [])];
@@ -172,7 +173,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
   if (openHit) {
     const t = openHit[1];
     const map: [RegExp, string, AILink][] = [
-      [/invest|sip/, 'Investments & SIPs', { kind: 'route', tab: 'you', route: { name: 'investments' } }],
+      [/invest|sip|\bfd\b|\brd\b|ppf/, 'Investments', { kind: 'route', tab: 'you', route: { name: 'investments' } }],
       [/feedback/, 'Send feedback', { kind: 'route', tab: 'you', route: { name: 'feedback' } }],
       [/subscri|bills?|recurring/, 'Subscriptions & bills', { kind: 'route', tab: 'you', route: { name: 'subscriptions' } }],
       [/net ?worth/, 'Net worth', { kind: 'route', tab: 'you', route: { name: 'networth' } }],
@@ -237,17 +238,42 @@ export function askPulse(s: State, asked: string): AIAnswer {
     };
   }
 
-  // --- SIPs / investments ---
-  if (/\bsips?\b|invest|mutual fund|\bmf\b|\brd\b|\bppf\b|\bnps\b/.test(q)) {
+  // --- Investments: SIPs, RDs, FDs, PPF, NPS, gold ---
+  if (/\bsips?\b|invest|mutual fund|\bmf\b|\brd\b|\bfd\b|fixed deposit|recurring deposit|\bppf\b|\bnps\b|\bgold\b/.test(q)) {
     const t = investmentTotals(s);
-    const list = (s.investments ?? []).filter((i) => i.status === 'active');
-    if (!list.length) return { text: "You haven't set up any SIPs yet. Add one in You → Investments & SIPs and I'll deduct it every month and keep it aside before payday." };
-    const rate = list.reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / Math.max(1, t.monthly);
+    const all = (s.investments ?? []).filter((i) => i.status === 'active');
+    const list = all.filter((i) => kindMeta(i.kind).recurring);
+    const fds = all.filter((i) => i.kind === 'fd');
+    if (!all.length) return { text: "You haven't added any investments yet. Add a SIP, RD, FD or PPF in You → Investments and I'll record each debit and keep it aside before payday." };
+    const rate = list.length ? list.reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / Math.max(1, t.monthly) : 7;
     const p10 = sipProjection(t.monthly, 10, rate, t.holdings);
     const thisMonth = investedBetween(s, mStart, today);
+    const kinds = [...new Set(list.map((i) => kindMeta(i.kind).short))];
+    const fdNext = fds.map((i) => ({ i, at: maturityDate(i) })).filter((x) => x.at && x.at > today).sort((a, b) => a.at!.localeCompare(b.at!))[0];
+    const parts = [
+      list.length ? `You invest ${rupees(t.monthly)} a month across ${list.length} ${list.length === 1 ? kinds[0] : kinds.length === 1 ? `${kinds[0]}s` : `investments (${kinds.join(', ')})`}. ${rupees(thisMonth)} has gone in this month.` : '',
+      t.next ? `Next debit: ${rupees(t.next.amount)} for ${t.next.name} on ${fmtDate(t.next.nextDate)}.` : '',
+      fds.length ? `You also have ${fds.length} FD${fds.length > 1 ? 's' : ''} worth ${rupees(fds.reduce((a, i) => a + i.amount, 0))}${fdNext ? `; ${fdNext.i.name} matures on ${fmtDate(fdNext.at!, true)}` : ''}.` : '',
+      list.length ? `Keep it up for 10 years at about ${Math.round(rate * 10) / 10}% a year and it could be worth around ${rupees(p10.value)} (an estimate, not a promise).` : '',
+    ];
     return {
-      text: `You invest ${rupees(t.monthly)} a month across ${list.length} SIP${list.length > 1 ? 's' : ''}. ${rupees(thisMonth)} has gone in this month. Next debit: ${rupees(t.next!.amount)} for ${t.next!.name} on ${fmtDate(t.next!.nextDate)}. Keep it up for 10 years at about ${Math.round(rate * 10) / 10}% a year and it could be worth around ${rupees(p10.value)} (an estimate, not a promise).`,
-      blocks: [{ type: 'list', rows: [...list.map((i) => ({ label: i.name, value: `${rupees(i.amount)}/${i.cycle === 'monthly' ? 'mo' : i.cycle === 'quarterly' ? 'qtr' : 'yr'}`, sub: `${i.platform ? `${i.platform} · ` : ''}next ${relDay(i.nextDate, today).toLowerCase()}` })), { label: 'Current value of holdings', value: rupees(t.holdings) }] }],
+      text: parts.filter(Boolean).join(' '),
+      blocks: [
+        {
+          type: 'list',
+          rows: [
+            ...all.map((i) => {
+              const m = kindMeta(i.kind);
+              const at = maturityDate(i);
+              const worth = maturityValue(i);
+              return m.recurring
+                ? { label: `${m.short} · ${i.name}`, value: `${rupees(i.amount)}/${i.cycle === 'monthly' ? 'mo' : i.cycle === 'quarterly' ? 'qtr' : 'yr'}`, sub: `${i.platform ? `${i.platform} · ` : ''}next ${relDay(i.nextDate, today).toLowerCase()}` }
+                : { label: `${m.short} · ${i.name}`, value: rupees(i.amount), sub: at ? `${i.expectedReturn}% · matures ${fmtDate(at, true)}${worth ? ` · ${rupees(worth)}` : ''}` : `${i.expectedReturn}%` };
+            }),
+            { label: 'Current value of holdings', value: rupees(t.holdings) },
+          ],
+        },
+      ],
       followups: ['How much can I spend this weekend?', 'What is my net worth?'],
     };
   }

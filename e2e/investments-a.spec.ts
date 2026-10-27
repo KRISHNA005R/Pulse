@@ -8,7 +8,7 @@ import { openDemo, state } from './helpers';
 async function open(page: Page) {
   await openDemo(page);
   await page.locator('nav').getByRole('button', { name: 'You' }).first().click();
-  await page.getByRole('button', { name: /Investments & SIPs/ }).click();
+  await page.getByRole('button', { name: /^Investments/ }).click();
   await expect(page.getByRole('heading', { name: 'Investments' })).toBeVisible();
 }
 const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;

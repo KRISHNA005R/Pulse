@@ -58,6 +58,7 @@ const accounts: Account[] = [
   { id: 'cash', name: 'Cash', institution: 'Wallet', type: 'cash', balance: 1240, spendable: true },
   { id: 'groww', name: 'Mutual funds', institution: 'Groww', type: 'investment', balance: 84200, spendable: false },
   { id: 'zerodha', name: 'Stocks', institution: 'Zerodha', type: 'investment', balance: 31800, spendable: false },
+  { id: 'hdfc-fd', name: 'HDFC FD', institution: 'HDFC Bank', type: 'investment', balance: 50000, spendable: false },
 ];
 
 const cards: CreditCard[] = [
@@ -263,6 +264,7 @@ const subscriptions: Subscription[] = [
 
 const investments: Investment[] = [
   { id: 'inv-ppfas', name: 'Parag Parikh Flexi Cap', platform: 'Groww', kind: 'sip', amount: 2000, cycle: 'monthly', nextDate: '2026-10-05', status: 'active', fromAccount: 'hdfc', toAccount: 'groww', startDate: '2025-04-05', expectedReturn: 12, autoDeduct: true, fundType: 'flexi', stepUp: 10, lastStepUp: '2026-04-05', priorInvested: 30200 },
+  { id: 'inv-fd', name: 'HDFC FD', platform: 'HDFC Bank', kind: 'fd', amount: 50000, cycle: 'monthly', nextDate: '2026-03-12', status: 'active', fromAccount: 'hdfc', toAccount: 'hdfc-fd', startDate: '2026-03-12', expectedReturn: 7.1, autoDeduct: false, priorInvested: 50000, tenureMonths: 12 },
   { id: 'inv-nifty', name: 'UTI Nifty 50 Index', platform: 'Zerodha Coin', kind: 'sip', amount: 1000, cycle: 'monthly', nextDate: '2026-10-15', status: 'active', fromAccount: 'hdfc', toAccount: 'zerodha', startDate: '2025-10-15', expectedReturn: 11, autoDeduct: true, fundType: 'index', priorInvested: 10000 },
 ];
 

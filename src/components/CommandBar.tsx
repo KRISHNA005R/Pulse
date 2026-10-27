@@ -92,7 +92,7 @@ export function CommandBar({ initial = '' }: { initial?: string; onClose?: () =>
       [/net ?worth|worth/, { id: 's-nw', icon: 'trend', label: 'Net worth', run: go(() => ui.resetTo('you', { name: 'networth' })) }],
       [/recap|wrapped|month/, { id: 's-recap', icon: 'spark', label: 'Monthly recap', run: go(() => ui.openSheet({ type: 'recap' })) }],
       [/card|credit/, { id: 's-cards', icon: 'card', label: 'Credit cards', run: go(() => ui.resetTo('you', { name: 'cards' })) }],
-      [/\bsips?\b|invest|mutual|\bppf\b|\bnps\b|\brd\b/, { id: 's-inv', icon: 'trend', label: 'Investments & SIPs', run: go(() => ui.resetTo('you', { name: 'investments' })) }],
+      [/\bsips?\b|invest|mutual|\bppf\b|\bnps\b|\brd\b|\bfd\b|fixed deposit|gold/, { id: 's-inv', icon: 'trend', label: 'Investments', run: go(() => ui.resetTo('you', { name: 'investments' })) }],
       ...(INSURANCE_ON ? ([[/insur|premium|polic/, { id: 's-ins', icon: 'shield', label: 'Insurance', run: go(() => ui.resetTo('you', { name: 'insurance' })) }]] as [RegExp, Cmd][]) : []),
       [/remind|notif|alert|nudge/, { id: 's-rem', icon: 'bell', label: 'Reminders', run: go(() => ui.resetTo('you', { name: 'reminders' })) }],
       [/feedback|bug|problem|suggest/, { id: 's-fb', icon: 'message', label: 'Send feedback', run: go(() => ui.resetTo('you', { name: 'feedback' })) }],

@@ -9,9 +9,10 @@ import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
-import { addMonths, fmtDate, haptic, rupees, rupeesShort } from '../lib/format';
+import { addMonths, fmtDate, haptic, monthName, rupees, rupeesShort } from '../lib/format';
 import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closingCharge, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
+import { INV_KIND_ORDER, INV_META, kindMeta, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { PeoplePicker } from './People';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
 
@@ -1090,14 +1091,6 @@ export function BackupPanel() {
 // ------------------------------------------------------------------
 // SIPs and other recurring investments
 // ------------------------------------------------------------------
-const INV_KINDS: { value: InvestmentKind; label: string; rate: number }[] = [
-  { value: 'sip', label: 'Mutual fund SIP', rate: 11 },
-  { value: 'rd', label: 'Recurring deposit (RD)', rate: 7 },
-  { value: 'ppf', label: 'PPF', rate: 7.1 },
-  { value: 'nps', label: 'NPS', rate: 10 },
-  { value: 'other', label: 'Other', rate: 8 },
-];
-
 /**
  * Most people have no idea what "expected return" to type. Offer sensible presets for the
  * kind of investment, say where to find the real number, and keep it clearly a guess.
@@ -1119,6 +1112,21 @@ const RETURN_GUIDE: Record<InvestmentKind, { presets: { label: string; rate: num
       { label: 'Small finance bank', rate: 7.5 },
     ],
     how: 'An RD has a fixed rate. It is printed on your RD receipt and shown in your bank app next to the deposit.',
+  },
+  fd: {
+    presets: [
+      { label: 'Post office / PSU bank', rate: 6.9 },
+      { label: 'Private bank', rate: 7.1 },
+      { label: 'Small finance bank', rate: 8 },
+    ],
+    how: 'An FD has a fixed rate for its whole term. It is on your FD receipt and in your bank app next to the deposit.',
+  },
+  gold: {
+    presets: [
+      { label: 'Cautious', rate: 7 },
+      { label: 'Long-run average', rate: 9 },
+    ],
+    how: 'Gold moves with world prices. Over long periods it has grown roughly 8–10% a year in rupees, but some years it falls.',
   },
   ppf: {
     presets: [{ label: 'Current PPF rate', rate: 7.1 }],
@@ -1171,7 +1179,7 @@ function ReturnField({ kind, rate, setRate, fundType, setFundType }: { kind: Inv
         ))}
       </div>
       <label htmlFor="inv-rate" className="mt-1 text-[13px] font-semibold text-ink2">
-        Expected return, % a year
+        {kindMeta(kind).fixedRate ? 'Interest rate, % a year' : 'Expected return, % a year'}
       </label>
       <div className="relative">
         <input id="inv-rate" inputMode="decimal" className="field num pr-10" value={rate} onChange={(e) => setRate(e.target.value.replace(/[^\d.]/g, ''))} aria-describedby="inv-rate-help" />
@@ -1182,7 +1190,7 @@ function ReturnField({ kind, rate, setRate, fundType, setFundType }: { kind: Inv
           How do I know my number?
         </button>
         {open ? <p className="mt-1.5 rounded-xl bg-sunk p-3 text-[13px] text-ink2">{guide.how}</p> : null}
-        <p className="mt-1">Only used to estimate growth. Returns are never guaranteed.</p>
+        <p className="mt-1">{kind === 'ppf' ? 'Set by the government every quarter.' : kindMeta(kind).fixedRate ? 'Fixed by your bank for the whole term.' : 'Only used to estimate growth. Returns are never guaranteed.'}</p>
       </div>
     </div>
   );
@@ -1199,12 +1207,36 @@ function lastAnniversary(start: ISODate, today: ISODate): ISODate {
   return base;
 }
 
+/** Step one of adding an investment: what kind is it? Each kind gets its own short form. */
+function KindPicker({ value, onChange }: { value: InvestmentKind; onChange: (k: InvestmentKind) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Type of investment" className="grid grid-cols-2 gap-2">
+      {INV_KIND_ORDER.map((k) => {
+        const m = INV_META[k];
+        const on = value === k;
+        return (
+          <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onChange(k)} className={`tap flex min-h-[64px] items-start gap-2.5 rounded-2xl border p-3 text-left transition-colors ${on ? 'border-accent bg-accent-soft' : 'border-line bg-surface hover:border-ink3'}`}>
+            <span className="text-[20px] leading-none" aria-hidden="true">
+              {m.emoji}
+            </span>
+            <span className="min-w-0">
+              <span className={`block text-[14px] font-semibold leading-tight ${on ? 'text-accent-ink' : ''}`}>{m.label}</span>
+              <span className="mt-0.5 block text-[12px] leading-snug text-ink3">{m.blurb}</span>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function InvestmentForm({ investmentId, onDone }: { investmentId?: string; onDone: () => void }) {
   const store = useStore();
   const { state } = store;
   const ex = state.investments.find((i) => i.id === investmentId);
   const investAccts = state.accounts.filter((a) => a.type === 'investment' || a.type === 'savings');
   const [kind, setKind] = useState<InvestmentKind>(ex?.kind ?? 'sip');
+  const meta = kindMeta(kind);
   const [name, setName] = useState(ex?.name ?? '');
   const [platform, setPlatform] = useState(ex?.platform ?? '');
   const [amount, setAmount] = useState(ex ? String(ex.amount) : '');
@@ -1221,9 +1253,29 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
   const [priorEdited, setPriorEdited] = useState(ex?.priorInvested != null);
   const [prior, setPrior] = useState(ex?.priorInvested != null ? String(ex.priorInvested) : '');
   const [value, setValue] = useState('');
+  const [tenure, setTenure] = useState(ex?.tenureMonths ?? meta.defaultTenure ?? 12);
+  // An FD: either paid from an account today, or one you already have.
+  const [fdSource, setFdSource] = useState<'now' | 'have'>(ex ? (ex.priorInvested ? 'have' : 'now') : 'now');
+
+  const pickKind = (k: InvestmentKind) => {
+    const m = kindMeta(k);
+    setKind(k);
+    setRate(String(k === 'sip' && fundType ? FUND_TYPES.find((f) => f.value === fundType)!.rate : m.rate));
+    if (!m.cycles.includes(cycle)) setCycle(m.cycles[0]);
+    if (m.defaultTenure) setTenure(m.defaultTenure);
+    if (!m.stepUp) setStepUp('0');
+    if (k === 'fd') setTo('__new');
+  };
+
   const n = roundMoney(parseFloat(amount) || 0);
-  const step = Math.max(0, parseFloat(stepUp) || 0);
-  const proj = sipProjection(n / CYCLE_MONTHS[cycle], 10, parseFloat(rate) || 0, 0, step);
+  const r = parseFloat(rate) || 0;
+  const step = meta.stepUp ? Math.max(0, parseFloat(stepUp) || 0) : 0;
+  const isFd = kind === 'fd';
+  const fdStart = isFd && fdSource === 'now' ? state.today : started;
+  const proj = sipProjection(n / CYCLE_MONTHS[cycle], 10, r, 0, step);
+  const matDate = maturityDate({ kind, startDate: isFd ? fdStart : started, tenureMonths: meta.tenures ? tenure : undefined });
+  const matValue = maturityValue({ kind, amount: n, expectedReturn: r, tenureMonths: meta.tenures ? tenure : undefined, cycle });
+  const ppfYearly = kind === 'ppf' ? (cycle === 'yearly' ? n : n * 12) : 0;
   // Instalments from the start date up to the first one PULSE records (or today, whichever is first).
   const priorUntil = ex ? (ex.startDate < state.today ? minDate(state.today, firstRecorded(state, ex.id) ?? state.today) : state.today) : minDate(state.today, next);
   const est = estimateInvested(n, started, priorUntil, cycle, step);
@@ -1231,150 +1283,210 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
   const isPast = started < state.today;
   const recorded = ex ? investedIn(state, ex.id) : 0;
   const valid = name.trim() && n > 0;
-  const dueNow = auto && next <= state.today && status === 'active';
+  const dueNow = meta.recurring && auto && next <= state.today && status === 'active';
+  const per = cycle === 'monthly' ? 'month' : cycle === 'quarterly' ? 'quarter' : 'year';
 
   return (
     <div className="flex flex-col gap-4">
-      <Field label="Type" htmlFor="inv-kind">
-        <select
-          id="inv-kind"
-          className="field"
-          value={kind}
-          onChange={(e) => {
-            const k = e.target.value as InvestmentKind;
-            setKind(k);
-            if (!ex) setRate(String(k === 'sip' && fundType ? FUND_TYPES.find((f) => f.value === fundType)!.rate : INV_KINDS.find((x) => x.value === k)!.rate));
-          }}
-        >
-          {INV_KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      {ex ? (
+        <p className="inline-flex items-center gap-2 self-start rounded-full bg-sunk px-3 py-1.5 text-[13px] font-semibold">
+          <span aria-hidden="true">{meta.emoji}</span> {meta.label}
+        </p>
+      ) : (
+        <KindPicker value={kind} onChange={pickKind} />
+      )}
       <div className="grid grid-cols-2 gap-3">
-        <Field label={kind === 'sip' ? 'Fund name' : 'Name'} htmlFor="inv-name">
-          <input id="inv-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === 'sip' ? 'Nifty 50 Index Fund' : kind === 'rd' ? 'SBI RD' : 'PPF account'} />
+        <Field label={meta.nameLabel} htmlFor="inv-name">
+          <input id="inv-name" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={meta.namePlaceholder} />
         </Field>
-        <Field label="App or bank" htmlFor="inv-platform">
-          <input id="inv-platform" className="field" value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder="Groww, Zerodha, SBI…" />
+        <Field label={meta.platformLabel} htmlFor="inv-platform">
+          <input id="inv-platform" className="field" value={platform} onChange={(e) => setPlatform(e.target.value)} placeholder={meta.platformPlaceholder} />
         </Field>
       </div>
       <div className="rounded-2xl bg-sunk/60">
-        <MoneyInput value={amount} onChange={setAmount} label="Instalment amount" size="md" id="inv-amount" />
-        <p className="-mt-1 pb-2 text-center text-[12.5px] text-ink3">Amount each {cycle === 'monthly' ? 'month' : cycle === 'quarterly' ? 'quarter' : 'year'}</p>
+        <MoneyInput value={amount} onChange={setAmount} label={meta.amountLabel} size="md" id="inv-amount" />
+        <p className="-mt-1 pb-2 text-center text-[12.5px] text-ink3">{meta.recurring ? `Each ${per}` : 'Put in once'}</p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Repeats" htmlFor="inv-cycle">
-          <select id="inv-cycle" className="field" value={cycle} onChange={(e) => setCycle(e.target.value as Investment['cycle'])}>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="yearly">Yearly</option>
-          </select>
-        </Field>
-        <Field label="Next debit date" htmlFor="inv-next">
-          <input id="inv-next" type="date" className="field px-2" value={next} onChange={(e) => e.target.value && setNext(e.target.value)} />
-        </Field>
-        <Field label="Deducted from" htmlFor="inv-from">
-          <select id="inv-from" className="field" value={from} onChange={(e) => setFrom(e.target.value)}>
-            {state.accounts.filter((a) => a.spendable).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
+
+      {meta.tenures && (
+        <div className="flex flex-col gap-2">
+          <p id="inv-tenure-label" className="text-[13px] font-semibold text-ink2">
+            Tenure
+          </p>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Tenure">
+            {meta.tenures.map((m) => (
+              <button key={m} type="button" aria-pressed={tenure === m} onClick={() => setTenure(m)} className={`inline-flex min-h-[36px] items-center rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${tenure === m ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface text-ink2 hover:border-ink3'}`}>
+                {tenureLabel(m)}
+              </button>
             ))}
-          </select>
-        </Field>
-        <Field label="Invested into" htmlFor="inv-to">
+          </div>
+        </div>
+      )}
+
+      {isFd && !ex && (
+        <div className="flex flex-col gap-2">
+          <p className="text-[13px] font-semibold text-ink2">Where is the money from?</p>
+          <div role="radiogroup" aria-label="Where is the money from?" className="grid grid-cols-2 gap-2">
+            {([
+              ['now', 'Paying it now', 'From one of your accounts, today'],
+              ['have', 'Already have it', 'Opened before, just track it'],
+            ] as const).map(([v, label, sub]) => (
+              <button key={v} type="button" role="radio" aria-checked={fdSource === v} onClick={() => setFdSource(v)} className={`tap rounded-2xl border p-3 text-left ${fdSource === v ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
+                <span className={`block text-[14px] font-semibold ${fdSource === v ? 'text-accent-ink' : ''}`}>{label}</span>
+                <span className="block text-[12px] text-ink3">{sub}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        {meta.recurring && meta.cycles.length > 1 && (
+          <Field label="Repeats" htmlFor="inv-cycle">
+            <select id="inv-cycle" className="field" value={cycle} onChange={(e) => setCycle(e.target.value as Investment['cycle'])}>
+              {meta.cycles.map((c) => (
+                <option key={c} value={c}>
+                  {c === 'monthly' ? 'Monthly' : c === 'quarterly' ? 'Quarterly' : 'Yearly'}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {meta.recurring && (
+          <Field label="Next debit date" htmlFor="inv-next">
+            <input id="inv-next" type="date" className="field px-2" value={next} onChange={(e) => e.target.value && setNext(e.target.value)} />
+          </Field>
+        )}
+        {isFd && (fdSource === 'have' || ex) && (
+          <Field label="Opened on" htmlFor="inv-started">
+            <input id="inv-started" type="date" className="field px-2" value={started} max={state.today} onChange={(e) => e.target.value && setStarted(e.target.value)} />
+          </Field>
+        )}
+        {(meta.recurring || (isFd && fdSource === 'now' && !ex)) && (
+          <Field label={isFd ? 'Paid from' : 'Deducted from'} htmlFor="inv-from">
+            <select id="inv-from" className="field" value={from} onChange={(e) => setFrom(e.target.value)}>
+              {state.accounts.filter((a) => a.spendable).map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <Field label={isFd ? 'Kept in' : 'Invested into'} htmlFor="inv-to">
           <select id="inv-to" className="field" value={to} onChange={(e) => setTo(e.target.value)}>
             {investAccts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
             ))}
-            <option value="__new">New holding{platform ? `: ${platform}` : ''}</option>
+            <option value="__new">New holding{name || platform ? `: ${isFd ? name || platform : platform || name}` : ''}</option>
           </select>
         </Field>
       </div>
       <ReturnField kind={kind} rate={rate} setRate={setRate} fundType={fundType} setFundType={setFundType} />
 
-      <div className="flex flex-col gap-2">
-        <p id="inv-step-label" className="text-[13px] font-semibold text-ink2">
-          Step-up every year
-        </p>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="inv-step-label">
-          {STEP_UPS.map((v) => (
-            <button key={v} type="button" aria-pressed={step === v} onClick={() => setStepUp(String(v))} className={`inline-flex min-h-[36px] items-center rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${step === v ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface text-ink2 hover:border-ink3'}`}>
-              {v === 0 ? 'No step-up' : `+${v}%`}
-            </button>
-          ))}
-          <label className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-line bg-surface pl-3 pr-2 text-[13px] text-ink2">
-            <span className="sr-only">Custom step-up percent</span>
-            <input inputMode="decimal" className="num w-10 bg-transparent text-right font-semibold text-ink focus:outline-none" value={STEP_UPS.includes(step) ? '' : stepUp} placeholder="Other" onChange={(e) => setStepUp(e.target.value.replace(/[^\d.]/g, '') || '0')} />%
-          </label>
-        </div>
-        <p className="text-[12.5px] text-ink3">
-          {step > 0 && n > 0
-            ? `Your instalment rises to ${rupees(roundMoney(n * (1 + step / 100)))} after a year, then ${rupees(roundMoney(n * Math.pow(1 + step / 100, 2)))}. PULSE raises it on each anniversary of the start date.`
-            : 'Raise your SIP a little every year as your income grows. Most fund apps call this a top-up or step-up.'}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-2xl border border-line p-4">
-        <Field label="Started on" htmlFor="inv-started">
-          <input id="inv-started" type="date" className="field px-2" value={started} max={state.today} onChange={(e) => e.target.value && setStarted(e.target.value)} />
-        </Field>
-        {isPast ? (
-          <>
-            <Field label="Put in before PULSE" htmlFor="inv-prior">
-              <input
-                id="inv-prior"
-                inputMode="decimal"
-                className="field num"
-                value={priorEdited ? prior : est.total ? String(est.total) : ''}
-                placeholder={`${sym()}0`}
-                onChange={(e) => {
-                  setPriorEdited(true);
-                  setPrior(e.target.value.replace(/[^\d.]/g, ''));
-                }}
-              />
-            </Field>
-            <p className="-mt-1 text-[12.5px] text-ink3">
-              {priorEdited ? (
-                <>
-                  Using your number.{' '}
-                  <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => setPriorEdited(false)}>
-                    Estimate it for me
-                  </button>
-                </>
-              ) : est.count ? (
-                `Worked out as ${est.count} instalment${est.count === 1 ? '' : 's'} since ${fmtDate(started, true)}${step ? ', with smaller amounts before each step-up' : ''}. Your app's "invested amount" is exact, so type it in if you have it.`
-              ) : (
-                'No instalments before PULSE yet.'
-              )}
-            </p>
-            {(!ex && to === '__new') && (
-              <Field label="Current value in your app (optional)" htmlFor="inv-value">
-                <input id="inv-value" inputMode="decimal" className="field num" value={value} placeholder={priorAmount ? rupees(priorAmount) : `${sym()}0`} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ''))} />
-              </Field>
-            )}
-          </>
-        ) : (
-          <p className="text-[12.5px] text-ink3">Started earlier? Pick the real start date and PULSE adds what you've already put in to your total.</p>
-        )}
-        {(ex || isPast) && (priorAmount > 0 || recorded > 0) && (
-          <p className="rounded-xl bg-sunk p-3 text-[13.5px]">
-            Total put in so far: <span className="num font-semibold">{rupees(priorAmount + recorded)}</span>
-            {recorded > 0 && priorAmount > 0 ? <span className="text-ink3"> ({rupees(priorAmount)} before PULSE + {rupees(recorded)} recorded here)</span> : null}
+      {meta.stepUp && (
+        <div className="flex flex-col gap-2">
+          <p id="inv-step-label" className="text-[13px] font-semibold text-ink2">
+            Step-up every year
           </p>
-        )}
-      </div>
-      <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub="Records the debit on its date and moves the money into your holding" />
-      {ex && <Segmented label="Status" size="sm" value={status} onChange={setStatus} options={[{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'stopped', label: 'Stopped' }]} />}
+          <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="inv-step-label">
+            {STEP_UPS.map((v) => (
+              <button key={v} type="button" aria-pressed={step === v} onClick={() => setStepUp(String(v))} className={`inline-flex min-h-[36px] items-center rounded-full border px-3.5 text-[13px] font-semibold transition-colors ${step === v ? 'border-accent bg-accent-soft text-accent-ink' : 'border-line bg-surface text-ink2 hover:border-ink3'}`}>
+                {v === 0 ? 'No step-up' : `+${v}%`}
+              </button>
+            ))}
+            <label className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-line bg-surface pl-3 pr-2 text-[13px] text-ink2">
+              <span className="sr-only">Custom step-up percent</span>
+              <input inputMode="decimal" className="num w-10 bg-transparent text-right font-semibold text-ink focus:outline-none" value={STEP_UPS.includes(step) ? '' : stepUp} placeholder="Other" onChange={(e) => setStepUp(e.target.value.replace(/[^\d.]/g, '') || '0')} />%
+            </label>
+          </div>
+          <p className="text-[12.5px] text-ink3">
+            {step > 0 && n > 0 ? `Rises to ${rupees(roundMoney(n * (1 + step / 100)))} after a year, then ${rupees(roundMoney(n * Math.pow(1 + step / 100, 2)))}.` : 'Raise it a little every year as your income grows.'}
+          </p>
+        </div>
+      )}
+
+      {kind === 'ppf' && (
+        <p className={`rounded-xl p-3 text-[13px] ${ppfYearly > 150000 ? 'bg-warn/10 text-warn' : 'bg-sunk text-ink2'}`}>
+          {ppfYearly > 150000 ? `That's ${rupees(ppfYearly)} a year. PPF takes at most ₹1,50,000 a year; the rest earns nothing.` : 'Locked for 15 years. Up to ₹1,50,000 a year, and the interest is tax-free.'}
+        </p>
+      )}
+
+      {meta.recurring && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-line p-4">
+          <Field label="Started on" htmlFor="inv-started">
+            <input id="inv-started" type="date" className="field px-2" value={started} max={state.today} onChange={(e) => e.target.value && setStarted(e.target.value)} />
+          </Field>
+          {isPast ? (
+            <>
+              <Field label="Put in before PULSE" htmlFor="inv-prior">
+                <input
+                  id="inv-prior"
+                  inputMode="decimal"
+                  className="field num"
+                  value={priorEdited ? prior : est.total ? String(est.total) : ''}
+                  placeholder={`${sym()}0`}
+                  onChange={(e) => {
+                    setPriorEdited(true);
+                    setPrior(e.target.value.replace(/[^\d.]/g, ''));
+                  }}
+                />
+              </Field>
+              <p className="-mt-1 text-[12.5px] text-ink3">
+                {priorEdited ? (
+                  <>
+                    Using your number.{' '}
+                    <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => setPriorEdited(false)}>
+                      Estimate it for me
+                    </button>
+                  </>
+                ) : est.count ? (
+                  `About ${est.count} instalment${est.count === 1 ? '' : 's'} since ${fmtDate(started, true)}. Type the exact number from your app if you have it.`
+                ) : (
+                  'No instalments before PULSE yet.'
+                )}
+              </p>
+              {!ex && to === '__new' && (
+                <Field label="Current value in your app (optional)" htmlFor="inv-value">
+                  <input id="inv-value" inputMode="decimal" className="field num" value={value} placeholder={priorAmount ? rupees(priorAmount) : `${sym()}0`} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ''))} />
+                </Field>
+              )}
+            </>
+          ) : (
+            <p className="text-[12.5px] text-ink3">Started earlier? Pick the real start date and PULSE adds what you've already put in.</p>
+          )}
+          {(ex || isPast) && (priorAmount > 0 || recorded > 0) && (
+            <p className="rounded-xl bg-sunk p-3 text-[13.5px]">
+              Total put in so far: <span className="num font-semibold">{rupees(priorAmount + recorded)}</span>
+            </p>
+          )}
+        </div>
+      )}
+      {meta.recurring && <Toggle checked={auto} onChange={setAuto} label="Deduct automatically" sub="Records the debit on its date and moves the money into your holding" />}
+      {ex && meta.recurring && <Segmented label="Status" size="sm" value={status} onChange={setStatus} options={[{ value: 'active', label: 'Active' }, { value: 'paused', label: 'Paused' }, { value: 'stopped', label: 'Stopped' }]} />}
       {n > 0 && (
-        <p className="rounded-2xl bg-accent-soft p-3 text-[14px]">
-          {rupees(n)} {cycle === 'monthly' ? 'a month' : cycle === 'quarterly' ? 'a quarter' : 'a year'} for 10 years at {parseFloat(rate) || 0}% could grow to about <span className="num font-semibold">{rupeesShort(proj.value)}</span> from {rupeesShort(proj.invested)} put in.
+        <p className="rounded-2xl bg-accent-soft p-3 text-[14px]" data-testid="inv-maturity">
+          {isFd && matDate && matValue != null ? (
+            <>
+              On {fmtDate(matDate, true)} you get about <span className="num font-semibold">{rupees(matValue)}</span>, that's {rupees(matValue - n)} of interest.
+            </>
+          ) : kind === 'rd' && matDate && matValue != null ? (
+            <>
+              After {tenureLabel(tenure)} ({monthName(matDate)} {matDate.slice(0, 4)}) you get about <span className="num font-semibold">{rupees(matValue)}</span> from {rupees(n * tenure)} put in.
+            </>
+          ) : kind === 'ppf' && matDate && matValue != null ? (
+            <>
+              After 15 years ({matDate.slice(0, 4)}) about <span className="num font-semibold">{rupeesShort(matValue)}</span> from {rupeesShort(Math.min(ppfYearly, 150000) * 15)} put in, tax-free.
+            </>
+          ) : (
+            <>
+              {rupees(n)} a {per} for 10 years at {r}% could grow to about <span className="num font-semibold">{rupeesShort(proj.value)}</span> from {rupeesShort(proj.invested)} put in.
+            </>
+          )}
           {dueNow && <span className="mt-1 block font-semibold">The first debit is due today, so it will be recorded when you save.</span>}
+          {isFd && fdSource === 'now' && !ex && <span className="mt-1 block font-semibold">{rupees(n)} moves out of {state.accounts.find((a) => a.id === from)?.name ?? 'your account'} today.</span>}
         </p>
       )}
       <button
@@ -1383,6 +1495,7 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
           const startChanged = !ex || ex.startDate !== started || (ex.stepUp ?? 0) !== step;
+          const fdNow = isFd && fdSource === 'now' && !ex;
           store.saveInvestment(
             {
               id: ex?.id,
@@ -1390,27 +1503,28 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
               platform: platform.trim(),
               kind,
               amount: n,
-              cycle,
-              nextDate: next,
-              status,
+              cycle: meta.cycles.includes(cycle) ? cycle : meta.cycles[0],
+              nextDate: isFd ? fdStart : next,
+              status: isFd ? (ex?.status ?? 'active') : status,
               fromAccount: from,
               toAccount: to,
-              startDate: started,
-              expectedReturn: parseFloat(rate) || 0,
-              autoDeduct: auto,
+              startDate: isFd ? fdStart : started,
+              expectedReturn: r,
+              autoDeduct: isFd ? fdNow : auto,
               fundType: kind === 'sip' ? fundType : undefined,
               stepUp: step || undefined,
               // The amount typed is today's instalment, so step-ups already behind it are not applied again.
               lastStepUp: step ? (startChanged ? lastAnniversary(started, state.today) : ex?.lastStepUp) : undefined,
-              priorInvested: isPast && priorAmount > 0 ? priorAmount : undefined,
+              priorInvested: isFd ? (fdSource === 'have' ? n : ex?.priorInvested) : isPast && priorAmount > 0 ? priorAmount : undefined,
+              tenureMonths: meta.tenures ? tenure : undefined,
             },
-            platform || name,
-            !ex && to === '__new' && isPast ? roundMoney(parseFloat(value) || 0) || priorAmount : undefined,
+            isFd || kind === 'rd' || kind === 'ppf' ? name || platform : platform || name,
+            !ex && to === '__new' ? (isFd ? (fdSource === 'have' ? n : 0) : isPast ? roundMoney(parseFloat(value) || 0) || priorAmount : undefined) : undefined,
           );
           onDone();
         }}
       >
-        {ex ? 'Save' : kind === 'sip' ? 'Add SIP' : 'Add investment'}
+        {ex ? 'Save' : `Add ${meta.short === 'Investment' ? 'investment' : meta.short}`}
       </button>
       {ex && (
         <DeleteRow

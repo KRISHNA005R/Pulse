@@ -17,6 +17,7 @@ import { SubscriptionRow, TransactionList } from '../components/money';
 import { BackupPanel } from '../components/Forms';
 import { Icon } from '../components/ui/Icon';
 import { RollingNumber } from '../components/ui/RollingNumber';
+import { kindMeta, maturityDate, maturityValue } from '../lib/invest';
 import { useInstall } from '../lib/pwa';
 import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
@@ -67,7 +68,7 @@ export function YouScreen() {
         <SectionHeader id="you-money" title="Money" />
         <NavRow icon="chart" label="Spending history" sub="Yearly report, month by month" onClick={() => go({ name: 'history' })} />
         <NavRow icon="trend" label="Net worth" sub="Everything you own minus what you owe" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
-        <NavRow icon="piggy" label="Investments & SIPs" sub={investmentTotals(state).count ? `${investmentTotals(state).count} active · deducted automatically` : 'Add SIPs, RDs, PPF or NPS'} value={investmentTotals(state).monthly ? `${rupees(investmentTotals(state).monthly)}/mo` : undefined} onClick={() => go({ name: 'investments' })} />
+        <NavRow icon="piggy" label="Investments" sub={(state.investments ?? []).length ? `${(state.investments ?? []).filter((i) => i.status === 'active').length} active · SIP, RD, FD and more` : 'SIP, RD, FD, PPF, NPS or gold'} value={investmentTotals(state).monthly ? `${rupees(investmentTotals(state).monthly)}/mo` : undefined} onClick={() => go({ name: 'investments' })} />
         {INSURANCE_ON && <NavRow icon="shield" label="Insurance" sub={ins.count ? `${ins.count} ${ins.count === 1 ? 'policy' : 'policies'}${ins.next ? ` · next due ${fmtDate(ins.next.nextDate)}` : ''}` : 'Health, term life, bike or car premiums'} value={ins.yearly ? `${rupeesShort(ins.yearly)}/yr` : undefined} onClick={() => go({ name: 'insurance' })} />}
         <NavRow icon="repeat" label="Subscriptions & bills" sub={`${rec.count} recurring payments`} value={`${rupees(rec.monthly)}/mo`} onClick={() => go({ name: 'subscriptions' })} />
         <NavRow icon="briefcase" label="Income" sub="Salary, freelance and side income" onClick={() => go({ name: 'income' })} />
@@ -1013,6 +1014,7 @@ export function InvestmentsScreen() {
   const list = state.investments ?? [];
   const holdings = holdingAccounts(state);
   const activeList = list.filter((i) => i.status === 'active');
+  const monthlyList = activeList.filter((i) => kindMeta(i.kind).recurring);
   const putIn = list.reduce((a, i) => a + investedTotal(state, i), 0);
   const gain = t.holdings - putIn;
   const recent = state.transactions.filter((x) => x.category === 'investments');
@@ -1026,16 +1028,16 @@ export function InvestmentsScreen() {
       <TopNavigation
         title="Investments"
         onBack={ui.pop}
-        sub="SIPs and other money you put away every month."
+        sub="SIP, RD, FD, PPF and more."
         right={
-          <button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => ui.openSheet({ type: 'investment-form' })}>
-            <Icon name="plus" size={16} /> SIP
+          <button type="button" aria-label="Add investment" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => ui.openSheet({ type: 'investment-form' })}>
+            <Icon name="plus" size={16} /> Add
           </button>
         }
       />
 
       {list.length === 0 && holdings.length === 0 ? (
-        <EmptyState icon="trend" art="/illustrations/plant.webp" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month, keeps it aside before payday, and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
+        <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF. PULSE records each debit on its date, keeps it aside before payday, and shows what it grows to." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
       ) : (
         <div className="flex flex-col gap-4">
           {/* 1. What it's worth, and how it's split */}
@@ -1095,13 +1097,13 @@ export function InvestmentsScreen() {
           </section>
 
           {/* 2. The monthly habit */}
-          {activeList.length > 0 && (
+          {monthlyList.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               <div data-testid="tile-monthly" className="rounded-2xl bg-sunk p-4">
                 <p className="text-[12.5px] text-ink3">Every month</p>
                 <p className="num mt-0.5 text-[20px] font-bold">{rupees(t.monthly)}</p>
                 <p className="text-[12.5px] text-ink3">
-                  {activeList.length} {activeList.length === 1 ? 'SIP' : 'SIPs'}
+                  {monthlyList.length} running
                 </p>
               </div>
               <div data-testid="tile-next" className="rounded-2xl bg-accent-soft p-4">
@@ -1112,34 +1114,46 @@ export function InvestmentsScreen() {
             </div>
           )}
 
-          {/* 3. The SIPs */}
-          {list.length === 0 && <EmptyState icon="trend" art="/illustrations/plant.webp" title="No SIPs yet." body="Add a SIP and PULSE deducts it on its date every month and shows what it could grow to." action={{ label: 'Add a SIP', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />}
+          {/* 3. Every investment */}
+          {list.length === 0 && <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF and PULSE records it on its date and shows what it could grow to." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />}
           {list.length > 0 && (
             <section aria-labelledby="inv-list">
               <p id="inv-list" className="eyebrow mb-1 px-1">
-                Your SIPs
+                Your investments
               </p>
               <ul className="divide-y divide-line rounded-3xl border border-line bg-surface px-2">
-                {list.map((inv) => (
-                  <li key={inv.id}>
-                    <button type="button" className={`row-btn min-h-[64px] ${inv.status === 'stopped' ? 'opacity-60' : ''}`} onClick={() => ui.openSheet({ type: 'investment-form', investmentId: inv.id })}>
-                      <CategoryMark state={state} category="investments" size={40} />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex items-center gap-2">
-                          <span className="truncate text-[15px] font-semibold">{inv.name}</span>
-                          {inv.status !== 'active' && <StatusPill status="neutral">{inv.status === 'paused' ? 'Paused' : 'Stopped'}</StatusPill>}
+                {list.map((inv) => {
+                  const m = kindMeta(inv.kind);
+                  const ends = maturityDate(inv);
+                  const matured = !!ends && ends <= state.today;
+                  const worth = maturityValue(inv);
+                  const sub = m.recurring
+                    ? [inv.platform, `${ordinal(parseDate(inv.nextDate).getDate())} ${cycleLabel(inv.cycle)}`, inv.stepUp ? `step-up ${inv.stepUp}%/yr` : null, ends && inv.kind !== 'ppf' ? `till ${fmtDate(ends, true)}` : null]
+                    : [`${inv.expectedReturn}%`, ends ? `${matured ? 'Matured' : 'Matures'} ${monthName(ends).slice(0, 3)} ${ends.slice(0, 4)}` : null, inv.platform];
+                  return (
+                    <li key={inv.id}>
+                      <button type="button" className={`row-btn min-h-[64px] ${inv.status === 'stopped' ? 'opacity-60' : ''}`} onClick={() => ui.openSheet({ type: 'investment-form', investmentId: inv.id })}>
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] bg-sunk text-[19px]" aria-hidden="true">
+                          {m.emoji}
                         </span>
-                        <span className="block truncate text-[13px] text-ink3">{[inv.platform, `${ordinal(parseDate(inv.nextDate).getDate())} ${cycleLabel(inv.cycle)}`, inv.stepUp ? `step-up ${inv.stepUp}%/yr` : null].filter(Boolean).join(' · ')}</span>
-                      </span>
-                      <span className="shrink-0 text-right">
-                        <span className="num block text-[15px] font-semibold">{rupees(inv.amount)}</span>
-                        <span className="block text-[12px] text-ink3">{inv.status === 'active' ? relDay(inv.nextDate, state.today) : '—'}</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-[15px] font-semibold">{inv.name}</span>
+                            <span className="shrink-0 rounded-md bg-sunk px-1.5 py-px text-[11px] font-bold text-ink2">{m.short === 'Investment' ? 'Other' : m.short}</span>
+                            {inv.status !== 'active' && <StatusPill status="neutral">{matured || (inv.kind === 'rd' && inv.status === 'stopped' && ends && ends <= state.today) ? 'Done' : inv.status === 'paused' ? 'Paused' : 'Stopped'}</StatusPill>}
+                          </span>
+                          <span className="block truncate text-[13px] text-ink3">{sub.filter(Boolean).join(' · ')}</span>
+                        </span>
+                        <span className="shrink-0 text-right">
+                          <span className="num block text-[15px] font-semibold">{rupees(inv.amount)}</span>
+                          <span className="block text-[12px] text-ink3">{!m.recurring ? (worth ? `→ ${rupeesShort(worth)}` : '') : inv.status === 'active' ? relDay(inv.nextDate, state.today) : '—'}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
-              <p className="mt-2 px-1 text-[12.5px] text-ink3">SIPs due before payday are kept out of safe-to-spend and recorded on their date.</p>
+              <p className="mt-2 px-1 text-[12.5px] text-ink3">Debits due before payday are kept out of safe-to-spend.</p>
             </section>
           )}
 
@@ -1167,7 +1181,7 @@ export function InvestmentsScreen() {
   );
 }
 
-const SPLIT_COLORS = ['rgb(var(--accent))', 'rgb(var(--ink) / .72)', 'rgb(var(--ink3))', '#E9A23B', 'rgb(var(--pos))'];
+const SPLIT_COLORS = ['rgb(var(--accent))', 'rgb(var(--ink) / .72)', '#E9A23B', 'rgb(var(--pos))', 'rgb(var(--ink3))'];
 
 /** The return PULSE assumes to start with: the SIPs' own expected returns, weighted by amount. */
 function defaultRate(state: ReturnType<typeof useStore>['state']) {

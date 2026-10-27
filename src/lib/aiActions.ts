@@ -4,6 +4,7 @@ import { BACK_WORDS, FUND_TYPES } from './finance';
 import { addDays, addMonths } from './format';
 import { guessCategory, parseEntry } from './parse';
 import { categoryFor, suggestEmoji } from './lexicon';
+import { INV_META } from './invest';
 
 // PULSE AI actions: turn a plain sentence ("spent 450 on dinner", "add netflix 199 monthly",
 // "start a SIP of 2000 on the 5th") into one concrete change the person confirms with a tap.
@@ -15,6 +16,7 @@ export type AIAction =
   | { kind: 'plan'; name: string; icon: string; target: number; targetDate: ISODate }
   | { kind: 'bill'; name: string; amount: number; cycle: Subscription['cycle']; nextDate: ISODate; category: CategoryId; subKind: Subscription['kind'] }
   | { kind: 'sip'; name: string; amount: number; nextDate: ISODate; fundType?: FundType; stepUp?: number; rate: number }
+  | { kind: 'deposit'; type: 'fd' | 'rd' | 'ppf'; name: string; bank: string; amount: number; rate: number; months?: number; nextDate: ISODate }
   | { kind: 'budget'; category: CategoryId; amount: number; period: BudgetPeriod; budgetId?: string }
   | { kind: 'settle'; personId: string; personName: string; from: string; to: string; amount: number }
   | { kind: 'undo-last'; txId: string; merchant: string; amount: number; date: ISODate }
@@ -129,6 +131,20 @@ export function parseAction(s: State, input: string): AIAction | null {
   const amount = amountIn(raw);
   const today = s.today;
   const verbAdd = /\b(add|log|record|track|create|make|set ?up|set|start|new|put|save|saved|move|moved|transfer|top ?up|deposit|note)\b/.test(lower);
+
+  // --- FD / RD / PPF: "add fd of 50000 at 7.5% for 2 years in SBI", "start an RD of 2000 for 12 months" ---
+  const dep = lower.match(/\b(fd|fixed deposit|rd|recurring deposit|ppf)\b/);
+  if (dep && amount && (verbAdd || /\b(fd|rd|ppf) of\b/.test(lower))) {
+    const type = /^f/.test(dep[1]) ? 'fd' : /^(rd|rec)/.test(dep[1]) ? 'rd' : 'ppf';
+    const meta = INV_META[type];
+    const pct = lower.match(/(\d{1,2}(?:\.\d{1,2})?)\s*%/);
+    const term = lower.match(/(\d{1,3})\s*(years?|yrs?|months?|mos?)\b/);
+    const months = type === 'ppf' ? undefined : term ? Number(term[1]) * (/^y/.test(term[2]) ? 12 : 1) : meta.defaultTenure;
+    const bankM = raw.match(/\b(?:in|with|at|from)\s+([A-Za-z][A-Za-z&. ]{1,24}?)\s*(?:$|\bfor\b|\bat\b|\bof\b|,)/i);
+    const bank = bankM ? bankM[1].trim().replace(/\b(bank|a|an|the)$/i, (w) => (w.toLowerCase() === 'bank' ? 'Bank' : '')).trim() : '';
+    const short = meta.short;
+    return { kind: 'deposit', type, name: bank ? `${bank} ${short}` : meta.label, bank, amount, rate: pct ? Number(pct[1]) : meta.rate, months, nextDate: type === 'fd' ? today : (dayOfMonth(lower, today) ?? addMonths(today, 1)) };
+  }
 
   // --- SIP ---
   if (/\bsips?\b|mutual fund/.test(lower) && amount && (verbAdd || /\bsip of\b/.test(lower))) {

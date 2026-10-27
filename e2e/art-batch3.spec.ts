@@ -34,7 +34,7 @@ test('empty lists in You: calendar (bills), card (credit cards), plant (SIPs), c
   await looksRight(page.getByTestId('empty-art'), 'calendar');
   await youRow(page, /Credit cards/);
   await looksRight(page.getByTestId('empty-art'), 'card');
-  await youRow(page, /Investments & SIPs/);
+  await youRow(page, /^Investments/);
   await looksRight(page.getByTestId('empty-art'), 'plant');
   await youRow(page, /^Income/);
   await looksRight(page.getByTestId('empty-art'), 'coins');

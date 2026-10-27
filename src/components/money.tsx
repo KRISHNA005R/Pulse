@@ -265,7 +265,7 @@ export function SafeBreakdown() {
       <p className="mb-2 text-[14.5px] text-ink2">What's actually free until payday on {fmtDate(sts.payday)}, after everything already spoken for.</p>
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
       <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
-      <Row label="SIPs & investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
+      <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
         <Row
           label="Insurance kept aside"

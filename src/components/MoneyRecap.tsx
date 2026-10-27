@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useStore } from '../store/store';
 import { buildRecap } from '../lib/insights';
-import { monthName, rupees } from '../lib/format';
-import { prevMonth } from '../lib/finance';
+import { addMonths, endOfMonth, fmtDate, monthName, rupees, rupeesShort } from '../lib/format';
+import { investmentTotals, prevMonth } from '../lib/finance';
+import { kindMeta, maturityDate, maturityValue } from '../lib/invest';
 import { Icon } from './ui/Icon';
 
 type Tone = 'accent' | 'ink' | 'plain';
@@ -22,6 +23,24 @@ export function MoneyRecap({ onClose, month: initialMonth }: { onClose: () => vo
   const [month, setMonth] = useState(initialMonth && initialMonth <= state.today ? initialMonth : state.today);
   const r = useMemo(() => buildRecap(state, month), [state, month]);
   const [i, setI] = useState(0);
+  // Investments this month, by kind, and anything that matures in the next three months.
+  const inv = useMemo(() => {
+    const start = month.slice(0, 8) + '01';
+    const end = endOfMonth(start) < state.today ? endOfMonth(start) : state.today;
+    const list = state.investments ?? [];
+    const byKind = new Map<string, number>();
+    for (const t of state.transactions) {
+      if (!t.investmentId || t.direction === 'in' || t.date < start || t.date > end) continue;
+      const k = kindMeta(list.find((x) => x.id === t.investmentId)?.kind).label;
+      byKind.set(k, (byKind.get(k) ?? 0) + t.amount);
+    }
+    const soonEnd = endOfMonth(start).slice(0, 8) + '28';
+    const soon = list
+      .map((x) => ({ x, at: maturityDate(x), worth: maturityValue(x) }))
+      .filter((m) => m.at && m.x.kind !== 'ppf' && m.at > state.today && m.at <= addMonths(soonEnd, 3))
+      .sort((a, b) => a.at!.localeCompare(b.at!));
+    return { byKind: [...byKind.entries()].sort((a, b) => b[1] - a[1]), soon, total: [...byKind.values()].reduce((a, b) => a + b, 0), held: investmentTotals(state).holdings, any: list.length > 0 };
+  }, [state, month]);
 
   const pages: { tone: Tone; eyebrow: string; body: ReactNode; label: string }[] = [
     {
@@ -127,6 +146,46 @@ export function MoneyRecap({ onClose, month: initialMonth }: { onClose: () => vo
         </div>
       ),
     },
+    ...(inv.any || inv.total > 0
+      ? [
+          {
+            tone: 'plain' as Tone,
+            eyebrow: 'Your investments',
+            label: 'Investments',
+            body: (
+              <div className="flex flex-1 flex-col justify-center gap-5">
+                <div>
+                  <p className="text-[15px] text-ink2">Went in this month</p>
+                  <p className="num-hero text-[clamp(34px,10vw,48px)] leading-none">{rupees(inv.total)}</p>
+                </div>
+                {inv.byKind.length > 0 && (
+                  <ul className="flex flex-col gap-2">
+                    {inv.byKind.map(([k, v]) => (
+                      <li key={k} className="flex items-baseline justify-between gap-3 border-b border-line pb-2 text-[15px]">
+                        <span>{k}</span>
+                        <span className="num font-semibold">{rupees(v)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {inv.soon.length > 0 && (
+                  <div className="rounded-2xl bg-accent-soft p-4 text-[14.5px]">
+                    {inv.soon.slice(0, 2).map((m) => (
+                      <p key={m.x.id}>
+                        {kindMeta(m.x.kind).emoji} <span className="font-semibold">{m.x.name}</span> matures {fmtDate(m.at!, true)}
+                        {m.worth ? <span className="num font-semibold"> · {rupeesShort(m.worth)}</span> : null}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[14.5px] text-ink2">
+                  Everything you hold is worth <span className="num font-semibold text-ink">{rupees(inv.held)}</span> now.
+                </p>
+              </div>
+            ),
+          },
+        ]
+      : []),
     {
       tone: 'accent',
       eyebrow: '3 things you did well',
@@ -230,3 +289,4 @@ export function MoneyRecap({ onClose, month: initialMonth }: { onClose: () => vo
     </div>
   );
 }
+

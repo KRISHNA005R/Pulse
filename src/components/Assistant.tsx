@@ -4,6 +4,7 @@ import { useStore } from '../store/store';
 import { useUI, type Route, type SheetSpec } from '../store/ui';
 import { askPulse, starterQuestions, type AIAnswer, type AIBlock, type AILink } from '../lib/assistant';
 import { defaultAccount, FUND_TYPES, safeToSpend } from '../lib/finance';
+import { INV_META, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { buildRecap } from '../lib/insights';
 import { yearSummary } from '../lib/history';
 import { MonthBars } from '../screens/History';
@@ -222,6 +223,23 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
       cta = 'Add SIP';
       break;
     }
+    case 'deposit': {
+      const m = INV_META[a.type];
+      const mat = maturityValue({ kind: a.type, amount: a.amount, expectedReturn: a.rate, tenureMonths: a.months, cycle: 'monthly' });
+      const at = maturityDate({ kind: a.type, startDate: state.today, tenureMonths: a.months });
+      title = `New ${m.short}`;
+      icon = 'bank';
+      rows = [
+        ...(a.bank ? [{ label: 'Bank', value: a.bank }] : []),
+        { label: a.type === 'fd' ? 'Deposit' : 'Each month', value: rupees(a.amount) },
+        { label: 'Interest', value: `${a.rate}% a year` },
+        ...(a.months ? [{ label: 'Tenure', value: tenureLabel(a.months) }] : []),
+        ...(at && mat ? [{ label: 'At maturity', value: `${rupees(mat)} · ${fmtDate(at, true)}` }] : []),
+        { label: a.type === 'fd' ? 'Paid from' : 'Deducted from', value: acctName },
+      ];
+      cta = `Add ${m.short}`;
+      break;
+    }
     case 'budget':
       title = a.budgetId ? 'Update budget' : 'New budget';
       icon = 'sliders';
@@ -296,6 +314,15 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
         update({ status: 'done', note: `SIP added. ${rupees(a.amount)} goes in on ${fmtDate(a.nextDate)}.` });
         return;
       }
+      case 'deposit': {
+        store.saveInvestment(
+          { name: a.name, platform: a.bank, kind: a.type, amount: a.amount, cycle: 'monthly', nextDate: a.nextDate, status: 'active', fromAccount: acct, toAccount: '__new', startDate: state.today, expectedReturn: a.rate, autoDeduct: true, tenureMonths: a.months },
+          a.name,
+          0,
+        );
+        update({ status: 'done', note: a.type === 'fd' ? `${a.name} added. ${rupees(a.amount)} moved out of ${acctName} today.` : `${a.name} added. ${rupees(a.amount)} goes in on ${fmtDate(a.nextDate)}.` });
+        return;
+      }
       case 'budget':
         store.saveBudget({ id: a.budgetId, category: a.category, amount: a.amount, period: a.period });
         update({ status: 'done', note: 'Budget saved.' });
@@ -331,6 +358,7 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
       case 'bill':
         return ui.openSheet({ type: 'sub-form', preset: { name: a.name, amount: a.amount, category: a.category } });
       case 'sip':
+      case 'deposit':
         return ui.openSheet({ type: 'investment-form' });
       case 'budget':
         return ui.openSheet({ type: 'budget-form', budgetId: a.budgetId, category: a.category });
@@ -344,7 +372,7 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
 
   const done = block.status === 'done' || block.status === 'opened';
   return (
-    <div className={`rounded-2xl border bg-surface p-4 ${done ? 'border-pos/40' : block.status === 'cancelled' ? 'border-line opacity-60' : 'border-accent/40'}`}>
+    <div data-testid="ai-action" className={`rounded-2xl border bg-surface p-4 ${done ? 'border-pos/40' : block.status === 'cancelled' ? 'border-line opacity-60' : 'border-accent/40'}`}>
       <p className="flex items-center gap-2 text-[14.5px] font-semibold">
         <span className={`grid h-7 w-7 place-items-center rounded-full ${done ? 'bg-pos/15 text-pos' : 'bg-accent-soft text-accent-ink'}`}>
           <Icon key={done ? 'd' : 'i'} name={done ? 'check' : icon} size={15} strokeWidth={done ? 3 : 2} className={done ? 'animate-boing' : ''} />

@@ -232,7 +232,7 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       );
     case 'investment-form':
       return (
-        <Sheet title={spec.investmentId ? 'Edit investment' : 'Add a SIP or investment'} onClose={close} z={z}>
+        <Sheet title={spec.investmentId ? 'Edit investment' : 'Add investment'} onClose={close} z={z}>
           <InvestmentForm investmentId={spec.investmentId} onDone={close} />
         </Sheet>
       );
