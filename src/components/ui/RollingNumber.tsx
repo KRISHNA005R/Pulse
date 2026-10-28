@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { gsap, reducedMotion, rollTarget, rollTokens } from '../../lib/motion';
 
 /**
@@ -12,11 +12,17 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
   const plain = reducedMotion();
   const tokens = rollTokens(text);
 
+  // Once every wheel has landed, the wheels are swapped for the plain number. Some phones (Safari)
+  // fail to clip a moving strip, so leaving the wheels on screen could show half-digits underneath.
+  const [done, setDone] = useState(false);
+
   useLayoutEffect(() => {
     const root = ref.current;
     if (!root || plain) return;
     const wheels = Array.from(root.querySelectorAll<HTMLElement>('[data-wheel]'));
     const n = wheels.length;
+    const tl = gsap.timeline({ onComplete: () => setDone(true) });
+    let moving = 0;
     wheels.forEach((el, i) => {
       const d = Number(el.dataset.wheel);
       const fromRaw = Number(el.dataset.at ?? '-1');
@@ -28,8 +34,15 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
         return;
       }
       gsap.killTweensOf(el);
-      gsap.fromTo(el, { '--p': from }, { '--p': to, duration: 1 + (n - i) * 0.09, delay: (n - 1 - i) * 0.035, ease: 'power3.out' });
+      moving++;
+      tl.fromTo(el, { '--p': from }, { '--p': to, duration: 1 + (n - i) * 0.09, ease: 'power3.out' }, (n - 1 - i) * 0.035);
     });
+    if (moving) setDone(false);
+    else {
+      tl.kill();
+      setDone(true);
+    }
+    return () => void tl.kill();
   }, [text, plain]);
 
   if (plain) {
@@ -40,8 +53,9 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
     );
   }
   return (
-    <span ref={ref} className={`roll ${className}`} data-testid={testId}>
+    <span ref={ref} className={`roll ${done ? 'roll-done' : ''} ${className}`} data-testid={testId}>
       <span className="sr-only">{text}</span>
+      <span className="roll-final" data-text={text} aria-hidden="true" />
       {tokens.map((t) => (t.digit ? <span key={t.key} className="roll-wheel" data-wheel={t.ch} aria-hidden="true" /> : <span key={t.key + t.ch} className="roll-ch" data-ch={t.ch} aria-hidden="true" />))}
     </span>
   );

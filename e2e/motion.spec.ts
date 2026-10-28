@@ -66,3 +66,18 @@ test('less motion: nothing hidden, nothing rolling', async ({ page }) => {
   await page.getByRole('button', { name: /^Debt/ }).first().click();
   await expect(page.locator('[data-wheel]')).toHaveCount(0);
 });
+
+test('when the roll ends, the wheels give way to plain text, so no half-digits can stay stuck (iPhone bug)', async ({ page }) => {
+  await openDemo(page);
+  await you(page, /^Debt/);
+  const roll = page.getByTestId('debt-left').first();
+  // While rolling, every wheel is hard-clipped (Safari ignores plain overflow on the moving strip).
+  const clip = await roll.locator('[data-wheel]').first().evaluate((e) => getComputedStyle(e).clipPath);
+  expect(clip).toContain('inset');
+  // After it lands: only the final number is drawn, and the wheels are gone from view.
+  await expect(roll).toHaveClass(/roll-done/, { timeout: 4000 });
+  expect(await roll.locator('[data-wheel]').first().evaluate((e) => getComputedStyle(e).display)).toBe('none');
+  const shown = await roll.locator('.roll-final').evaluate((e) => getComputedStyle(e, '::before').content);
+  const s = await state(page);
+  expect(shown.replace(/"/g, '')).toBe(`₹${s.debts[0].remaining.toLocaleString('en-IN')}`);
+});

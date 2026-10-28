@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { blockedCalls, log, openDemo, state } from './helpers';
+import { blockedCalls, log, openDemo, setState, state } from './helpers';
 
 // Journey 3: logging money. A spend, money in, and money got back, all checked against the numbers
 // the app shows (Activity, Income) and the saved balances.
@@ -23,6 +23,9 @@ test('logging a spend takes it off the bank and shows it in Activity', async ({ 
 
 test('Got it back: a payback is not income and comes off spending', async ({ page }) => {
   const errors = await openDemo(page);
+  // Drop the demo's subscriptions and anything already spent today, so a renewal that happens to
+  // fall on the day the tests run doesn't change today's total.
+  await setState(page, 's.subscriptions = []; s.transactions = s.transactions.filter((t) => t.date !== s.today);');
   const bank0 = (await state(page)).accounts[0].balance;
 
   await (await log(page, 3000, 'Dinner at Toit')).save();
