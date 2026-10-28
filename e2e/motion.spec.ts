@@ -19,7 +19,7 @@ test('big amounts roll like a meter and land on the right number', async ({ page
   const wheels = roll.locator('[data-wheel]');
   expect(await wheels.count()).toBe(String(s.debts[0].remaining).length);
   await page.waitForTimeout(2200);
-  const landed = await wheels.evaluateAll((els) => els.map((e) => Math.round(Number(getComputedStyle(e).getPropertyValue('--p'))) % 10).join(''));
+  const landed = await roll.locator('.roll-strip').evaluateAll((els) => els.map((e) => Math.round(Number(getComputedStyle(e).getPropertyValue('--p'))) % 10).join(''));
   expect(landed).toBe(String(s.debts[0].remaining));
 });
 
@@ -67,17 +67,23 @@ test('less motion: nothing hidden, nothing rolling', async ({ page }) => {
   await expect(page.locator('[data-wheel]')).toHaveCount(0);
 });
 
-test('when the roll ends, the wheels give way to plain text, so no half-digits can stay stuck (iPhone bug)', async ({ page }) => {
+test('when the roll ends, every digit shows plainly and the box keeps exactly its size (iPhone bugs)', async ({ page }) => {
   await openDemo(page);
   await you(page, /^Debt/);
   const roll = page.getByTestId('debt-left').first();
-  // While rolling, every wheel is hard-clipped (Safari ignores plain overflow on the moving strip).
-  const clip = await roll.locator('[data-wheel]').first().evaluate((e) => getComputedStyle(e).clipPath);
-  expect(clip).toContain('inset');
-  // After it lands: only the final number is drawn, and the wheels are gone from view.
-  await expect(roll).toHaveClass(/roll-done/, { timeout: 4000 });
-  expect(await roll.locator('[data-wheel]').first().evaluate((e) => getComputedStyle(e).display)).toBe('none');
-  const shown = await roll.locator('.roll-final').evaluate((e) => getComputedStyle(e, '::before').content);
+  // Layout size (offsetWidth/Height), so the card's rise-in zoom doesn't count.
+  const box = () => roll.evaluate((e) => [(e as HTMLElement).offsetWidth, (e as HTMLElement).offsetHeight]);
+  // While rolling: every wheel is hard-clipped, and the strip that moves is a real element.
+  const wheel = roll.locator('[data-wheel]').first();
+  expect(await wheel.evaluate((e) => getComputedStyle(e).clipPath)).toContain('inset');
+  await expect(wheel.locator('.roll-strip')).toHaveCount(1);
+  const rolling = await box();
+  // After it lands: each wheel shows only its own digit (no strip left to peek through)...
+  await expect(roll).toHaveAttribute('data-done', '', { timeout: 4000 });
+  const digits = await roll.locator('.roll-strip').evaluateAll((els) => els.map((e) => getComputedStyle(e, '::before').content.replace(/"/g, '')).join(''));
   const s = await state(page);
-  expect(shown.replace(/"/g, '')).toBe(`₹${s.debts[0].remaining.toLocaleString('en-IN')}`);
+  expect(digits).toBe(String(s.debts[0].remaining));
+  // ...and the number's box is the same size as while it rolled, so the card doesn't jump.
+  const landed = await box();
+  expect(landed).toEqual(rolling);
 });

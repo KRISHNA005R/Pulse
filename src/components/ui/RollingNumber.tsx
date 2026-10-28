@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { gsap, reducedMotion, rollTarget, rollTokens } from '../../lib/motion';
 
 /**
@@ -12,35 +12,40 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
   const plain = reducedMotion();
   const tokens = rollTokens(text);
 
-  // Once every wheel has landed, the wheels are swapped for the plain number. Some phones (Safari)
-  // fail to clip a moving strip, so leaving the wheels on screen could show half-digits underneath.
-  const [done, setDone] = useState(false);
-
   useLayoutEffect(() => {
     const root = ref.current;
     if (!root || plain) return;
     const wheels = Array.from(root.querySelectorAll<HTMLElement>('[data-wheel]'));
+    // Back to rolling: wheels show their full strip and size themselves again.
+    delete root.dataset.done;
+    wheels.forEach((w) => (w.style.width = ''));
     const n = wheels.length;
-    const tl = gsap.timeline({ onComplete: () => setDone(true) });
+    // When every wheel has landed, each one keeps its exact width and shows only its own digit. The
+    // box never changes size (no jump), and there's no strip left for Safari to show outside the box.
+    const land = () => {
+      wheels.forEach((w) => (w.style.width = `${w.getBoundingClientRect().width}px`));
+      root.dataset.done = '';
+    };
+    const tl = gsap.timeline({ onComplete: land });
     let moving = 0;
-    wheels.forEach((el, i) => {
-      const d = Number(el.dataset.wheel);
-      const fromRaw = Number(el.dataset.at ?? '-1');
+    wheels.forEach((w, i) => {
+      const strip = w.firstElementChild as HTMLElement;
+      const d = Number(w.dataset.wheel);
+      const fromRaw = Number(strip.dataset.at ?? '-1');
       const from = fromRaw < 0 ? 0 : fromRaw % 10;
       const to = rollTarget(d);
-      el.dataset.at = String(to);
+      strip.dataset.at = String(to);
+      gsap.killTweensOf(strip);
       if (fromRaw >= 0 && fromRaw % 10 === d) {
-        gsap.set(el, { '--p': to });
+        gsap.set(strip, { '--p': to });
         return;
       }
-      gsap.killTweensOf(el);
       moving++;
-      tl.fromTo(el, { '--p': from }, { '--p': to, duration: 1 + (n - i) * 0.09, ease: 'power3.out' }, (n - 1 - i) * 0.035);
+      tl.fromTo(strip, { '--p': from }, { '--p': to, duration: 1 + (n - i) * 0.09, ease: 'power3.out' }, (n - 1 - i) * 0.035);
     });
-    if (moving) setDone(false);
-    else {
+    if (!moving) {
       tl.kill();
-      setDone(true);
+      land();
     }
     return () => void tl.kill();
   }, [text, plain]);
@@ -53,10 +58,17 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
     );
   }
   return (
-    <span ref={ref} className={`roll ${done ? 'roll-done' : ''} ${className}`} data-testid={testId}>
+    <span ref={ref} className={`roll ${className}`} data-testid={testId}>
       <span className="sr-only">{text}</span>
-      <span className="roll-final" data-text={text} aria-hidden="true" />
-      {tokens.map((t) => (t.digit ? <span key={t.key} className="roll-wheel" data-wheel={t.ch} aria-hidden="true" /> : <span key={t.key + t.ch} className="roll-ch" data-ch={t.ch} aria-hidden="true" />))}
+      {tokens.map((t) =>
+        t.digit ? (
+          <span key={t.key} className="roll-wheel" data-wheel={t.ch} aria-hidden="true">
+            <span className="roll-strip" data-d={t.ch} />
+          </span>
+        ) : (
+          <span key={t.key + t.ch} className="roll-ch" data-ch={t.ch} aria-hidden="true" />
+        ),
+      )}
     </span>
   );
 }
