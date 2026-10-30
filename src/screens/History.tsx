@@ -196,10 +196,13 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
   const history = [...started].reverse().filter((m) => m.month >= firstLogged || m.spent > 0 || m.income > 0);
   const maxMonth = Math.max(1, ...history.map((m) => m.spent));
   const monthsShown = allMonths ? history : history.slice(0, 3);
-  // This month's "left" is the same money as Home's Safe to spend (bank balance minus the bills, SIPs,
-  // card dues, plan savings and buffer still to come before payday). "Came in minus spent" isn't what's
-  // left: those payments haven't gone out yet.
-  const safeNow = useMemo(() => safeToSpend(state).safe, [state]);
+  // This month's "left" is the money you can still spend, buffer included: bank balance minus the bills,
+  // SIPs, card dues and plan savings still to come before payday (Home's Safe to spend + the buffer).
+  // "Came in minus spent" isn't what's left: those payments haven't gone out yet.
+  const safeNow = useMemo(() => {
+    const t = safeToSpend(state);
+    return Math.max(0, t.available - t.bills - t.invest - t.cards - t.goals - t.setAside);
+  }, [state]);
 
   // A category keeps the same colour everywhere on this page: its place in the year's top five.
   const colorOf = (cat: string) => {
