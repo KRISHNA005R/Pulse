@@ -38,7 +38,7 @@ export function HomeScreen() {
   const dup = useMemo(() => detections(state).find((d) => d.kind === 'duplicate'), [state]);
 
   return (
-    <div className="stagger flex flex-col gap-8">
+    <div className="flex flex-col gap-8">
       <PaydayCard />
       <RewindOffer />
       <PaydayWin />

@@ -3,7 +3,7 @@ import { gsap, reducedMotion, rollTarget, rollTokens } from '../../lib/motion';
 
 /**
  * An amount that rolls into place like a meter: every digit is a little wheel that spins to its
- * number, the ones digit first and the big digits last. The wheels and fixed characters are drawn
+ * number, the ones digit first and the big digits last. One further down the page waits until you scroll to it. The wheels and fixed characters are drawn
  * with CSS (not text), so the element's text is exactly the amount, for screen readers and copying.
  * With "reduce motion" it's just the number.
  */
@@ -26,7 +26,8 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
       wheels.forEach((w) => (w.style.width = `${w.getBoundingClientRect().width}px`));
       root.dataset.done = '';
     };
-    const tl = gsap.timeline({ onComplete: land });
+    // Paused until the number is on screen: one lower down rolls when you scroll to it.
+    const tl = gsap.timeline({ paused: true, onComplete: land });
     let moving = 0;
     wheels.forEach((w, i) => {
       const strip = w.firstElementChild as HTMLElement;
@@ -46,8 +47,26 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
     if (!moving) {
       tl.kill();
       land();
+      return;
     }
-    return () => void tl.kill();
+    const r = root.getBoundingClientRect();
+    if ((r.top < window.innerHeight && r.bottom > 0) || typeof IntersectionObserver === 'undefined') {
+      tl.play();
+      return () => void tl.kill();
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        tl.play();
+      },
+      { threshold: 0.6 },
+    );
+    io.observe(root);
+    return () => {
+      io.disconnect();
+      tl.kill();
+    };
   }, [text, plain]);
 
   if (plain) {

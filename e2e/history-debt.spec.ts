@@ -113,3 +113,23 @@ test('debt: no credit cards row (cards have their own section)', async ({ page }
   await openDebt(page);
   await expect(page.getByRole('button', { name: /Credit cards/ })).toHaveCount(0);
 });
+
+test('history: this month\'s "left" is the same money as Home\'s Safe to spend; past months say "saved"', async ({ page }) => {
+  await openDemo(page);
+  await setState(page, 's.accounts.find((a) => a.spendable).balance += 60000;');
+  // Home's number, e.g. "₹2,443".
+  const hero = page.locator('.hero-amt .sr-only').first();
+  await expect(hero).toHaveText(/₹[1-9]/);
+  const homeText = (await hero.textContent()) ?? '';
+  const safe = Number(homeText.replace(/[^\d]/g, ''));
+  const short = safe >= 1e4 ? `₹${Math.round(safe / 1e3)}K` : safe >= 1e3 ? `₹${(safe / 1e3).toFixed(1).replace(/\.0$/, '')}K` : `₹${safe}`;
+  await page.locator('nav').getByRole('button', { name: 'You' }).first().click();
+  await page.getByRole('button', { name: /Spending history/ }).click();
+  const rows = page.getByTestId('month-row');
+  await expect(rows.first()).toContainText('so far');
+  await expect(rows.first()).toContainText(`${short} left`);
+  // A finished month: what came in minus what went out is what you kept, so it says "saved" (or "over").
+  const past = await rows.nth(1).textContent();
+  expect(past).not.toMatch(/left/);
+  expect(past).toMatch(/saved|over/);
+});

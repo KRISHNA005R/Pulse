@@ -559,7 +559,9 @@ export function PlanProgress({ plan, onClick }: { plan: Plan; onClick: () => voi
           <span className="block truncate text-[15px] font-semibold">{plan.name}</span>
           <span className={`block text-[13px] ${m.tone === 'behind' ? 'text-warn' : m.tone === 'ahead' || m.tone === 'done' ? 'text-pos' : 'text-ink3'}`}>{m.short}</span>
         </span>
-        <span className="num text-[20px] font-semibold">{Math.round(m.progress * 100)}%</span>
+        <span className="num text-[20px] font-semibold">
+          <RollingNumber text={`${Math.round(m.progress * 100)}%`} />
+        </span>
       </span>
       <ProgressBar value={m.progress} label={`${plan.name} ${Math.round(m.progress * 100)}% funded`} height={6} tone={m.tone === 'paused' ? 'ink' : 'accent'} />
     </button>
@@ -584,7 +586,9 @@ export function PlanCard({ plan, onOpen }: { plan: Plan; onOpen: () => void }) {
             {rupees(plan.saved)} <span className="text-ink3">/ {rupees(plan.target)}</span>
           </p>
         </div>
-        <p className="num-hero text-[25px] leading-none">{Math.round(m.progress * 100)}%</p>
+        <p className="num-hero text-[25px] leading-none">
+          <RollingNumber text={`${Math.round(m.progress * 100)}%`} />
+        </p>
       </div>
       <div className="mt-4">
         <ProgressBar value={m.progress} marker={m.tone === 'done' || m.tone === 'paused' ? undefined : expectedFrac} label={`${plan.name} progress`} tone={m.tone === 'paused' ? 'ink' : 'accent'} />

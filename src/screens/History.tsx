@@ -3,7 +3,7 @@ import { gsap, reducedMotion } from '../lib/motion';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { activeYears, monthStat, yearSummary, type MonthStat } from '../lib/history';
-import { categoryName, spendByCategory } from '../lib/finance';
+import { categoryName, safeToSpend, spendByCategory } from '../lib/finance';
 import { endOfMonth, monthName, monthShort, rupees, rupeesShort } from '../lib/format';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
@@ -196,6 +196,10 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
   const history = [...started].reverse().filter((m) => m.month >= firstLogged || m.spent > 0 || m.income > 0);
   const maxMonth = Math.max(1, ...history.map((m) => m.spent));
   const monthsShown = allMonths ? history : history.slice(0, 3);
+  // This month's "left" is the same money as Home's Safe to spend (bank balance minus the bills, SIPs,
+  // card dues, plan savings and buffer still to come before payday). "Came in minus spent" isn't what's
+  // left: those payments haven't gone out yet.
+  const safeNow = useMemo(() => safeToSpend(state).safe, [state]);
 
   // A category keeps the same colour everywhere on this page: its place in the year's top five.
   const colorOf = (cat: string) => {
@@ -353,7 +357,8 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
         {history.length ? (
           <ul className="overflow-hidden rounded-3xl border border-line bg-surface">
             {monthsShown.map((m) => {
-              const left = m.income - m.spent;
+              // Past months: what came in minus what went out is what you kept.
+              const kept = m.income - m.spent;
               return (
                 <li key={m.month} className="border-b border-line last:border-b-0">
                   <button type="button" data-testid="month-row" className="tap flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-sunk/50" onClick={() => ui.openSheet({ type: 'recap', month: m.month })} aria-label={`${monthName(m.month)} ${year}: ${rupees(m.spent)} spent, ${rupees(m.income)} came in. Open recap`}>
@@ -365,8 +370,14 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
                       <span className="block h-full origin-left animate-grow-x rounded-full bg-accent" style={{ width: `${Math.max(m.spent ? 2 : 0, (m.spent / maxMonth) * 100)}%` }} />
                     </span>
                     <span className="w-[78px] shrink-0 text-right">
-                      <span className="num block text-[14.5px] font-semibold">{rupeesShort(m.spent)}</span>
-                      {m.income > 0 && <span className={`num block text-[11.5px] font-semibold ${left >= 0 ? 'text-pos' : 'text-ink3'}`}>{left >= 0 ? `+${rupeesShort(left)} left` : `${rupeesShort(left)} over`}</span>}
+                      <span className="num block text-[14.5px] font-semibold">
+                        <RollingNumber text={rupeesShort(m.spent)} />
+                      </span>
+                      {m.current ? (
+                        <span className="num block text-[11.5px] font-semibold text-pos">{rupeesShort(safeNow)} left</span>
+                      ) : (
+                        m.income > 0 && <span className={`num block text-[11.5px] font-semibold ${kept >= 0 ? 'text-pos' : 'text-ink3'}`}>{kept >= 0 ? `+${rupeesShort(kept)} saved` : `${rupeesShort(-kept)} over`}</span>
+                      )}
                     </span>
                   </button>
                 </li>

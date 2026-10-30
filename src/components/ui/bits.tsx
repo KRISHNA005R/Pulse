@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { sym } from '../../lib/currency';
 import type { Person, State } from '../../types';
 import { Icon } from './Icon';
+import { RollingNumber } from './RollingNumber';
 import { useStore } from '../../store/store';
 import { rupees } from '../../lib/format';
 import { calm, gifUrl, okFace, okGif, okPhoto } from '../../lib/photo';
@@ -284,7 +285,7 @@ export function NavRow({ icon, label, sub, value, onClick, emoji }: { icon?: str
         <span className="block truncate text-[15px] font-medium">{label}</span>
         {sub && <span className="block truncate text-[13px] text-ink3">{sub}</span>}
       </span>
-      {value && <span className="num shrink-0 text-[14.5px] text-ink2">{value}</span>}
+      {value && <span className="num shrink-0 text-[14.5px] text-ink2">{typeof value === 'string' && /\d/.test(value) ? <RollingNumber text={value} /> : value}</span>}
       <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
     </button>
   );

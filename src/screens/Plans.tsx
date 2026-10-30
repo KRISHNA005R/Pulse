@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { roundMoney } from '../lib/currency';
 import { useUI } from '../store/ui';
@@ -16,6 +16,11 @@ import { FriendConnect, FriendPayments, GroupShareCard } from '../components/Fri
 export function PlansScreen() {
   const ui = useUI();
   const seg = ui.plansSegment;
+  // The screen already rises in when it opens; the section's own fade is only for switching sections.
+  const firstSeg = useRef(seg);
+  const switchedRef = useRef(false);
+  if (seg !== firstSeg.current) switchedRef.current = true;
+  const switched = switchedRef.current;
   const add = seg === 'plans' ? () => ui.openSheet({ type: 'plan-form' }) : seg === 'splits' ? () => ui.openSheet({ type: 'group-form' }) : seg === 'bhisi' ? () => ui.openSheet({ type: 'bhisi-form' }) : () => ui.openSheet({ type: 'budget-form' });
   return (
     <div>
@@ -29,7 +34,7 @@ export function PlansScreen() {
         }
       />
       <Segmented label="Section" value={seg} onChange={ui.setPlansSegment} options={[{ value: 'plans', label: 'Plans' }, { value: 'splits', label: 'Splits' }, { value: 'bhisi', label: 'Bhisi' }, { value: 'budgets', label: 'Budgets' }]} />
-      <div key={seg} className="mt-6 animate-toast">{seg === 'plans' ? <PlansList /> : seg === 'splits' ? <SplitsView /> : seg === 'bhisi' ? <BhisiList /> : <BudgetsView />}</div>
+      <div key={seg} className={`mt-6 ${switched ? 'animate-toast' : ''}`}>{seg === 'plans' ? <PlansList /> : seg === 'splits' ? <SplitsView /> : seg === 'bhisi' ? <BhisiList /> : <BudgetsView />}</div>
     </div>
   );
 }

@@ -30,7 +30,9 @@ export const rollTarget = (d: number) => 10 + d;
 export function revealIn(root: HTMLElement): () => void {
   // The screen's own blocks (everything under its root except the title bar) rise in, plus anything marked.
   const screen = root.firstElementChild;
-  if (screen) for (const el of Array.from(screen.children)) if (el.tagName !== 'HEADER' && el instanceof HTMLElement) el.dataset.reveal = '';
+  // A block that already has its own entrance animation is left alone: two at once made it show, vanish, and rise again.
+  if (screen)
+    for (const el of Array.from(screen.children)) if (el.tagName !== 'HEADER' && el instanceof HTMLElement && getComputedStyle(el).animationName === 'none') el.dataset.reveal = '';
   const items = Array.from(root.querySelectorAll<HTMLElement>('[data-reveal]'));
   if (!items.length) return () => {};
   if (reducedMotion() || typeof IntersectionObserver === 'undefined') {
@@ -42,11 +44,16 @@ export function revealIn(root: HTMLElement): () => void {
   const later = items.filter((el) => !now.includes(el));
   gsap.fromTo(now, { autoAlpha: 0, y: 26, scale: 0.98 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.6, ease: 'power3.out', stagger: 0.07, clearProps: 'transform,visibility' });
   gsap.set(later, { opacity: 0, y: 36 });
+  // Bars, donuts and the like inside a card further down wait too, so you see them play.
+  later.forEach((el) => el.classList.add('reveal-wait'));
   const io = new IntersectionObserver(
     (entries) => {
       const show = entries.filter((e) => e.isIntersecting).map((e) => e.target as HTMLElement);
       if (!show.length) return;
-      show.forEach((el) => io.unobserve(el));
+      show.forEach((el) => {
+        io.unobserve(el);
+        el.classList.remove('reveal-wait');
+      });
       gsap.to(show, { opacity: 1, y: 0, duration: 0.65, ease: 'power3.out', stagger: 0.08, clearProps: 'transform' });
     },
     { rootMargin: '0px 0px -8% 0px' },
@@ -54,6 +61,7 @@ export function revealIn(root: HTMLElement): () => void {
   later.forEach((el) => io.observe(el));
   return () => {
     io.disconnect();
+    items.forEach((el) => el.classList.remove('reveal-wait'));
     gsap.killTweensOf(items);
     gsap.set(items, { clearProps: 'opacity,transform,visibility' });
   };

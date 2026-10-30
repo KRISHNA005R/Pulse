@@ -87,3 +87,33 @@ test('when the roll ends, every digit shows plainly and the box keeps exactly it
   const landed = await box();
   expect(landed).toEqual(rolling);
 });
+
+test('a block never gets two entrance animations at once (Plans used to show, vanish, then rise again)', async ({ page }) => {
+  await openDemo(page);
+  for (const tab of ['Plans', 'You', 'Activity', 'Home']) {
+    await page.locator('nav').getByRole('button', { name: tab }).first().click();
+    await page.waitForTimeout(150);
+    const clashes = await page.locator('[data-reveal]').evaluateAll((els) => els.filter((e) => getComputedStyle(e).animationName !== 'none').map((e) => e.className));
+    expect(clashes, tab).toEqual([]);
+  }
+  // Switching sections inside Plans still gets its little fade.
+  await page.locator('nav').getByRole('button', { name: 'Plans' }).first().click();
+  await page.getByRole('radio', { name: 'Splits' }).or(page.getByRole('tab', { name: 'Splits' })).or(page.getByRole('button', { name: 'Splits', exact: true })).first().click();
+  await expect(page.locator('main .animate-toast').first()).toBeVisible();
+});
+
+test('a number further down waits and rolls when you scroll to it', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 560 });
+  await openDemo(page);
+  await page.locator('nav').getByRole('button', { name: 'Plans' }).first().click();
+  await page.waitForTimeout(300);
+  // The first rolling number that starts below the screen.
+  const idx = await page.locator('main .roll').evaluateAll((els) => els.findIndex((e) => e.getBoundingClientRect().top > window.innerHeight));
+  expect(idx, 'a rolling number should start below the screen for this test').toBeGreaterThanOrEqual(0);
+  const roll = page.locator('main .roll').nth(idx);
+  await page.waitForTimeout(2500);
+  // Not rolled yet: it is waiting for you.
+  expect(await roll.getAttribute('data-done')).toBeNull();
+  await roll.scrollIntoViewIfNeeded();
+  await expect(roll).toHaveAttribute('data-done', '', { timeout: 4000 });
+});
