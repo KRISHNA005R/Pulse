@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openDemo } from './helpers';
+import { openDemo, setState } from './helpers';
 
 // Home → Safe to spend card: the "days to payday" strip is one line all month (no switch to day bars),
 // and today's dot moves right as the days go by. Bill days stay as dots under the line.
@@ -7,6 +7,8 @@ import { openDemo } from './helpers';
 async function progressOn(page: import('@playwright/test').Page, day: string) {
   await page.clock.install({ time: new Date(`${day}T12:00:00+05:30`) });
   await openDemo(page);
+  // Salary added automatically, so the month runs payday to payday (no "waiting for salary" days).
+  await setState(page, "s.incomes.forEach((i) => (i.autoCredit = true));");
   const line = page.getByTestId('payday-line');
   await expect(line).toBeVisible();
   await expect(page.getByTestId('payday-days')).toHaveCount(0); // never the per-day bars
