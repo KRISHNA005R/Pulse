@@ -152,7 +152,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const cycleDone = Math.min(1, daysBetween(cycleStart, state.today) / cycleDays);
 
   const soon = sts.daysLeft <= 1;
-  const paydayIn = sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
+  const paydayIn = sts.waiting ? 'today · add salary' : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
   // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
   const extra = paydaysBefore(state, sts.payday)[0];
 
@@ -198,7 +198,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
             </span>
             {!soon && <span className="text-[13px] font-medium text-ink3">/day</span>}
           </dd>
-          <dd className="mt-0.5 truncate text-[12px] text-ink3">{soon ? 'until payday' : `for ${sts.daysLeft} days`}</dd>
+          <dd className="mt-0.5 truncate text-[12px] text-ink3">{sts.waiting ? 'until salary is in' : soon ? 'until payday' : `for ${sts.daysLeft} days`}</dd>
         </div>
         <div className="min-w-0 rounded-2xl bg-accent-soft px-3.5 py-3">
           <dt className="text-[12px] font-medium text-accent-ink/80">Payday</dt>
@@ -262,7 +262,11 @@ export function SafeBreakdown() {
   );
   return (
     <div>
-      <p className="mb-2 text-[14.5px] text-ink2">What's actually free until payday on {fmtDate(sts.payday)}, after everything already spoken for.</p>
+      <p className="mb-2 text-[14.5px] text-ink2">
+        {sts.waiting
+          ? "It's payday, but your salary isn't added yet. Until it is, this is what's free today. Add your salary and the new month's number shows up."
+          : `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.`}
+      </p>
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
       <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
@@ -278,7 +282,7 @@ export function SafeBreakdown() {
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       <p className="text-[13.5px] text-ink3">
-        That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
+        {sts.waiting ? 'Only what is due today counts until your salary is in.' : `That's ${rupees(sts.daily)} a day for ${sts.daysLeft} days.`} Card spending counts straight away, because that money is already spent.
       </p>
     </div>
   );
