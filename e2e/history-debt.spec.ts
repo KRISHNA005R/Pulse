@@ -140,3 +140,27 @@ test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; pa
   expect(past).not.toMatch(/left|saved/);
   expect(past).toMatch(/₹[\d.,]+K? carried/);
 });
+
+test('history: the small boxes follow the picked month (came in, saved); peak month stays the year\'s', async ({ page }) => {
+  await openHistory(page);
+  const short = (n: number) => (n >= 1e5 ? `₹${(n / 1e5).toFixed(n >= 1e6 ? 0 : 1).replace(/\.0$/, '')}L` : n >= 1e3 ? `₹${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '')}K` : `₹${Math.round(n)}`);
+  // What came in each month, read from the month list.
+  const cameIn = async (mon: string) => {
+    const label = (await page.getByTestId('month-row').filter({ hasText: mon }).first().getAttribute('aria-label')) ?? '';
+    return Number(label.match(/₹([\d,]+) came in/)![1].replace(/,/g, ''));
+  };
+  await page.getByRole('radio', { name: /^Sep/ }).click();
+  const box = page.getByTestId('tile-in');
+  await expect(box).toContainText('Came in · Sep');
+  await expect(box).toContainText(short(await cameIn('Sep')));
+  await expect(page.getByTestId('tile-saved')).toContainText('Saved · Sep');
+  await page.getByRole('radio', { name: /^Aug/ }).click();
+  await expect(box).toContainText('Came in · Aug');
+  await expect(box).toContainText(short(await cameIn('Aug')));
+  // Peak month is the year's, and tapping it opens that month.
+  const peak = page.getByTestId('tile-peak');
+  await expect(peak).toContainText('Peak month');
+  const peakMon = ((await peak.textContent()) ?? '').match(/^(\w{3})/)?.[1] ?? '';
+  await peak.click();
+  await expect(box).toContainText(`Came in · ${peakMon}`);
+});

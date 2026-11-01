@@ -291,18 +291,30 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
         </div>
       </section>
 
-      <section className="mt-3 grid grid-cols-3 gap-2" aria-label={`${year} totals`}>
+      {/* The picked month's money in and saved (they change with the month); peak month is the year's, tap to open it. */}
+      <section className="mt-3 grid grid-cols-3 gap-2" aria-label={`${monthName(sel)}: came in and saved; ${year} peak month`}>
         {[
-          { label: 'Came in', value: rupeesShort(y.income), icon: 'arrow-in' },
-          { label: 'Plans & SIPs', value: rupeesShort(y.saved + y.invested), icon: 'piggy' },
-          { label: 'Peak month', value: y.highest ? `${monthShort(y.highest.month).slice(0, 3)} · ${rupeesShort(y.highest.spent)}` : '—', icon: 'trend' },
-        ].map((t) => (
-          <div key={t.label} className="rounded-2xl border border-line bg-surface px-3 py-3">
-            <Icon name={t.icon} size={15} className="text-ink3" />
-            <p className="num mt-1.5 truncate text-[15px] font-semibold">{t.value}</p>
-            <p className="truncate text-[11.5px] text-ink3">{t.label}</p>
-          </div>
-        ))}
+          { id: 'in', label: `Came in · ${monthShort(sel)}`, value: rupeesShort(selStat.income), icon: 'arrow-in' },
+          { id: 'saved', label: `Saved · ${monthShort(sel)}`, value: rupeesShort(selStat.saved + selStat.invested), icon: 'piggy' },
+          { id: 'peak', label: 'Peak month', value: y.highest ? `${monthShort(y.highest.month).slice(0, 3)} · ${rupeesShort(y.highest.spent)}` : '—', icon: 'trend', open: y.highest?.month },
+        ].map((t) => {
+          const body = (
+            <>
+              <Icon name={t.icon} size={15} className="text-ink3" />
+              <p className="num mt-1.5 truncate text-[15px] font-semibold">{t.value}</p>
+              <p className="truncate text-[11.5px] text-ink3">{t.label}</p>
+            </>
+          );
+          return t.open ? (
+            <button key={t.id} type="button" data-testid={`tile-${t.id}`} onClick={() => setPicked(t.open!)} className="tap rounded-2xl border border-line bg-surface px-3 py-3 text-left hover:border-ink3/40">
+              {body}
+            </button>
+          ) : (
+            <div key={t.id} data-testid={`tile-${t.id}`} className="rounded-2xl border border-line bg-surface px-3 py-3">
+              {body}
+            </div>
+          );
+        })}
       </section>
 
       {y.categories.length > 0 && (
