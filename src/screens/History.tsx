@@ -291,11 +291,12 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
         </div>
       </section>
 
-      {/* The picked month's money in and saved (they change with the month); peak month is the year's, tap to open it. */}
-      <section className="mt-3 grid grid-cols-3 gap-2" aria-label={`${monthName(sel)}: came in and saved; ${year} peak month`}>
+      {/* The picked month's money in and invested (they change with the month); peak month is the year's, tap to open it. */}
+      <section className="mt-3 grid grid-cols-3 gap-2" aria-label={`${monthName(sel)}: came in and invested; ${year} peak month`}>
         {[
           { id: 'in', label: `Came in · ${monthShort(sel)}`, value: rupeesShort(selStat.income), icon: 'arrow-in' },
-          { id: 'saved', label: `Saved · ${monthShort(sel)}`, value: rupeesShort(selStat.saved + selStat.invested), icon: 'piggy' },
+          // Everything under Investments that month: SIP, RD, FD, PPF, NPS, gold and the rest.
+          { id: 'invest', label: `Invested · ${monthShort(sel)}`, value: rupeesShort(selStat.invested), icon: 'piggy' },
           { id: 'peak', label: 'Peak month', value: y.highest ? `${monthShort(y.highest.month).slice(0, 3)} · ${rupeesShort(y.highest.spent)}` : '—', icon: 'trend', open: y.highest?.month },
         ].map((t) => {
           const body = (

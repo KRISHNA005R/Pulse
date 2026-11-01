@@ -141,7 +141,7 @@ test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; pa
   expect(past).toMatch(/₹[\d.,]+K? carried/);
 });
 
-test('history: the small boxes follow the picked month (came in, saved); peak month stays the year\'s', async ({ page }) => {
+test('history: the small boxes follow the picked month (came in, invested); peak month stays the year\'s', async ({ page }) => {
   await openHistory(page);
   const short = (n: number) => (n >= 1e5 ? `₹${(n / 1e5).toFixed(n >= 1e6 ? 0 : 1).replace(/\.0$/, '')}L` : n >= 1e3 ? `₹${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '')}K` : `₹${Math.round(n)}`);
   // What came in each month, read from the month list.
@@ -153,7 +153,14 @@ test('history: the small boxes follow the picked month (came in, saved); peak mo
   const box = page.getByTestId('tile-in');
   await expect(box).toContainText('Came in · Sep');
   await expect(box).toContainText(short(await cameIn('Sep')));
-  await expect(page.getByTestId('tile-saved')).toContainText('Saved · Sep');
+  // Invested: everything under Investments that month (SIP, RD, FD, PPF, NPS, gold, other).
+  const investedIn = async (prefix: string) =>
+    (await state(page)).transactions
+      .filter((t: { type: string; category: string; direction?: string; date: string }) => t.type === 'transfer' && t.category === 'investments' && t.direction !== 'in' && t.date.startsWith(prefix))
+      .reduce((a: number, t: { amount: number }) => a + t.amount, 0);
+  const inv = page.getByTestId('tile-invest');
+  await expect(inv).toContainText('Invested · Sep');
+  await expect(inv).toContainText(short(await investedIn('2026-09')));
   await page.getByRole('radio', { name: /^Aug/ }).click();
   await expect(box).toContainText('Came in · Aug');
   await expect(box).toContainText(short(await cameIn('Aug')));
