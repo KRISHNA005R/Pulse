@@ -76,53 +76,55 @@ export function PaydayCard() {
   const what = i.kind === 'salary' ? 'salary' : i.name;
   return (
     <section className="relative overflow-hidden rounded-3xl bg-accent p-5 text-on-accent shadow-soft" aria-labelledby="payday-title">
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="eyebrow !text-current opacity-80">{isToday ? "It's payday" : `Payday was ${relDay(date, state.today).toLowerCase()}`}</p>
+      {/* Phone: picture beside the question, buttons full width below. Wider: picture beside everything, so it adds no height. */}
+      <div className="grid grid-cols-[1fr_auto] gap-x-2">
+        <div className="min-w-0">
+          <p className="eyebrow !text-current opacity-80">
+            {isToday ? "It's payday" : `Payday was ${relDay(date, state.today).toLowerCase()}`} · {i.name}
+          </p>
           <h2 id="payday-title" className="display mt-1 text-[clamp(20px,6vw,24px)] leading-tight">
             Did your {rupees(i.expected)} {what} land?
           </h2>
-          <p className="mt-1 text-[14px] opacity-85">
-            {i.name} · {fmtDate(date)}. Add it and safe-to-spend updates for the month ahead.
-          </p>
         </div>
-        <img src="/illustrations/payday-salary.webp" alt="" aria-hidden="true" width={624} height={700} decoding="async" data-testid="payday-salary-art" className="pop-in -mr-2 -mt-2 h-[118px] w-auto shrink-0 object-contain sm:h-[136px]" />
-      </div>
-      {edit ? (
-        <form
-          className="mt-4 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const n = parseFloat(amt);
-            if (n > 0) store.confirmPayday(i.id, date, n, auto);
-          }}
-        >
-          <label htmlFor="payday-amt" className="sr-only">
-            Amount that came in
-          </label>
-          <input id="payday-amt" inputMode="decimal" autoFocus className="num min-w-0 flex-1 rounded-full bg-white/90 px-4 text-[16px] font-semibold text-ink placeholder:text-ink3 focus:outline-none" placeholder={rupees(i.expected)} value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} />
-          <button type="submit" disabled={!(parseFloat(amt) > 0)} className="tap min-h-[46px] shrink-0 rounded-full bg-ink px-5 text-[14.5px] font-semibold text-bg disabled:opacity-50">
-            Add
-          </button>
-        </form>
-      ) : (
-        <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
-          <button type="button" className="tap min-h-[46px] rounded-full bg-ink px-4 text-[15px] font-semibold text-bg" onClick={() => store.confirmPayday(i.id, date, undefined, auto)}>
-            Yes, add {rupees(i.expected)}
-          </button>
-          <button type="button" className="tap min-h-[46px] rounded-full bg-white/20 px-4 text-[14px] font-semibold" onClick={() => setEdit(true)}>
-            Other amount
-          </button>
+        <img src="/illustrations/payday-salary.webp" alt="" aria-hidden="true" width={624} height={700} decoding="async" data-testid="payday-salary-art" className="pop-in -mr-2 -mt-2 h-[96px] w-auto shrink-0 self-start object-contain sm:row-span-2 sm:-mb-2 sm:h-[128px] sm:self-center" />
+        <div className="col-span-2 min-w-0 sm:col-span-1">
+          {edit ? (
+            <form
+              className="mt-4 flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const n = parseFloat(amt);
+                if (n > 0) store.confirmPayday(i.id, date, n, auto);
+              }}
+            >
+              <label htmlFor="payday-amt" className="sr-only">
+                Amount that came in
+              </label>
+              <input id="payday-amt" inputMode="decimal" autoFocus className="num min-w-0 flex-1 rounded-full bg-white/90 px-4 text-[16px] font-semibold text-ink placeholder:text-ink3 focus:outline-none" placeholder={rupees(i.expected)} value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+              <button type="submit" disabled={!(parseFloat(amt) > 0)} className="tap min-h-[46px] shrink-0 rounded-full bg-ink px-5 text-[14.5px] font-semibold text-bg disabled:opacity-50">
+                Add
+              </button>
+            </form>
+          ) : (
+            <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+              <button type="button" aria-label={`Yes, add ${rupees(i.expected)}`} className="tap min-h-[46px] rounded-full bg-ink px-4 text-[15px] font-semibold text-bg" onClick={() => store.confirmPayday(i.id, date, undefined, auto)}>
+                Yes, add it
+              </button>
+              <button type="button" className="tap min-h-[46px] rounded-full bg-white/20 px-4 text-[14px] font-semibold" onClick={() => setEdit(true)}>
+                Other amount
+              </button>
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[13px]">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-medium">
+              <input type="checkbox" className="h-4 w-4 accent-[#17140F]" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+              Auto-add every month
+            </label>
+            <button type="button" className="font-semibold underline underline-offset-2 opacity-85" onClick={() => store.skipPayday(i.id, date)}>
+              Not yet
+            </button>
+          </div>
         </div>
-      )}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[13px]">
-        <label className="inline-flex cursor-pointer items-center gap-2 font-medium">
-          <input type="checkbox" className="h-4 w-4 accent-[#17140F]" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-          Add it automatically every month
-        </label>
-        <button type="button" className="font-semibold underline underline-offset-2 opacity-85" onClick={() => store.skipPayday(i.id, date)}>
-          Not yet
-        </button>
       </div>
     </section>
   );
