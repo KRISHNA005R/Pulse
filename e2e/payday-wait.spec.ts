@@ -38,3 +38,23 @@ test('How it works shows where the money came from, and it adds up to Available 
   expect(text).toMatch(/left from before .* came in − .* went out/);
   expect(left + cameIn - wentOut).toBeCloseTo(avail, 0);
 });
+
+test('salary 2 days late and not enough for rent: says "2 days late" and how short, not a bare ₹0', async ({ page }) => {
+  await openDemo(page);
+  await setState(
+    page,
+    `const iso = (d) => new Date(Date.now() + 5.5 * 3600e3 + d * 864e5).toISOString().slice(0, 10);
+     const m = s.incomes.find((i) => i.main) ?? [...s.incomes].filter((i) => i.cycle === 'monthly' && i.nextDate).sort((a, b) => b.expected - a.expected)[0];
+     m.autoCredit = false; m.nextDate = iso(-2);
+     s.transactions = s.transactions.filter((t) => t.type !== 'income');
+     s.cards.forEach((c) => (c.balance = 0)); s.plans.forEach((p) => (p.cycleReserve = 0));
+     s.accounts.forEach((a) => { if (a.spendable) a.balance = 0; });
+     s.accounts.find((a) => a.spendable).balance = 8000;
+     s.subscriptions = [{ id: 'rent-x', name: 'Rent', amount: 18000, cycle: 'monthly', nextDate: iso(2), category: 'bills', status: 'active', kind: 'bill', account: s.accounts[0].id, autoDebit: false }];`,
+  );
+  await expect(page.getByText('2 days late · add salary')).toBeVisible();
+  const note = page.getByTestId('short-note');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('short for Rent');
+  await expect(note).toContainText("covered when your salary comes in");
+});

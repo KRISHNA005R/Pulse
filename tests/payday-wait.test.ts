@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createSeed } from '../src/data/seed';
 import { mainIncome, refillReserves, safeToSpend, upcoming } from '../src/lib/finance';
 import type { State } from '../src/types';
+import { addDays } from '../src/lib/format';
 
 // Payday, but the salary isn't in yet. The new month must not start early: counting a whole month
 // of bills against last month's leftover made Safe to spend ₹0 at midnight on payday.
@@ -20,17 +21,19 @@ function onPayday(): State {
 }
 
 describe('payday before the salary is added', () => {
-  it('stays on the old month: only what is due today counts, not the whole of next month', () => {
+  it('bridges to the salary: bills due in the next 7 days count, not the whole of next month', () => {
     const s = onPayday();
     const sts = safeToSpend(s);
     expect(sts.waiting).toBe(true);
     expect(sts.payday).toBe(s.today);
     expect(sts.daysLeft).toBe(1);
-    const dueToday = upcoming(s, s.today.replace(/\d\d$/, (d) => String(Number(d) + 1).padStart(2, '0'))).filter((u) => u.kind !== 'investment' && u.kind !== 'card');
-    expect(sts.billItems.map((b) => b.id).sort()).toEqual(dueToday.map((b) => b.id).sort());
+    const week = upcoming(s, addDays(s.today, 7)).filter((u) => u.kind !== 'investment' && u.kind !== 'card');
+    expect(sts.billItems.map((b) => b.id).sort()).toEqual(week.map((b) => b.id).sort());
+    expect(sts.billItems.every((b) => b.date < addDays(s.today, 7))).toBe(true);
     // Plain maths: bank − due today − card dues − old plan savings − buffer.
     expect(sts.safe).toBe(Math.max(0, sts.available - sts.bills - sts.invest - sts.cards - sts.goals - sts.setAside - sts.buffer));
-    expect(sts.safe).toBeGreaterThan(0);
+    // Either there's money to spend, or it says which payment isn't covered (never a bare ₹0).
+    expect(sts.safe > 0 || sts.shortFor !== null).toBe(true);
   });
 
   it("next month's plan savings aren't taken from last month's money", () => {
@@ -71,5 +74,42 @@ describe('payday before the salary is added', () => {
     const s = onPayday();
     s.today = s.today.replace(/\d\d$/, (d) => String(Number(d) + 8).padStart(2, '0'));
     expect(safeToSpend(s).waiting).toBe(false);
+  });
+
+  it('rent due in 3 days is kept aside while waiting', () => {
+    const s = onPayday();
+    const rent = s.subscriptions.find((x) => x.id === 'bill-rent')!;
+    rent.nextDate = addDays(s.today, 3);
+    const sts = safeToSpend(s);
+    expect(sts.billItems.some((b) => b.ref === 'bill-rent')).toBe(true);
+    rent.nextDate = addDays(s.today, 9);
+    expect(safeToSpend(s).billItems.some((b) => b.ref === 'bill-rent')).toBe(false);
+  });
+});
+
+describe('short of money: say how short, not just ₹0', () => {
+  it('names the first bill that the money can not cover, and by how much', () => {
+    const s = onPayday();
+    const rent = s.subscriptions.find((x) => x.id === 'bill-rent')!;
+    rent.nextDate = addDays(s.today, 3);
+    s.cards.forEach((c) => (c.balance = 0));
+    s.plans.forEach((p) => (p.cycleReserve = 0));
+    s.accounts.forEach((a) => (a.balance = 0));
+    s.accounts.find((a) => a.spendable)!.balance = 8000;
+    const sts = safeToSpend(s);
+    expect(sts.safe).toBe(0);
+    expect(sts.short).toBe(sts.bills + sts.invest + sts.setAside - 8000);
+    expect(sts.shortFor?.name).toBe('Rent');
+    expect(sts.shortFor?.date).toBe(rent.nextDate);
+  });
+
+  it('not short when the money covers everything (the buffer is a cushion, not a debt)', () => {
+    const s = onPayday();
+    s.cards.forEach((c) => (c.balance = 0));
+    s.plans.forEach((p) => (p.cycleReserve = 0));
+    s.accounts.find((a) => a.spendable)!.balance = 200000;
+    const sts = safeToSpend(s);
+    expect(sts.short).toBe(0);
+    expect(sts.shortFor).toBeNull();
   });
 });

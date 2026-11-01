@@ -152,7 +152,8 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const cycleDone = Math.min(1, daysBetween(cycleStart, state.today) / cycleDays);
 
   const soon = sts.daysLeft <= 1;
-  const paydayIn = sts.waiting ? 'today · add salary' : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
+  const late = sts.waiting ? daysBetween(sts.payday, state.today) : 0;
+  const paydayIn = sts.waiting ? `${late === 0 ? 'today' : late === 1 ? '1 day late' : `${late} days late`} · add salary` : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
   // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
   const extra = paydaysBefore(state, sts.payday)[0];
 
@@ -186,6 +187,13 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         <h2 id="sts-label" className="eyebrow mt-2.5 text-ink2">
           Safe to spend
         </h2>
+        {/* Short of money: say by how much and for what, never just ₹0. */}
+        {sts.short > 0 && sts.shortFor && !hide && (
+          <p data-testid="short-note" className="mt-2 text-[13.5px] leading-snug text-ink2">
+            You're <span className="num font-semibold text-ink">{rupees(sts.short)}</span> short for {sts.shortFor.name} on {fmtDate(sts.shortFor.date)}.{' '}
+            {sts.waiting ? "It'll be covered when your salary comes in." : 'Add money that came in, or move a payment to later.'}
+          </p>
+        )}
       </div>
 
       {/* 3. Per day and payday, side by side (stacked on very narrow phones) */}
@@ -265,7 +273,7 @@ export function SafeBreakdown() {
     <div>
       <p className="mb-2 text-[14.5px] text-ink2">
         {sts.waiting
-          ? "It's payday, but your salary isn't added yet. Until it is, this is what's free today. Add your salary and the new month's number shows up."
+          ? "It's payday, but your salary isn't added yet. Until it is, bills due in the next 7 days are kept aside. Later ones will be paid from your salary. Add it and the new month's number shows up."
           : `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.`}
       </p>
       <Row
@@ -287,7 +295,7 @@ export function SafeBreakdown() {
           </>
         }
       />
-      <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
+      <Row label={sts.waiting ? 'Bills in the next 7 days' : 'Upcoming bills'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || (sts.waiting ? 'Nothing in the next 7 days' : 'Nothing before payday')} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
         <Row
@@ -301,7 +309,8 @@ export function SafeBreakdown() {
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       <p className="text-[13.5px] text-ink3">
-        {sts.waiting ? 'Only what is due today counts until your salary is in.' : `That's ${rupees(sts.daily)} a day for ${sts.daysLeft} days.`} Card spending counts straight away, because that money is already spent.
+        {sts.short > 0 && sts.shortFor ? `You're ${rupees(sts.short)} short: ${sts.shortFor.name} on ${fmtDate(sts.shortFor.date)} isn't covered yet. ` : ''}
+        {sts.waiting ? 'Only bills in the next 7 days count until your salary is in.' : `That's ${rupees(sts.daily)} a day for ${sts.daysLeft} days.`} Card spending counts straight away, because that money is already spent.
       </p>
     </div>
   );

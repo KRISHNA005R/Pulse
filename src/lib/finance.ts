@@ -373,16 +373,21 @@ export interface SafeToSpend {
   daily: number;
   daysLeft: number;
   payday: ISODate;
-  /** It's payday and the salary isn't in yet: the old month carries on, and this is what's left today. */
+  /** It's payday and the salary isn't in yet: bills due in the next 7 days are kept aside until it is. */
   waiting: boolean;
+  /** Money needed to cover everything counted here (not the buffer). 0 when there's enough. */
+  short: number;
+  /** The first payment, by date, that the money doesn't cover. */
+  shortFor: { name: string; date: ISODate } | null;
 }
 
 export function safeToSpend(s: State): SafeToSpend {
   const available = s.accounts.filter((a) => a.spendable).reduce((a, x) => a + x.balance, 0);
-  // Payday with the salary not in yet: count only what's due today, not the whole next month.
+  // Payday with the salary not in yet: keep aside bills due in the next 7 days (before the salary is
+  // likely to land), not the whole next month. The rest will be paid from the salary.
   const wait = salaryWaiting(s);
   const payday = wait ? wait.date : nextPayday(s);
-  const all = upcoming(s, wait ? addDays(s.today, 1) : payday);
+  const all = upcoming(s, wait ? addDays(s.today, 7) : payday);
   // A card bill is part of what's owed on the card, which is counted in full below.
   const billItems = all.filter((u) => u.kind !== 'investment' && u.kind !== 'card');
   const cardItems = s.cards.filter((c) => c.balance > 0);
@@ -398,7 +403,22 @@ export function safeToSpend(s: State): SafeToSpend {
   const buffer = s.settings.buffer;
   const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
   const daysLeft = wait ? 1 : Math.max(1, daysBetween(s.today, payday));
-  return { waiting: !!wait, available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  // Short of money? Card dues, plan savings and set-asides are already spoken for; then the payments go
+  // out by date. The first one the money can't cover is the one to name.
+  const owed = bills + invest + cards + goals + setAside;
+  const short = Math.max(0, roundMoney(owed - available));
+  let shortFor: SafeToSpend['shortFor'] = null;
+  if (short > 0) {
+    let left = available - cards - goals - setAside;
+    for (const u of [...billItems, ...investItems].sort((a, b) => a.date.localeCompare(b.date))) {
+      left -= u.amount;
+      if (left < 0) {
+        shortFor = { name: u.name, date: u.date };
+        break;
+      }
+    }
+  }
+  return { waiting: !!wait, short, shortFor, available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
 }
 
 // ------------------------------------------------------------------
