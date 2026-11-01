@@ -150,6 +150,37 @@ export function salaryWaiting(s: State): { income: IncomeSource; date: ISODate }
   return landed ? null : { income: m, date };
 }
 
+/**
+ * Where today's money came from: what was left from before this pay cycle started, what came in since,
+ * and what went out since (from bank and cash; card spends are counted under card dues instead).
+ * left + cameIn − wentOut = Available now.
+ */
+export function carryOver(s: State): { since: ISODate; left: number; cameIn: number; wentOut: number } {
+  const wait = salaryWaiting(s);
+  const since = addMonths(wait ? wait.date : nextPayday(s), -1);
+  const spendable = new Set(s.accounts.filter((a) => a.spendable).map((a) => a.id));
+  let cameIn = 0;
+  let wentOut = 0;
+  for (const t of s.transactions) {
+    if (t.date < since || t.date > s.today) continue;
+    const effects: number[] = [];
+    if (t.type === 'expense') {
+      if (spendable.has(t.account)) effects.push(-t.amount);
+    } else if (t.type === 'income') {
+      if (spendable.has(t.account)) effects.push(t.amount);
+    } else {
+      // Bank to cash (both spendable) is just moving money around: neither in nor out.
+      const out = t.direction !== 'in';
+      const inside = spendable.has(t.account) && !!t.toAccount && spendable.has(t.toAccount);
+      if (!inside && spendable.has(t.account)) effects.push(out ? -t.amount : t.amount);
+      if (!inside && t.toAccount && spendable.has(t.toAccount)) effects.push(t.amount);
+    }
+    for (const e of effects) e > 0 ? (cameIn += e) : (wentOut -= e);
+  }
+  const available = s.accounts.filter((a) => a.spendable).reduce((a, x) => a + x.balance, 0);
+  return { since, left: roundMoney(available - cameIn + wentOut), cameIn: roundMoney(cameIn), wentOut: roundMoney(wentOut) };
+}
+
 /** Other fixed-date income expected before the next main payday (not counted until it lands). */
 export function paydaysBefore(s: State, until: ISODate): { income: IncomeSource; date: ISODate }[] {
   const m = mainIncome(s);

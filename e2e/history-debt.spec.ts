@@ -3,7 +3,12 @@ import { openDemo, setState, state } from './helpers';
 
 // Spending history and Debt, redesigned: charts first, very little text, the long lists folded away.
 
+// A fixed day mid-month, so these don't depend on the real date (on the 1st, the new month has no
+// spending yet and the last month may have no salary in it).
+const MID_MONTH = new Date('2026-10-20T12:00:00+05:30');
+
 async function openHistory(page: Page) {
+  await page.clock.install({ time: MID_MONTH });
   await openDemo(page);
   await page.locator('nav').getByRole('button', { name: 'You' }).first().click();
   await page.getByRole('button', { name: /Spending history/ }).click();
@@ -115,6 +120,7 @@ test('debt: no credit cards row (cards have their own section)', async ({ page }
 });
 
 test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; past months say "saved"', async ({ page }) => {
+  await page.clock.install({ time: MID_MONTH });
   await openDemo(page);
   await setState(page, 's.accounts.find((a) => a.spendable).balance += 60000;');
   // Home's number, e.g. "₹2,443".

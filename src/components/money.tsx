@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode } from 'react';
 import { INSURANCE_ON } from '../lib/features';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, carryOver, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
@@ -251,11 +251,12 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
 export function SafeBreakdown() {
   const { state } = useStore();
   const sts = safeToSpend(state);
-  const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) => (
+  const carry = carryOver(state);
+  const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: ReactNode; strong?: boolean }) => (
     <div className={`flex items-baseline justify-between gap-3 py-3 ${strong ? '' : 'border-b border-line'}`}>
       <div>
         <p className={strong ? 'text-[16px] font-semibold' : 'text-[15px]'}>{label}</p>
-        {sub && <p className="text-[13px] text-ink3">{sub}</p>}
+        {sub && <div className="text-[13px] text-ink3">{sub}</div>}
       </div>
       <p className={`num shrink-0 ${strong ? 'text-[24px] font-semibold text-accent-ink' : 'text-[17px]'}`}>{value}</p>
     </div>
@@ -267,7 +268,25 @@ export function SafeBreakdown() {
           ? "It's payday, but your salary isn't added yet. Until it is, this is what's free today. Add your salary and the new month's number shows up."
           : `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.`}
       </p>
-      <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
+      <Row
+        label="Available now"
+        value={rupees(sts.available)}
+        sub={
+          <>
+            <p>{state.accounts.filter((a) => a.spendable).map((a) => a.name).join(', ')}</p>
+            {/* Where that money came from: left from before this payday + what came in − what went out. */}
+            <p data-testid="carry-over" className="mt-1">
+              {sts.waiting ? (
+                <>All of it is left from before payday. Your salary isn't added yet.</>
+              ) : (
+                <>
+                  <span className="num font-semibold text-ink2">{rupees(carry.left)}</span> left from before {fmtDate(carry.since)} + <span className="num font-semibold text-pos">{rupees(carry.cameIn)}</span> came in − <span className="num font-semibold text-ink2">{rupees(carry.wentOut)}</span> went out
+                </>
+              )}
+            </p>
+          </>
+        }
+      />
       <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
