@@ -76,16 +76,18 @@ export function PaydayCard() {
   const what = i.kind === 'salary' ? 'salary' : i.name;
   return (
     <section className="relative overflow-hidden rounded-3xl bg-accent p-5 text-on-accent shadow-soft" aria-labelledby="payday-title">
-      <span className="pointer-events-none absolute -right-4 -top-6 select-none text-[96px] leading-none opacity-20" aria-hidden="true">
-        💸
-      </span>
-      <p className="eyebrow !text-current opacity-80">{isToday ? "It's payday" : `Payday was ${relDay(date, state.today).toLowerCase()}`}</p>
-      <h2 id="payday-title" className="display mt-1 text-[clamp(20px,6vw,24px)] leading-tight">
-        Did your {rupees(i.expected)} {what} land?
-      </h2>
-      <p className="mt-1 text-[14px] opacity-85">
-        {i.name} · {fmtDate(date)}. Add it and safe-to-spend updates for the month ahead.
-      </p>
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="eyebrow !text-current opacity-80">{isToday ? "It's payday" : `Payday was ${relDay(date, state.today).toLowerCase()}`}</p>
+          <h2 id="payday-title" className="display mt-1 text-[clamp(20px,6vw,24px)] leading-tight">
+            Did your {rupees(i.expected)} {what} land?
+          </h2>
+          <p className="mt-1 text-[14px] opacity-85">
+            {i.name} · {fmtDate(date)}. Add it and safe-to-spend updates for the month ahead.
+          </p>
+        </div>
+        <img src="/illustrations/payday-salary.webp" alt="" aria-hidden="true" width={624} height={700} decoding="async" data-testid="payday-salary-art" className="pop-in -mr-2 -mt-2 h-[118px] w-auto shrink-0 object-contain sm:h-[136px]" />
+      </div>
       {edit ? (
         <form
           className="mt-4 flex gap-2"
