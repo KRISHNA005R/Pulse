@@ -133,37 +133,9 @@ export function nextPayday(s: State): ISODate {
 }
 
 /**
- * Payday has come but the main salary isn't in yet (and it isn't added automatically). Until it is,
- * the old month carries on: Safe to spend is what you have today, not next month's bills taken from
- * last month's leftover. Stops waiting after a week (then the month starts without it).
- */
-export function salaryWaiting(s: State): { income: IncomeSource; date: ISODate } | null {
-  if (s.mode !== 'personal') return null; // the demo's dates don't move on their own
-  const m = mainIncome(s);
-  if (!m?.nextDate || m.cycle !== 'monthly' || m.autoCredit || !(m.expected > 0)) return null;
-  const date = m.nextDate <= s.today ? m.nextDate : addMonths(m.nextDate, -1);
-  if (date > s.today || daysBetween(date, s.today) > 7) return null;
-  const cat = incomeCategory(m.kind);
-  const landed = s.transactions.some(
-    (t) => isEarned(t) && t.date >= addDays(date, -4) && (t.incomeId === m.id || (!t.incomeId && t.category === cat && Math.abs(t.amount - m.expected) <= m.expected * 0.35)),
-  );
-  return landed ? null : { income: m, date };
-}
-
-/**
- * Where today's money came from: what was left from before this pay cycle started, what came in since,
- * and what went out since (from bank and cash; card spends are counted under card dues instead).
- * left + cameIn − wentOut = Available now.
- */
-export function carryOver(s: State): { since: ISODate; left: number; cameIn: number; wentOut: number } {
-  const wait = salaryWaiting(s);
-  return moneySince(s, addMonths(wait ? wait.date : nextPayday(s), -1));
-}
-
-/**
  * What a finished month carried over: the money in bank and cash just before the next payday (for
  * October with salary on the 1st, what was left before 1 Nov). That money moves on into the next
- * month. Null while that payday hasn't come yet.
+ * month. Null while that payday hasn't come yet. (Used by Spending history.)
  */
 export function leftAtPayday(s: State, month: ISODate): { date: ISODate; left: number } | null {
   const next = addMonths(month.slice(0, 8) + '01', 1);
@@ -171,32 +143,24 @@ export function leftAtPayday(s: State, month: ISODate): { date: ISODate; left: n
   const last = Number(endOfMonth(next).slice(8));
   const date = next.slice(0, 8) + String(Math.min(day, last)).padStart(2, '0');
   if (date > s.today) return null;
-  return { date, left: moneySince(s, date).left };
-}
-
-/** Money in and out of bank and cash from a date to today, and so what there was just before it. */
-function moneySince(s: State, since: ISODate): { since: ISODate; left: number; cameIn: number; wentOut: number } {
+  // Bank + cash now, with everything since that payday taken back out (bank-to-cash moves are neither).
   const spendable = new Set(s.accounts.filter((a) => a.spendable).map((a) => a.id));
-  let cameIn = 0;
-  let wentOut = 0;
+  let net = 0;
   for (const t of s.transactions) {
-    if (t.date < since || t.date > s.today) continue;
-    const effects: number[] = [];
+    if (t.date < date || t.date > s.today) continue;
     if (t.type === 'expense') {
-      if (spendable.has(t.account)) effects.push(-t.amount);
+      if (spendable.has(t.account)) net -= t.amount;
     } else if (t.type === 'income') {
-      if (spendable.has(t.account)) effects.push(t.amount);
+      if (spendable.has(t.account)) net += t.amount;
     } else {
-      // Bank to cash (both spendable) is just moving money around: neither in nor out.
       const out = t.direction !== 'in';
       const inside = spendable.has(t.account) && !!t.toAccount && spendable.has(t.toAccount);
-      if (!inside && spendable.has(t.account)) effects.push(out ? -t.amount : t.amount);
-      if (!inside && t.toAccount && spendable.has(t.toAccount)) effects.push(t.amount);
+      if (!inside && spendable.has(t.account)) net += out ? -t.amount : t.amount;
+      if (!inside && t.toAccount && spendable.has(t.toAccount)) net += t.amount;
     }
-    for (const e of effects) e > 0 ? (cameIn += e) : (wentOut -= e);
   }
   const available = s.accounts.filter((a) => a.spendable).reduce((a, x) => a + x.balance, 0);
-  return { since, left: roundMoney(available - cameIn + wentOut), cameIn: roundMoney(cameIn), wentOut: roundMoney(wentOut) };
+  return { date, left: roundMoney(available - net) };
 }
 
 /** Other fixed-date income expected before the next main payday (not counted until it lands). */
@@ -284,8 +248,6 @@ export function applyMoney(s: State, tx: Transaction, sign: 1 | -1) {
  * every-payday amount (never more than what's still left to save). Safe to call any time.
  */
 export function refillReserves(s: State) {
-  // The new month's plan savings come out of the new salary, so they wait for it.
-  if (salaryWaiting(s)) return;
   const pd = nextPayday(s);
   for (const p of s.plans) {
     // Plans from before this existed: a held amount meant "every payday" to most people.
@@ -391,21 +353,12 @@ export interface SafeToSpend {
   daily: number;
   daysLeft: number;
   payday: ISODate;
-  /** It's payday and the salary isn't in yet: bills due in the next 7 days are kept aside until it is. */
-  waiting: boolean;
-  /** Money needed to cover everything counted here (not the buffer). 0 when there's enough. */
-  short: number;
-  /** The first payment, by date, that the money doesn't cover. */
-  shortFor: { name: string; date: ISODate } | null;
 }
 
 export function safeToSpend(s: State): SafeToSpend {
   const available = s.accounts.filter((a) => a.spendable).reduce((a, x) => a + x.balance, 0);
-  // Payday with the salary not in yet: keep aside bills due in the next 7 days (before the salary is
-  // likely to land), not the whole next month. The rest will be paid from the salary.
-  const wait = salaryWaiting(s);
-  const payday = wait ? wait.date : nextPayday(s);
-  const all = upcoming(s, wait ? addDays(s.today, 7) : payday);
+  const payday = nextPayday(s);
+  const all = upcoming(s, payday);
   // A card bill is part of what's owed on the card, which is counted in full below.
   const billItems = all.filter((u) => u.kind !== 'investment' && u.kind !== 'card');
   const cardItems = s.cards.filter((c) => c.balance > 0);
@@ -413,30 +366,14 @@ export function safeToSpend(s: State): SafeToSpend {
   const investItems = all.filter((u) => u.kind === 'investment');
   const bills = billItems.reduce((a, b) => a + b.amount, 0);
   const invest = investItems.reduce((a, b) => a + b.amount, 0);
-  // While waiting, savings already set aside for the new month aren't taken from last month's money.
-  const goalItems = s.plans.filter((p) => p.status === 'active' && p.cycleReserve > 0 && !(wait && p.reserveFor && p.reserveFor > wait.date)).map((plan) => ({ plan, amount: plan.cycleReserve }));
+  const goalItems = s.plans.filter((p) => p.status === 'active' && p.cycleReserve > 0).map((plan) => ({ plan, amount: plan.cycleReserve }));
   const goals = goalItems.reduce((a, g) => a + g.amount, 0);
   const setAsideItems = (INSURANCE_ON ? (s.insurance ?? []) : []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
   const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
   const buffer = s.settings.buffer;
   const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
-  const daysLeft = wait ? 1 : Math.max(1, daysBetween(s.today, payday));
-  // Short of money? Card dues, plan savings and set-asides are already spoken for; then the payments go
-  // out by date. The first one the money can't cover is the one to name.
-  const owed = bills + invest + cards + goals + setAside;
-  const short = Math.max(0, roundMoney(owed - available));
-  let shortFor: SafeToSpend['shortFor'] = null;
-  if (short > 0) {
-    let left = available - cards - goals - setAside;
-    for (const u of [...billItems, ...investItems].sort((a, b) => a.date.localeCompare(b.date))) {
-      left -= u.amount;
-      if (left < 0) {
-        shortFor = { name: u.name, date: u.date };
-        break;
-      }
-    }
-  }
-  return { waiting: !!wait, short, shortFor, available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  const daysLeft = Math.max(1, daysBetween(s.today, payday));
+  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
 }
 
 // ------------------------------------------------------------------

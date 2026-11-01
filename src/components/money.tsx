@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
 import { INSURANCE_ON } from '../lib/features';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, carryOver, categoryName, groupSummary, isBack, myCost, netCost, nextPayday, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
@@ -144,18 +144,15 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
     else if (!sameData) setDelta(null);
   }, [sts.safe, state.mode, state.user.fullName]);
   const hide = state.settings.hideBalances;
-  // The line follows the real date. Normally: last payday → next payday. Waiting for salary: the new
-  // cycle has begun (payday → the one after), with today's dot a few days in.
-  const lineEnd = sts.waiting ? nextPayday(state) : sts.payday;
-  const billDays = new Set(upcoming(state, lineEnd).map((b) => (b.date < state.today ? state.today : b.date)));
-  const prev = sts.waiting ? sts.payday : addMonths(sts.payday, -1);
+  const billDays = new Set(upcoming(state, sts.payday).map((b) => (b.date < state.today ? state.today : b.date)));
+  // This pay cycle: from a month before payday (the last payday, or the 1st with no salary set) to payday.
+  const prev = addMonths(sts.payday, -1);
   const cycleStart = prev < state.today ? prev : state.today;
-  const cycleDays = Math.max(1, daysBetween(cycleStart, lineEnd));
+  const cycleDays = Math.max(1, daysBetween(cycleStart, sts.payday));
   const cycleDone = Math.min(1, daysBetween(cycleStart, state.today) / cycleDays);
 
   const soon = sts.daysLeft <= 1;
-  const late = sts.waiting ? daysBetween(sts.payday, state.today) : 0;
-  const paydayIn = sts.waiting ? (late === 0 ? 'today · add salary' : late === 1 ? 'salary 1 day late' : `salary ${late} days late`) : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
+  const paydayIn = sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
   // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
   const extra = paydaysBefore(state, sts.payday)[0];
 
@@ -189,12 +186,6 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         <h2 id="sts-label" className="eyebrow mt-2.5 text-ink2">
           Safe to spend
         </h2>
-        {/* Short of money: say by how much and for what, never just ₹0. */}
-        {sts.short > 0 && sts.shortFor && !hide && (
-          <p data-testid="short-note" className="mt-2 text-[13.5px] leading-snug text-ink2">
-            <span className="num font-semibold text-ink">{rupees(sts.short)}</span> short for {sts.shortFor.name} ({fmtDate(sts.shortFor.date)}).{sts.waiting ? ' Covered once salary is in.' : ''}
-          </p>
-        )}
       </div>
 
       {/* 3. Per day and payday, side by side (stacked on very narrow phones) */}
@@ -207,7 +198,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
             </span>
             {!soon && <span className="text-[13px] font-medium text-ink3">/day</span>}
           </dd>
-          <dd className="mt-0.5 truncate text-[12px] text-ink3">{sts.waiting ? 'until salary is in' : soon ? 'until payday' : `for ${sts.daysLeft} days`}</dd>
+          <dd className="mt-0.5 truncate text-[12px] text-ink3">{soon ? 'until payday' : `for ${sts.daysLeft} days`}</dd>
         </div>
         <div className="min-w-0 rounded-2xl bg-accent-soft px-3.5 py-3">
           <dt className="text-[12px] font-medium text-accent-ink/80">Payday</dt>
@@ -221,7 +212,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
       {/* 4. Runway to payday: one line for the whole pay cycle, all month. It fills and today's dot
             moves right as the days go by; bill days are small dots under the line. */}
       {sts.daysLeft >= 1 && (
-        <div className="mt-4" role="img" aria-label={sts.waiting ? `Payday was ${fmtDate(sts.payday)}; salary not added yet. Next payday ${fmtDate(lineEnd)}.` : `${sts.daysLeft} ${sts.daysLeft === 1 ? 'day' : 'days'} until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
+        <div className="mt-4" role="img" aria-label={`${sts.daysLeft} ${sts.daysLeft === 1 ? 'day' : 'days'} until payday on ${fmtDate(sts.payday)}. ${billDays.size} of those days have a bill.`}>
           <div data-testid="payday-line" data-progress={cycleDone.toFixed(3)}>
             <div className="relative h-1.5 rounded-full bg-sunk">
               <span className="absolute left-0 top-0 h-1.5 rounded-full bg-accent/70" style={{ width: `${cycleDone * 100}%` }} />
@@ -238,7 +229,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
                   Today
                 </span>
               )}
-              <span className="absolute right-0 text-accent-ink">{fmtDate(lineEnd)}</span>
+              <span className="absolute right-0 text-accent-ink">{fmtDate(sts.payday)}</span>
             </div>
           </div>
         </div>
@@ -260,43 +251,20 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
 export function SafeBreakdown() {
   const { state } = useStore();
   const sts = safeToSpend(state);
-  const carry = carryOver(state);
-  const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: ReactNode; strong?: boolean }) => (
+  const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) => (
     <div className={`flex items-baseline justify-between gap-3 py-3 ${strong ? '' : 'border-b border-line'}`}>
       <div>
         <p className={strong ? 'text-[16px] font-semibold' : 'text-[15px]'}>{label}</p>
-        {sub && <div className="text-[13px] text-ink3">{sub}</div>}
+        {sub && <p className="text-[13px] text-ink3">{sub}</p>}
       </div>
       <p className={`num shrink-0 ${strong ? 'text-[24px] font-semibold text-accent-ink' : 'text-[17px]'}`}>{value}</p>
     </div>
   );
   return (
     <div>
-      <p className="mb-2 text-[14.5px] text-ink2">
-        {sts.waiting
-          ? 'Salary not added yet, so only the next 7 days of bills count.'
-          : `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.`}
-      </p>
-      <Row
-        label="Available now"
-        value={rupees(sts.available)}
-        sub={
-          <>
-            <p>{state.accounts.filter((a) => a.spendable).map((a) => a.name).join(', ')}</p>
-            {/* Where that money came from: left from before this payday + what came in − what went out. */}
-            <p data-testid="carry-over" className="mt-1">
-              {sts.waiting ? (
-                <>All from before payday.</>
-              ) : (
-                <>
-                  <span className="num font-semibold text-ink2">{rupees(carry.left)}</span> left from before {fmtDate(carry.since)} + <span className="num font-semibold text-pos">{rupees(carry.cameIn)}</span> came in − <span className="num font-semibold text-ink2">{rupees(carry.wentOut)}</span> went out
-                </>
-              )}
-            </p>
-          </>
-        }
-      />
-      <Row label={sts.waiting ? 'Bills in the next 7 days' : 'Upcoming bills'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || (sts.waiting ? 'Nothing in the next 7 days' : 'Nothing before payday')} />
+      <p className="mb-2 text-[14.5px] text-ink2">What's actually free until payday on {fmtDate(sts.payday)}, after everything already spoken for.</p>
+      <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
+      <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
         <Row
@@ -307,10 +275,10 @@ export function SafeBreakdown() {
       )}
       {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={sts.cardItems.map((c) => `${c.name} ${rupees(c.balance)}`).join(' · ') || 'Nothing owed'} />}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
-      <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="Change it in You → Budget preferences." />
+      <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       <p className="text-[13.5px] text-ink3">
-        {sts.short > 0 && sts.shortFor ? `${rupees(sts.short)} short for ${sts.shortFor.name} (${fmtDate(sts.shortFor.date)}).` : sts.waiting ? '' : `${rupees(sts.daily)} a day for ${sts.daysLeft} days.`}
+        That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
       </p>
     </div>
   );
