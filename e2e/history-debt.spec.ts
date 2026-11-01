@@ -119,7 +119,7 @@ test('debt: no credit cards row (cards have their own section)', async ({ page }
   await expect(page.getByRole('button', { name: /Credit cards/ })).toHaveCount(0);
 });
 
-test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; past months say "saved"', async ({ page }) => {
+test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; past months show what carried over', async ({ page }) => {
   await page.clock.install({ time: MID_MONTH });
   await openDemo(page);
   await setState(page, 's.accounts.find((a) => a.spendable).balance += 60000;');
@@ -135,8 +135,8 @@ test('history: this month\'s "left" is Home\'s Safe to spend plus the buffer; pa
   const rows = page.getByTestId('month-row');
   await expect(rows.first()).toContainText('so far');
   await expect(rows.first()).toContainText(`${short} left`);
-  // A finished month: what came in minus what went out is what you kept, so it says "saved" (or "over").
+  // A finished month: the money left just before the next payday, which carried into this month.
   const past = await rows.nth(1).textContent();
-  expect(past).not.toMatch(/left/);
-  expect(past).toMatch(/saved|over/);
+  expect(past).not.toMatch(/left|saved/);
+  expect(past).toMatch(/₹[\d.,]+K? carried/);
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createSeed } from '../src/data/seed';
-import { carryOver, nextPayday, safeToSpend } from '../src/lib/finance';
+import { carryOver, leftAtPayday, mainIncome, nextPayday, safeToSpend } from '../src/lib/finance';
 import { addMonths } from '../src/lib/format';
 
 // "How it works": where today's money came from. Left from before this payday + what came in since
@@ -41,5 +41,39 @@ describe('carry-over from before payday', () => {
     const after = carryOver(s);
     expect(after.cameIn).toBe(before.cameIn);
     expect(after.wentOut).toBe(before.wentOut);
+  });
+
+});
+
+describe('what a finished month carried over: money left just before the next payday', () => {
+  it('a month ends the day before the next payday (salary on the 4th: September ends before 4 Oct)', () => {
+    const s = createSeed();
+    s.today = '2026-10-20';
+    const day = Number(mainIncome(s)!.nextDate!.slice(8));
+    const r = leftAtPayday(s, '2026-09-01')!;
+    expect(r.date).toBe(`2026-10-${String(day).padStart(2, '0')}`);
+  });
+
+  it('this cycle\'s carry-over is the same number as the last month\'s "carried over"', () => {
+    const s = createSeed();
+    const c = carryOver(s);
+    const month = addMonths(c.since, -1).slice(0, 8) + '01';
+    expect(leftAtPayday(s, month)!.left).toBeCloseTo(c.left, 2);
+  });
+
+  it('a spend after payday does not change what the month before carried over', () => {
+    const s = createSeed();
+    const since = carryOver(s).since;
+    const month = addMonths(since, -1).slice(0, 8) + '01';
+    const before = leftAtPayday(s, month)!.left;
+    const bank = s.accounts.find((a) => a.spendable)!;
+    s.transactions.push({ id: 'x', merchant: 'Dinner', amount: 900, type: 'expense', category: 'food', date: since, account: bank.id, recurring: false, status: 'completed' });
+    bank.balance -= 900;
+    expect(leftAtPayday(s, month)!.left).toBeCloseTo(before, 2);
+  });
+
+  it('a month whose payday has not come yet has no carried-over number', () => {
+    const s = createSeed();
+    expect(leftAtPayday(s, s.today.slice(0, 8) + '01')).toBeNull();
   });
 });

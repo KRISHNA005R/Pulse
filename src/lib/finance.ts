@@ -157,7 +157,25 @@ export function salaryWaiting(s: State): { income: IncomeSource; date: ISODate }
  */
 export function carryOver(s: State): { since: ISODate; left: number; cameIn: number; wentOut: number } {
   const wait = salaryWaiting(s);
-  const since = addMonths(wait ? wait.date : nextPayday(s), -1);
+  return moneySince(s, addMonths(wait ? wait.date : nextPayday(s), -1));
+}
+
+/**
+ * What a finished month carried over: the money in bank and cash just before the next payday (for
+ * October with salary on the 1st, what was left before 1 Nov). That money moves on into the next
+ * month. Null while that payday hasn't come yet.
+ */
+export function leftAtPayday(s: State, month: ISODate): { date: ISODate; left: number } | null {
+  const next = addMonths(month.slice(0, 8) + '01', 1);
+  const day = Number(mainIncome(s)?.nextDate?.slice(8) ?? '1');
+  const last = Number(endOfMonth(next).slice(8));
+  const date = next.slice(0, 8) + String(Math.min(day, last)).padStart(2, '0');
+  if (date > s.today) return null;
+  return { date, left: moneySince(s, date).left };
+}
+
+/** Money in and out of bank and cash from a date to today, and so what there was just before it. */
+function moneySince(s: State, since: ISODate): { since: ISODate; left: number; cameIn: number; wentOut: number } {
   const spendable = new Set(s.accounts.filter((a) => a.spendable).map((a) => a.id));
   let cameIn = 0;
   let wentOut = 0;

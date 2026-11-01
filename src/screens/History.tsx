@@ -3,7 +3,7 @@ import { gsap, reducedMotion } from '../lib/motion';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { activeYears, monthStat, yearSummary, type MonthStat } from '../lib/history';
-import { categoryName, safeToSpend, spendByCategory } from '../lib/finance';
+import { categoryName, leftAtPayday, safeToSpend, spendByCategory } from '../lib/finance';
 import { endOfMonth, monthName, monthShort, rupees, rupeesShort } from '../lib/format';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
@@ -360,8 +360,8 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
         {history.length ? (
           <ul className="overflow-hidden rounded-3xl border border-line bg-surface">
             {monthsShown.map((m) => {
-              // Past months: what came in minus what went out is what you kept.
-              const kept = m.income - m.spent;
+              // Past months: the money left just before the next payday, which carried on into the next month.
+              const carried = m.current ? null : leftAtPayday(state, m.month);
               return (
                 <li key={m.month} className="border-b border-line last:border-b-0">
                   <button type="button" data-testid="month-row" className="tap flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-sunk/50" onClick={() => ui.openSheet({ type: 'recap', month: m.month })} aria-label={`${monthName(m.month)} ${year}: ${rupees(m.spent)} spent, ${rupees(m.income)} came in. Open recap`}>
@@ -379,7 +379,7 @@ export function HistoryScreen({ year: initialYear }: { year?: number }) {
                       {m.current ? (
                         <span className="num block text-[11.5px] font-semibold text-pos">{rupeesShort(safeNow)} left</span>
                       ) : (
-                        m.income > 0 && <span className={`num block text-[11.5px] font-semibold ${kept >= 0 ? 'text-pos' : 'text-ink3'}`}>{kept >= 0 ? `+${rupeesShort(kept)} saved` : `${rupeesShort(-kept)} over`}</span>
+                        carried && <span className={`num block text-[11.5px] font-semibold ${carried.left >= 0 ? 'text-pos' : 'text-ink3'}`}>{rupeesShort(carried.left)} carried</span>
                       )}
                     </span>
                   </button>
