@@ -153,7 +153,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
 
   const soon = sts.daysLeft <= 1;
   const late = sts.waiting ? daysBetween(sts.payday, state.today) : 0;
-  const paydayIn = sts.waiting ? `${late === 0 ? 'today' : late === 1 ? '1 day late' : `${late} days late`} · add salary` : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
+  const paydayIn = sts.waiting ? (late === 0 ? 'today · add salary' : late === 1 ? 'salary 1 day late' : `salary ${late} days late`) : sts.daysLeft <= 1 ? 'tomorrow' : `in ${sts.daysLeft} days`;
   // A second salary before the main payday isn't counted yet; mention it so the month makes sense.
   const extra = paydaysBefore(state, sts.payday)[0];
 

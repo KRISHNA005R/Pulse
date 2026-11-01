@@ -12,7 +12,7 @@ test('on payday before the salary is added, Safe to spend is what is free today,
      const m = s.incomes.find((i) => i.main) ?? [...s.incomes].filter((i) => i.cycle === 'monthly' && i.nextDate).sort((a, b) => b.expected - a.expected)[0];
      m.autoCredit = false; m.nextDate = today;
      s.transactions = s.transactions.filter((t) => t.type !== 'income');
-     s.accounts.find((a) => a.spendable).balance = 20000;`,
+     s.accounts.find((a) => a.spendable).balance = 80000;`,
   );
   const hero = page.locator('.hero-amt .sr-only').first();
   await expect(hero).not.toHaveText('₹0');
@@ -52,7 +52,7 @@ test('salary 2 days late and not enough for rent: says "2 days late" and how sho
      s.accounts.find((a) => a.spendable).balance = 8000;
      s.subscriptions = [{ id: 'rent-x', name: 'Rent', amount: 18000, cycle: 'monthly', nextDate: iso(2), category: 'bills', status: 'active', kind: 'bill', account: s.accounts[0].id, autoDebit: false }];`,
   );
-  await expect(page.getByText('2 days late · add salary')).toBeVisible();
+  await expect(page.getByText('salary 2 days late')).toBeVisible();
   const note = page.getByTestId('short-note');
   await expect(note).toBeVisible();
   await expect(note).toContainText('short for Rent');
