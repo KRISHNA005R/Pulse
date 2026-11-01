@@ -85,3 +85,19 @@ test('the 404 page has the lost-signal picture', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /404/ })).toBeVisible();
   await looksRight(page.getByTestId('lost-art'), 'offline');
 });
+
+test('payday card: the salary picture shows and loads, with the short question', async ({ page }) => {
+  await openDemo(page);
+  await setState(
+    page,
+    `const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+     const m = [...s.incomes].filter((i) => i.cycle === 'monthly' && i.nextDate).sort((a, b) => b.expected - a.expected)[0];
+     m.main = true; m.autoCredit = false; m.nextDate = today;
+     s.transactions = s.transactions.filter((t) => t.type !== 'income');`,
+  );
+  const art = page.getByTestId('payday-salary-art');
+  await expect(art).toBeVisible();
+  expect(await art.evaluate((e) => (e as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+  await expect(page.getByRole('button', { name: /^Yes, add ₹/ })).toBeVisible();
+  await expect(page.getByText('Auto-add every month')).toBeVisible();
+});

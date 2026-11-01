@@ -86,7 +86,7 @@ export function PaydayCard() {
             Did your {rupees(i.expected)} {what} land?
           </h2>
         </div>
-        <img src="/illustrations/payday-salary.webp" alt="" aria-hidden="true" width={624} height={700} decoding="async" data-testid="payday-salary-art" className="pop-in -mr-2 -mt-2 h-[96px] w-auto shrink-0 self-start object-contain sm:row-span-2 sm:-mb-2 sm:h-[128px] sm:self-center" />
+        <img src="/illustrations/payday-salary.webp" alt="" aria-hidden="true" width={624} height={700} decoding="async" data-testid="payday-salary-art" className="pop-in -mr-2 -mt-3 -mb-1 h-[116px] w-auto shrink-0 self-start object-contain sm:row-span-2 sm:-my-4 sm:h-[160px] sm:self-center" />
         <div className="col-span-2 min-w-0 sm:col-span-1">
           {edit ? (
             <form
