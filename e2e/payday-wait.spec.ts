@@ -56,5 +56,10 @@ test('salary 2 days late and not enough for rent: says "2 days late" and how sho
   const note = page.getByTestId('short-note');
   await expect(note).toBeVisible();
   await expect(note).toContainText('short for Rent');
-  await expect(note).toContainText("covered when your salary comes in");
+  await expect(note).toContainText('Covered once salary is in');
+  // The line follows the real date: payday → next payday, today's dot 2 days in (not a full old line).
+  const line = page.getByTestId('payday-line');
+  const p = Number(await line.getAttribute('data-progress'));
+  expect(p).toBeGreaterThan(0);
+  expect(p).toBeLessThan(0.15);
 });
