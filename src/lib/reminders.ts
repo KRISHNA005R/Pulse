@@ -45,7 +45,7 @@ export function buildReminders(s: State, p: ReminderPrefs = prefsOf(s), now = ne
     const date = addDays(today, d);
     const atRisk = d === 0 && p.streak && st.count >= 2 && !st.today;
     if (d === 0 && loggedToday) continue; // already logged today: no nudge tonight
-    if (atRisk) add(date, time, { title: `Your ${st.count}-day streak ends tonight 🔥`, body: 'Log one thing to keep it going.', url: '/?action=add', tag: `daily-${date}` });
+    if (atRisk) add(date, time, { title: `Your ${st.count}-day streak ends tonight 🔥`, body: 'Log one thing, or tap your streak, to keep it going.', url: '/?action=add', tag: `daily-${date}` });
     else if (p.daily) add(date, time, { title: 'Log today’s spends', body: 'Ten seconds now keeps your safe-to-spend honest.', url: '/?action=add', tag: `daily-${date}` });
   }
 

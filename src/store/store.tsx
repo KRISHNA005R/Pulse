@@ -1851,6 +1851,14 @@ function useStoreImpl() {
     [commit, toast],
   );
 
+  /** Tap the streak to check in for today: it keeps the streak going, like logging something. */
+  const checkIn = useCallback((): boolean => {
+    const s0 = ref.current;
+    if ((s0.checkIns ?? []).includes(s0.today)) return false;
+    commit((s) => void (s.checkIns = [...(s.checkIns ?? []), s.today]));
+    return true;
+  }, [commit]);
+
   // ---------- sync across devices ----------
   const [sync, setSync] = useState<SyncStatus>(() => {
     const cfg = loadSync();
@@ -2136,6 +2144,7 @@ function useStoreImpl() {
     restoreState,
     confirmPayday,
     skipPayday,
+    checkIn,
     sync,
     syncNow,
     enableSync,

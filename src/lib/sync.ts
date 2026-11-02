@@ -324,6 +324,9 @@ export function merge3(base: State | null, local: State, remote: State, preferLo
   out.user = mergeObject(base?.user, local.user, remote.user, preferLocal);
   out.onboarding = { ...mergeObject(base?.onboarding, local.onboarding, remote.onboarding, preferLocal), done: true };
   out.dismissedDetections = mergeStrings(base?.dismissedDetections, local.dismissedDetections, remote.dismissedDetections);
+  // Check-ins are only ever added, so both phones' days are kept.
+  const checks = [...new Set([...(local.checkIns ?? []), ...(remote.checkIns ?? [])])].sort();
+  if (checks.length) out.checkIns = checks;
   const nw = new Map<string, { month: string; value: number }>();
   for (const p of [...(remote.netWorthHistory ?? []), ...(local.netWorthHistory ?? [])]) nw.set(p.month, p);
   out.netWorthHistory = [...nw.values()].sort((a, b) => a.month.localeCompare(b.month));

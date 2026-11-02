@@ -40,19 +40,28 @@ function useRolling(value: number, ms = 800) {
 
 /** The logging streak pill next to the greeting. */
 export function StreakPill() {
-  const { state, toast } = useStore();
+  const { state, toast, checkIn } = useStore();
   const st = useMemo(() => streak(state), [state]);
   if (st.count < 1) return null;
   return (
     <button
       type="button"
+      data-testid="streak-pill"
       onClick={(e) => {
         haptic(8);
+        // Not logged today yet? Tapping checks in for today and keeps the streak going.
+        if (!st.today && checkIn()) {
+          haptic(20);
+          burstFrom(e.currentTarget, { kind: 'fire', power: 1 });
+          const n = st.count + 1;
+          toast({ text: n >= st.best && n > 2 ? `${n}-day streak. Your best ever!` : `${n}-day streak. Checked in for today.`, tone: 'good', emoji: '🔥' });
+          return;
+        }
         burstFrom(e.currentTarget, { kind: 'fire', power: 0.5 });
-        toast({ text: st.today ? `${st.count}-day logging streak. Best: ${st.best} days.` : `${st.count}-day streak. Log anything today to keep it alive.`, emoji: '🔥' });
+        toast({ text: `${st.count}-day streak. Best: ${st.best} days.`, emoji: '🔥' });
       }}
       className={`tap inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[13.5px] font-bold ${st.today ? 'bg-accent-soft text-accent-ink' : 'animate-ring bg-sunk text-ink2'}`}
-      aria-label={`${st.count}-day logging streak${st.today ? '' : ', log today to keep it'}`}
+      aria-label={`${st.count}-day streak${st.today ? '' : '. Tap to check in for today'}`}
     >
       <span className="inline-block animate-flicker" aria-hidden="true">
         🔥

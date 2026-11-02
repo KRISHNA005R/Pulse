@@ -455,6 +455,8 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
+  /** Days the person tapped the streak to check in. They keep the streak going like a logged spend. */
+  checkIns?: ISODate[];
   /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
   bhisis?: Bhisi[];
   /** Money left just before each main payday ("survived payday"). */
