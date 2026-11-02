@@ -39,6 +39,7 @@ export function BottomNavigation() {
         }}
         aria-current={on ? 'page' : undefined}
         aria-label={it.label}
+        data-tour={it.tab}
         className={`flex h-[50px] shrink-0 items-center overflow-hidden rounded-full border-[1.5px] active:scale-[0.96] ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-ink/75 bg-transparent text-ink hover:bg-sunk'}`}
         style={{
           width: on ? PILL_W[it.tab] : 50,
@@ -73,6 +74,7 @@ export function BottomNavigation() {
           }}
           className={`tap grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full bg-accent text-on-accent shadow-[0_8px_20px_-8px_rgb(var(--accent))] ${nudge ? 'animate-ring' : ''}`}
           aria-label="Add expense"
+          data-tour="add"
         >
           <span className="grid place-items-center transition-transform duration-500 [transition-timing-function:cubic-bezier(.34,1.8,.5,1)]" style={{ transform: `rotate(${spin * 90}deg)` }}>
             <Icon name="plus" size={24} strokeWidth={2.4} />
@@ -101,7 +103,7 @@ export function SideNavigation() {
           const on = ui.tab === it.tab;
           return (
             <li key={it.tab}>
-              <button type="button" onClick={() => ui.setTab(it.tab)} aria-current={on ? 'page' : undefined} className={`tap flex min-h-[46px] w-full items-center gap-3 rounded-full px-4 text-[15px] font-semibold ${on ? 'bg-pill text-pill-fg' : 'text-ink2 hover:bg-sunk'}`}>
+              <button type="button" data-tour={it.tab} onClick={() => ui.setTab(it.tab)} aria-current={on ? 'page' : undefined} className={`tap flex min-h-[46px] w-full items-center gap-3 rounded-full px-4 text-[15px] font-semibold ${on ? 'bg-pill text-pill-fg' : 'text-ink2 hover:bg-sunk'}`}>
                 <Icon name={it.icon} size={19} strokeWidth={on ? 2.3 : 1.9} />
                 {it.label}
               </button>
@@ -109,10 +111,10 @@ export function SideNavigation() {
           );
         })}
       </ul>
-      <button type="button" onClick={() => ui.openSheet({ type: 'composer' })} className="btn-accent mt-6 w-full">
+      <button type="button" data-tour="add" onClick={() => ui.openSheet({ type: 'composer' })} className="btn-accent mt-6 w-full">
         <Icon name="plus" size={18} /> Add expense
       </button>
-      <button type="button" onClick={() => ui.openSheet({ type: 'ai' })} className="btn-ghost mt-2 w-full xl:hidden">
+      <button type="button" data-tour="ai" onClick={() => ui.openSheet({ type: 'ai' })} className="btn-ghost mt-2 w-full xl:hidden">
         <Icon name="spark" size={17} /> Ask PULSE AI
       </button>
       <div className="mt-auto px-3 text-[12px] leading-relaxed text-ink3">
@@ -133,7 +135,7 @@ export function MobileTopBar() {
         <button type="button" onClick={() => ui.openSheet({ type: 'command' })} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-sunk" aria-label="Search or run a command">
           <Icon name="search" size={20} />
         </button>
-        <button type="button" onClick={() => ui.openSheet({ type: 'ai' })} className="tap inline-flex h-11 items-center gap-1.5 rounded-full bg-sunk px-3.5 text-[14px] font-semibold" aria-label="Ask PULSE AI">
+        <button type="button" data-tour="ai" onClick={() => ui.openSheet({ type: 'ai' })} className="tap inline-flex h-11 items-center gap-1.5 rounded-full bg-sunk px-3.5 text-[14px] font-semibold" aria-label="Ask PULSE AI">
           <Icon name="spark" size={17} className="text-accent-ink" /> AI
         </button>
       </div>

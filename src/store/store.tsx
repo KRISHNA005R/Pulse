@@ -1489,12 +1489,14 @@ function useStoreImpl() {
   /** Replace everything with a person's own fresh start (built by createFresh). */
   const startPersonal = useCallback(
     (fresh: State) => {
+      // A brand-new account gets the short tour on its first Home.
+      fresh.settings.tourPending = true;
       writeStash(null);
       setHasStash(false);
       ref.current = fresh;
       setState(fresh);
       setToasts([]);
-      toast({ text: `Welcome, ${fresh.user.name}. Add your first expense with the + button.`, tone: 'good' });
+      toast({ text: `Welcome, ${fresh.user.name}.`, tone: 'good' });
     },
     [toast],
   );
@@ -1851,6 +1853,10 @@ function useStoreImpl() {
     [commit, toast],
   );
 
+  /** The short tour: finished or skipped (not shown again), or asked for again from You. */
+  const endTour = useCallback(() => commit((s) => void (s.settings.tourPending = false)), [commit]);
+  const replayTour = useCallback(() => commit((s) => void (s.settings.tourPending = true)), [commit]);
+
   /** Tap the streak to check in for today: it keeps the streak going, like logging something. */
   const checkIn = useCallback((): boolean => {
     const s0 = ref.current;
@@ -2145,6 +2151,8 @@ function useStoreImpl() {
     confirmPayday,
     skipPayday,
     checkIn,
+    endTour,
+    replayTour,
     sync,
     syncNow,
     enableSync,

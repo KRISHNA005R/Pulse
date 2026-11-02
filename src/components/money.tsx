@@ -180,7 +180,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
       </div>
 
       {/* 2. The number, sized to always fit on one line */}
-      <div className="relative mt-3">
+      <div className="relative mt-3" data-tour="safe">
         <p
           key={`n${delta?.id ?? 0}`}
           className={`hero-amt num-hero ${delta ? 'animate-squash' : ''} ${hide ? 'blur-md select-none' : ''}`}

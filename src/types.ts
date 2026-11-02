@@ -379,6 +379,8 @@ export type InsightDetail =
 
 export interface Settings {
   buffer: number;
+  /** The short tour of the app is waiting to be shown (set for new accounts, or from "Show the tour again"). */
+  tourPending?: boolean;
   theme: 'system' | 'light' | 'dark';
   /** Currency the person tracks in (amounts are not converted). See lib/currency.ts. */
   currency: import('./lib/currency').CurrencyCode;

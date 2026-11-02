@@ -11,6 +11,7 @@ import { UIProvider, useUI } from './store/ui';
 import { BottomNavigation, MobileTopBar, SideNavigation } from './components/Navigation';
 import { SheetHost } from './components/SheetHost';
 import { Toasts } from './components/money';
+import { Tour } from './components/Tour';
 import { Onboarding } from './components/Onboarding';
 import { AIChat } from './components/Assistant';
 import { TransactionDetail } from './components/TransactionDetail';
@@ -118,7 +119,7 @@ function ContextPanel() {
             <span className="grid h-7 w-7 place-items-center rounded-full bg-accent text-on-accent" aria-hidden="true">
               <Icon name="spark" size={14} />
             </span>
-            <h2 className="display flex-1 text-[18px]">PULSE AI</h2>
+            <h2 data-tour="ai" className="display flex-1 text-[18px]">PULSE AI</h2>
             {ui.chat.length > 0 && (
               <button type="button" className="text-[13px] font-semibold text-ink3 hover:text-ink" onClick={() => ui.setChat([])}>
                 Clear
@@ -391,6 +392,7 @@ function Shell() {
       <SheetHost />
       <MemberMoment />
       <Toasts />
+      <Tour />
     </div>
   );
 }

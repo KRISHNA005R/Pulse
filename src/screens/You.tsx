@@ -93,7 +93,18 @@ export function YouScreen() {
         {state.mode === 'demo' ? (
           <NavRow emoji="🧭" label="Demo tour" sub="What to try, step by step" onClick={() => go({ name: 'demo-guide' })} />
         ) : (
-          <NavRow emoji="🧭" label="Explore demo data" sub="Try every feature with a sample month" onClick={() => go({ name: 'demo-guide' })} />
+          <>
+            <NavRow
+              emoji="👋"
+              label="Show the tour again"
+              sub="A 20-second look around the app"
+              onClick={() => {
+                store.replayTour();
+                ui.setTab('home');
+              }}
+            />
+            <NavRow emoji="🧭" label="Explore demo data" sub="Try every feature with a sample month" onClick={() => go({ name: 'demo-guide' })} />
+          </>
         )}
       </section>
 
