@@ -86,11 +86,11 @@ export default defineConfig(({ mode }) => {
               },
               workbox: {
                 globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2,jpg,webp,webmanifest,mp3}'],
-                globIgnores: ['stats/**', 'founder/**', 'email/**', 'screenshots/**', 'illustrations/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
+                globIgnores: ['stats/**', 'founder/**', 'welcome/**', 'email/**', 'screenshots/**', 'illustrations/**', 'og-image.jpg', 'migrate.html', 'sw-migrate.js', 'llms.txt', '**/*cyrillic*', '**/*vietnamese*', '**/*greek*', 'fonts/**'],
                 // Reminders: the push and notification-tap handlers live in public/push-sw.js.
                 importScripts: ['/push-sw.js'],
                 navigateFallback: '/index.html',
-                navigateFallbackDenylist: [/^\/stats/, /^\/founder/, /^\/about/, /^\/404/, /^\/migrate/, /^\/api\//, /\.(xml|txt)$/],
+                navigateFallbackDenylist: [/^\/stats/, /^\/founder/, /^\/about/, /^\/welcome/, /^\/404/, /^\/migrate/, /^\/api\//, /\.(xml|txt)$/],
                 // GIF profile photos: an id never gets a different picture, so the phone keeps its copy
                 // and friends' photos still move without internet.
                 runtimeCaching: [
