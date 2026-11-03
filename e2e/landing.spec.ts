@@ -100,3 +100,22 @@ test.describe('less motion', () => {
     expect(await page.locator('.reveal').evaluateAll((els) => els.every((e) => getComputedStyle(e).opacity === '1'))).toBe(true);
   });
 });
+
+test('SEO: indexable, its own title and description, canonical, and valid structured data that matches the page', async ({ page, request }) => {
+  await open(page);
+  await expect(page).toHaveTitle('Safe to spend until payday: free budget app for India | PULSE');
+  expect(await page.locator('meta[name="robots"]').getAttribute('content')).toMatch(/^index, follow/);
+  expect(await page.locator('link[rel="canonical"]').getAttribute('href')).toBe('https://pulsemoney.in/welcome/');
+  const desc = (await page.locator('meta[name="description"]').getAttribute('content')) ?? '';
+  expect(desc.length).toBeGreaterThan(120);
+  expect(desc.length).toBeLessThanOrEqual(160);
+  const graph = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent()) ?? '{}')['@graph'];
+  const types = graph.map((x: { '@type': string }) => x['@type']);
+  for (const t of ['WebPage', 'BreadcrumbList', 'Organization', 'WebApplication', 'FAQPage']) expect(types).toContain(t);
+  // Every FAQ answer in the structured data is shown on the page.
+  const faq = graph.find((x: { '@type': string }) => x['@type'] === 'FAQPage').mainEntity;
+  for (const q of faq) await expect(page.locator('.faq-list summary', { hasText: q.name })).toHaveCount(1);
+  // In the sitemap, and linked from the other pages.
+  expect(await (await request.get('/sitemap.xml')).text()).toContain('<loc>https://pulsemoney.in/welcome/</loc>');
+  for (const path of ['/about/', '/privacy/']) expect(await (await request.get(path)).text()).toContain('href="/welcome/"');
+});

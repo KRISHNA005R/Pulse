@@ -15,5 +15,6 @@ Built in Mumbai for Gen Z Bharat. Founded by Krishna Raval, a designer and devel
 
 ## Pages
 - [PULSE app](https://pulsemoney.in/): the web app, with a demo month to explore.
+- [Why PULSE](https://pulsemoney.in/welcome/): the overview page: what Safe to spend is, a worked example and calculator, every feature, privacy in plain words, install steps and FAQ.
 - [Krishna Raval, founder](https://pulsemoney.in/founder/): who made PULSE, with contact links.
 - [How PULSE works](https://pulsemoney.in/about/): features, how safe-to-spend is calculated, privacy and FAQ.

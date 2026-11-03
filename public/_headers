@@ -31,3 +31,9 @@
 /stats/*
   Cache-Control: no-cache
   X-Robots-Tag: noindex, nofollow
+
+/welcome/img/*
+  Cache-Control: public, max-age=2592000
+
+/welcome/
+  Cache-Control: public, max-age=0, must-revalidate

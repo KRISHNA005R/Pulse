@@ -10,6 +10,19 @@
     <image:image><image:loc>https://pulsemoney.in/og-image.jpg</image:loc></image:image>
   </url>
   <url>
+    <loc>https://pulsemoney.in/welcome/</loc>
+    <xhtml:link rel="alternate" hreflang="en-IN" href="https://pulsemoney.in/welcome/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://pulsemoney.in/welcome/" />
+    <lastmod>2026-11-04</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+    <image:image><image:loc>https://pulsemoney.in/og-image.jpg</image:loc></image:image>
+    <image:image><image:loc>https://pulsemoney.in/welcome/img/plans-2x.webp</image:loc></image:image>
+    <image:image><image:loc>https://pulsemoney.in/illustrations/payday-salary.webp</image:loc></image:image>
+    <image:image><image:loc>https://pulsemoney.in/illustrations/gullak.webp</image:loc></image:image>
+    <image:image><image:loc>https://pulsemoney.in/illustrations/splits.webp</image:loc></image:image>
+  </url>
+  <url>
     <loc>https://pulsemoney.in/about/</loc>
     <xhtml:link rel="alternate" hreflang="en-IN" href="https://pulsemoney.in/about/" />
     <xhtml:link rel="alternate" hreflang="x-default" href="https://pulsemoney.in/about/" />
