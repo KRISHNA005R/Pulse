@@ -300,8 +300,11 @@ export function SafeBreakdown() {
 // ------------------------------------------------------------------
 // TransactionRow with swipe actions
 // ------------------------------------------------------------------
-const ACTIONS_W = 166; // two 74px pills, the gap and the edge padding
-const ACTIONS_W_ONE = 86; // just Delete: money in, transfers and balance corrections can't be split
+// Round buttons, like iPhone: two 52px circles with a 10px gap and 8px either side.
+const BTN = 52;
+const GAP = 10;
+const ACTIONS_W = BTN * 2 + GAP + 16;
+const ACTIONS_W_ONE = BTN + 16; // just Delete: money in, transfers and balance corrections can't be split
 const FULL_SWIPE = 0.62; // share of the row width that turns a swipe into delete
 
 export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boolean }) {
@@ -350,10 +353,13 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
     del.style.transform = `scale(${full ? 1 : 0.55 + a * 0.45})`;
     if (sp) {
       sp.style.transition = tr;
-      sp.style.opacity = full ? '0' : String(b);
+      // A full swipe: Split stays in place, dimmed, while Delete stretches toward it (like iPhone).
+      sp.style.opacity = full ? '0.35' : String(b);
       sp.style.transform = `scale(${0.55 + b * 0.45}) translateX(${(1 - b) * 30}px)`;
     }
-    del.style.width = full ? `${Math.max(74, -x - 8)}px` : '74px';
+    // Delete grows from a circle into a long pill that fills the space the row leaves behind.
+    const room = -x - 16 - (sp ? BTN + GAP : 0);
+    del.style.width = full ? `${Math.max(BTN, room)}px` : `${BTN}px`;
     li.dataset.full = full ? '1' : '';
   };
 
@@ -456,31 +462,33 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
   return (
     <li ref={liRef} className="group/row relative overflow-hidden rounded-xl">
       {/* swipe actions (touch): revealed as the row slides left */}
-      <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 py-1 pr-1.5" aria-hidden={!open}>
+      <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-[10px] pr-2" aria-hidden={!open}>
         {canSplit && (
           <button
             ref={splitRef}
             type="button"
             tabIndex={open ? 0 : -1}
-            style={{ opacity: 0, transform: 'scale(.55)' }}
-            className="flex h-full w-[74px] origin-right flex-col items-center justify-center gap-0.5 rounded-2xl bg-ink text-[12.5px] font-semibold text-bg active:scale-95"
+            aria-label="Split"
+            style={{ opacity: 0, transform: 'scale(.55)', width: BTN, height: BTN }}
+            className="grid shrink-0 origin-right place-items-center rounded-full bg-ink text-bg active:brightness-90"
             onClick={() => {
               close();
               ui.openSheet({ type: 'group-expense', personId: tx.people?.[0] });
             }}
           >
-            <Icon name="split" size={18} /> Split
+            <Icon name="split" size={21} />
           </button>
         )}
         <button
           ref={delRef}
           type="button"
           tabIndex={open ? 0 : -1}
-          style={{ opacity: 0, transform: 'scale(.55)', width: 74 }}
-          className="flex h-full origin-right flex-col items-center justify-center gap-0.5 rounded-2xl bg-neg text-[12.5px] font-semibold text-white active:scale-95"
+          aria-label="Delete"
+          style={{ opacity: 0, transform: 'scale(.55)', width: BTN, height: BTN }}
+          className="flex shrink-0 origin-right items-center justify-start overflow-hidden rounded-full bg-[#B83424] pl-[15.5px] text-white active:brightness-90"
           onClick={remove}
         >
-          <Icon name="trash" size={18} className="group-data-[full='1']/row:animate-wiggle" /> Delete
+          <Icon name="trash" size={21} className="shrink-0 group-data-[full='1']/row:animate-wiggle" />
         </button>
       </div>
       <button
