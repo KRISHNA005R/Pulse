@@ -125,8 +125,10 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
             ))}
         </select>
       </Row>
-      {tx.type === 'expense' && (
-        <Row label="Plan">
+      {/* Only on an older spend that was tagged with a plan (spent on it). New spends don't get one:
+          money goes into a plan with Add money, or Moved → the plan. */}
+      {tx.type === 'expense' && tx.plan && (
+        <Row label="Spent on plan">
           <select aria-label="Assign to plan" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.plan ?? ''} onChange={(e) => store.updateTransaction(tx.id, { plan: e.target.value || undefined })}>
             <option value="">None</option>
             {state.plans.map((p) => (

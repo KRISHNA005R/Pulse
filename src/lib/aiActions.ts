@@ -238,5 +238,6 @@ export function parseAction(s: State, input: string): AIAction | null {
   const category = p.category ?? 'other';
   const catName = s.categories.find((c) => c.id === category)?.name ?? 'Expense';
   const merchant = p.merchant && label && !label.toLowerCase().includes(p.merchant.toLowerCase()) ? `${p.merchant} · ${label}` : label || p.merchant || catName;
-  return { kind: 'expense', amount, merchant, category, date: p.date ?? today, plan: p.plan ?? undefined };
+  // Never tagged with a plan: that read like money went into it. "Add 4180 to Goa" does that.
+  return { kind: 'expense', amount, merchant, category, date: p.date ?? today };
 }

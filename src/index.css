@@ -371,3 +371,7 @@ body {
 .win-stamp { position: fixed; left: 50%; top: 38%; z-index: 2147482500; pointer-events: none; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; border: 6px solid rgb(var(--accent)); color: rgb(var(--accent)); background: rgb(var(--surface) / .92); display: grid; place-items: center; text-align: center; box-shadow: 0 0 0 6px rgb(var(--surface) / .92), inset 0 0 0 4px rgb(var(--surface)), inset 0 0 0 7px rgb(var(--accent) / .55); }
 .win-stamp::before { content: attr(data-stamp); font-family: var(--font-display, inherit); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: -.02em; text-transform: uppercase; max-width: 180px; }
 .win-stamp::after { content: attr(data-sub); position: absolute; bottom: 44px; left: 0; right: 0; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgb(var(--ink3)); }
+
+/* Sideways rows: the ‹ › arrows only on a laptop/desktop with a mouse (touch already swipes). */
+.hscroll-arrow { display: none; }
+@media (hover: hover) and (pointer: fine) { .hscroll-arrow { display: grid; } }

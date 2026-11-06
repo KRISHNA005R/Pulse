@@ -567,13 +567,7 @@ function useStoreImpl() {
         toast({ text: 'Transfer recorded.' });
         return;
       }
-      if (tx.plan) {
-        const p = next.plans.find((x) => x.id === tx.plan);
-        if (p) {
-          toast({ text: `Added to ${p.name}. Safe to spend is now ${rupees(sts.safe)}.` });
-          return;
-        }
-      }
+      // (A spend tagged with a plan is money spent on it, not added to it: no "Added to" message.)
       if (b) {
         const st = budgetState(next, b);
         const cat = categoryName(next, b.category).toLowerCase();

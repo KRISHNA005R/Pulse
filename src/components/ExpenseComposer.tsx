@@ -10,6 +10,7 @@ import { categoryFor, emojiFor } from '../lib/lexicon';
 import { addDays, fmtDate, haptic, rupees } from '../lib/format';
 import { BACK_WORDS, budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
 import { Icon } from './ui/Icon';
+import { HScroll } from './ui/HScroll';
 import { PeoplePicker } from './People';
 import { SwipeToConfirm } from './ui/SwipeToConfirm';
 import { CategoryMark, MoneyInput, PersonAvatar, Segmented } from './ui/bits';
@@ -75,8 +76,10 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     const p = state.plans.find((x) => x.status === 'active');
     return p ? `pot:${p.id}` : state.accounts.find((a) => a.id !== (preset?.account ?? defaultAccount(state)))?.id ?? '';
   });
-  const [plan, setPlan] = useState<string | null | undefined>(preset?.plan);
+  const [plan] = useState<string | null | undefined>(preset?.plan);
   const [people, setPeople] = useState<string[] | null>(preset?.people ?? null);
+  /** New names the hint added to a split (made into friends when it's saved). */
+  const [extraNew, setExtraNew] = useState<string[]>([]);
   const [recurring, setRecurring] = useState(false);
   const [mode, setMode] = useState<SplitMode>('equal');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -96,10 +99,14 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const effBack = effType === 'income' && (back ?? BACK_WORDS.test(text));
   const catKind: 'income' | 'expense' = effType === 'income' && !effBack ? 'income' : 'expense';
   const effCat: CategoryId = cat ?? (effBack ? categoryFor(text.replace(BACK_WORDS, ' '), state.categories, 'expense') ?? 'other' : effType === 'income' ? (parsed.type === 'income' && /freelance|client/i.test(text) ? 'freelance' : /salary/i.test(text) ? 'salary' : 'income-other') : parsed.category ?? 'other');
-  const effPlan = plan === undefined ? parsed.plan : plan;
+  // A spend isn't put into a plan. Only an old spend that already had one keeps it (editing it).
+  const effPlan = plan ?? undefined;
   const effDate = preset?.date || date !== state.today ? date : parsed.date ?? date;
-  const effPeople = people ?? parsed.people;
-  const pendingNew = people ? [] : parsed.newPeople;
+  // Friends named in the text don't make a split by themselves: the hint below offers it.
+  const effPeople = people ?? [];
+  const pendingNew = extraNew;
+  const namedPeople = [...parsed.people.map((id) => state.people.find((p) => p.id === id)?.short ?? state.people.find((p) => p.id === id)?.name ?? ''), ...parsed.newPeople].filter(Boolean);
+  const offerSplit = people === null && namedPeople.length > 0;
   const participants = ['me', ...effPeople];
   const hasSplit = effType === 'expense' && (effPeople.length > 0 || pendingNew.length > 0);
 
@@ -121,9 +128,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const inferredBits = [
     parsed.amount && !amount ? rupees(parsed.amount) : null,
     parsed.category && !cat ? state.categories.find((c) => c.id === parsed.category)?.name : null,
-    parsed.people.length || parsed.newPeople.length ? `with ${[...parsed.people.map((id) => state.people.find((p) => p.id === id)?.short), ...parsed.newPeople].join(', ')}` : null,
-    effType === 'expense' && (parsed.people.length || parsed.newPeople.length) ? `split ${Math.round(100 / (1 + parsed.people.length + parsed.newPeople.length))}/${Math.round(100 - 100 / (1 + parsed.people.length + parsed.newPeople.length))}` : null,
-    parsed.plan && plan === undefined ? state.plans.find((p) => p.id === parsed.plan)?.name : null,
     parsed.date && parsed.date !== state.today ? 'yesterday' : null,
   ].filter(Boolean);
 
@@ -267,7 +271,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
 
       {/* Quick picks: your usual places, then every category, then make your own */}
       {picks.length > 0 && (
-        <div className="no-scrollbar -mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1" role="group" aria-label="Quick picks">
+        <HScroll outerClassName="-mx-5 mt-5" className="no-scrollbar flex gap-2 overflow-x-auto px-5 pb-1" role="group" aria-label="Quick picks" testId="hscroll-quick-picks" focusKey={`${effType}-${effBack}-${cat !== null || text.trim() ? effCat : ''}`}>
           {picks.map((q) => {
             const on = q.kind === 'category' && !effBack && effCat === q.category && (cat !== null || !!text.trim());
             return (
@@ -317,7 +321,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             </span>
             <span className="whitespace-nowrap text-[12px] font-semibold">New</span>
           </button>
-        </div>
+        </HScroll>
       )}
 
       {effBack && (
@@ -361,6 +365,22 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
           <Icon name="spark" size={14} /> Got it: {inferredBits.join(' · ')}
         </p>
       )}
+      {effType === 'expense' && offerSplit && (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            className="chip"
+            onClick={() => {
+              haptic(6);
+              setPeople(parsed.people);
+              setExtraNew(parsed.newPeople);
+              setPanel('people');
+            }}
+          >
+            <Icon name="users" size={15} /> Split with {namedPeople.join(', ')}?
+          </button>
+        </div>
+      )}
 
       {/* Bank or cash: always visible, because it decides which balance moves */}
       {showSource && (
@@ -368,7 +388,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
           <p id="composer-source" className="text-[12.5px] font-semibold text-ink3">
             {effType === 'income' ? 'Received in' : 'Paid from'}
           </p>
-          <div role="radiogroup" aria-labelledby="composer-source" className={sources.length <= 2 ? 'mt-1.5 grid grid-cols-2 gap-2' : 'no-scrollbar -mx-5 mt-1.5 flex gap-2 overflow-x-auto px-5 pb-1'}>
+          <HScroll role="radiogroup" aria-labelledby="composer-source" outerClassName={sources.length <= 2 ? '' : '-mx-5'} className={sources.length <= 2 ? 'mt-1.5 grid grid-cols-2 gap-2' : 'no-scrollbar mt-1.5 flex gap-2 overflow-x-auto px-5 pb-1'} focusKey={account}>
             {sources.map((o) => {
               const on = account === o.id;
               return (
@@ -393,7 +413,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
                 </button>
               );
             })}
-          </div>
+          </HScroll>
           {short && source && (
             <p className="mt-2 text-[12.5px] leading-snug text-ink2" role="status">
               {source.cash
@@ -406,10 +426,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
 
       {/* Details, one swipeable row */}
       {effType !== 'transfer' ? (
-        <div className="no-scrollbar -mx-5 mt-4 flex gap-1.5 overflow-x-auto px-5 pb-1">
-          <button type="button" className="chip shrink-0 rounded-full" aria-expanded={panel === 'category'} onClick={() => togglePanel('category')}>
-            <span aria-hidden="true">{catObj?.emoji ?? '✨'}</span> {effBack ? `Comes off ${catName}` : catName}
-          </button>
+        <HScroll outerClassName="-mx-5 mt-4" className="no-scrollbar flex gap-1.5 overflow-x-auto px-5 pb-1" testId="composer-details">
           <button type="button" className="chip shrink-0" aria-expanded={panel === 'date'} onClick={() => togglePanel('date')}>
             <Icon name="calendar" size={15} /> {dateLabel}
           </button>
@@ -418,15 +435,12 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
               <button type="button" className="chip shrink-0" aria-expanded={panel === 'people'} onClick={() => togglePanel('people')}>
                 <Icon name="users" size={15} /> {effPeople.length + pendingNew.length ? `${effPeople.length + pendingNew.length + 1} people` : 'Split'}
               </button>
-              <button type="button" className="chip shrink-0" aria-expanded={panel === 'plan'} onClick={() => togglePanel('plan')}>
-                <Icon name="target" size={15} /> {effPlan ? state.plans.find((p) => p.id === effPlan)?.name : 'Plan'}
-              </button>
             </>
           )}
           <button type="button" className="chip shrink-0" aria-pressed={recurring} onClick={() => { haptic(6); setRecurring(!recurring); }}>
             <Icon name="repeat" size={15} /> Monthly
           </button>
-        </div>
+        </HScroll>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
@@ -488,18 +502,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             Pick a date
           </label>
           <input id="composer-date" type="date" className="field w-auto py-2" value={effDate} max={state.today} onChange={(e) => e.target.value && setDate(e.target.value)} />
-        </div>
-      )}
-      {panel === 'plan' && (
-        <div className="mt-4 flex animate-rise flex-wrap justify-center gap-2">
-          <button type="button" className="chip" aria-pressed={!effPlan} onClick={() => { setPlan(null); setPanel(null); }}>
-            No plan
-          </button>
-          {state.plans.filter((p) => p.status !== 'paused').map((p) => (
-            <button key={p.id} type="button" className="chip" aria-pressed={effPlan === p.id} onClick={() => { setPlan(p.id); setPanel(null); }}>
-              {p.icon} {p.name}
-            </button>
-          ))}
         </div>
       )}
       {panel === 'people' && (
