@@ -1,5 +1,6 @@
 import { GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ex, scaled } from '../lib/currency';
 import { BrandSignature } from '../components/ui/BrandSignature';
 import { useStore } from '../store/store';
@@ -37,8 +38,24 @@ export function HomeScreen() {
   const oweGroup = owe ? state.groups.find((g) => (personBalances(state, g.id).get(owe[0]) ?? 0) < 0) : undefined;
   const dup = useMemo(() => detections(state).find((d) => d.kind === 'duplicate'), [state]);
 
+  // Beta: Home is drawn in glass. The warm shapes behind it are what the glass blurs.
+  useEffect(() => {
+    document.documentElement.dataset.glass = '1';
+    return () => {
+      delete document.documentElement.dataset.glass;
+    };
+  }, []);
+
   return (
     <div className="flex flex-col gap-8">
+      {createPortal(
+        <div className="glass-backdrop" aria-hidden="true">
+          <span className="gb gb-1" />
+          <span className="gb gb-2" />
+          <span className="gb gb-3" />
+        </div>,
+        document.body,
+      )}
       <PaydayCard />
       <RewindOffer />
       <PaydayWin />
@@ -49,7 +66,7 @@ export function HomeScreen() {
 
       <section aria-labelledby="h-next">
         <SectionHeader id="h-next" title="Up next" action={{ label: 'All bills', onClick: () => ui.push({ name: 'subscriptions' }, 'you') }} />
-        <ul className="flex flex-col">
+        <ul className="home-panel flex flex-col">
           {next.map((u) => (
             <li key={u.id}>
               <button type="button" className="row-btn" onClick={() => (u.kind === 'bhisi' && u.ref ? ui.push({ name: 'bhisi', id: u.ref }) : u.kind === 'income' ? ui.push({ name: 'income' }, 'you') : u.kind === 'investment' ? ui.push({ name: 'investments' }, 'you') : u.kind === 'insurance' ? ui.push({ name: 'insurance' }, 'you') : u.kind === 'card' ? ui.push({ name: 'cards' }, 'you') : ui.openSheet({ type: 'sub-form', subId: u.ref }))}>
@@ -114,7 +131,7 @@ export function HomeScreen() {
       <section aria-labelledby="h-plans">
         <SectionHeader id="h-plans" title="Your plans" action={{ label: 'See all', onClick: () => { ui.setPlansSegment('plans'); ui.resetTo('plans'); } }} />
         {plans.length ? (
-          <div className="flex flex-col">
+          <div className="home-panel flex flex-col">
             {plans.map((p) => (
               <PlanProgress key={p.id} plan={p} onClick={() => ui.push({ name: 'plan', id: p.id })} />
             ))}
@@ -127,7 +144,7 @@ export function HomeScreen() {
       <section aria-labelledby="h-recent">
         <SectionHeader id="h-recent" title="Recent" action={{ label: 'Activity', onClick: () => ui.resetTo('activity') }} />
         {recent.length ? (
-          <ul className="flex flex-col">
+          <ul className="home-panel flex flex-col">
             {recent.map((t) => (
               <TransactionRow key={t.id} tx={t} compact />
             ))}
