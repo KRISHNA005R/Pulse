@@ -40,10 +40,10 @@ export function BottomNavigation() {
         aria-current={on ? 'page' : undefined}
         aria-label={it.label}
         data-tour={it.tab}
-        className={`flex h-[50px] shrink-0 items-center overflow-hidden rounded-full border-[1.5px] active:scale-[0.96] ${on ? 'border-transparent bg-pill text-pill-fg' : 'border-ink/75 bg-transparent text-ink hover:bg-sunk'}`}
+        className={`flex h-[46px] shrink-0 items-center overflow-hidden rounded-full active:scale-[0.96] ${on ? 'liquid-active text-pill-fg' : 'bg-transparent text-ink'}`}
         style={{
-          width: on ? PILL_W[it.tab] : 50,
-          paddingLeft: 13, // keeps the icon exactly where it sits in the circle
+          width: on ? PILL_W[it.tab] - 4 : 46,
+          paddingLeft: 12.5, // keeps the icon exactly where it sits in the circle
           transition: `width 480ms ${ease}, background-color 320ms ease, border-color 320ms ease, color 320ms ease, transform 150ms ease`,
         }}
       >
@@ -62,9 +62,10 @@ export function BottomNavigation() {
     );
   };
   return (
-    <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-40 bg-bg/85 backdrop-blur-md lg:hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
-      <div className="mx-auto flex max-w-[480px] items-center justify-between gap-1.5 px-4 pt-2.5">
-        {ITEMS.map(tabButton)}
+    <nav aria-label="Main" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 lg:hidden" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}>
+      {/* Liquid glass: one floating capsule for the tabs, and the + as its own glass drop. */}
+      <div className="pointer-events-auto mx-auto flex max-w-[480px] items-center justify-between gap-2.5 px-4 pt-2.5">
+        <div className="liquid flex items-center gap-0.5 rounded-full p-[3px]">{ITEMS.map(tabButton)}</div>
         <button
           type="button"
           onClick={() => {
@@ -72,7 +73,7 @@ export function BottomNavigation() {
             setSpin((n) => n + 1);
             ui.openSheet({ type: 'composer' });
           }}
-          className={`tap grid h-[50px] w-[50px] shrink-0 place-items-center rounded-full bg-accent text-on-accent shadow-[0_8px_20px_-8px_rgb(var(--accent))] ${nudge ? 'animate-ring' : ''}`}
+          className={`liquid liquid-tint tap grid h-[52px] w-[52px] shrink-0 place-items-center rounded-full text-on-accent ${nudge ? 'animate-ring' : ''}`}
           aria-label="Add expense"
           data-tour="add"
         >
@@ -131,11 +132,11 @@ export function MobileTopBar() {
       <p className="display text-[21px] tracking-tight">
         PULSE<span className="text-accent-ink">.</span>
       </p>
-      <div className="flex items-center gap-1">
-        <button type="button" onClick={() => ui.openSheet({ type: 'command' })} className="tap grid h-11 w-11 place-items-center rounded-full hover:bg-sunk" aria-label="Search or run a command">
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => ui.openSheet({ type: 'command' })} className="liquid tap grid h-11 w-11 place-items-center rounded-full" aria-label="Search or run a command">
           <Icon name="search" size={20} />
         </button>
-        <button type="button" data-tour="ai" onClick={() => ui.openSheet({ type: 'ai' })} className="tap inline-flex h-11 items-center gap-1.5 rounded-full bg-sunk px-3.5 text-[14px] font-semibold" aria-label="Ask PULSE AI">
+        <button type="button" data-tour="ai" onClick={() => ui.openSheet({ type: 'ai' })} className="liquid tap inline-flex h-11 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-semibold" aria-label="Ask PULSE AI">
           <Icon name="spark" size={17} className="text-accent-ink" /> AI
         </button>
       </div>
