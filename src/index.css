@@ -375,3 +375,139 @@ body {
 /* Sideways rows: the ‹ › arrows only on a laptop/desktop with a mouse (touch already swipes). */
 .hscroll-arrow { display: none; }
 @media (hover: hover) and (pointer: fine) { .hscroll-arrow { display: grid; } }
+
+/* ---------- Beta: glass ----------
+   Two kinds:
+   - Liquid glass (.liquid): Apple-style clear glass for the floating controls (tab bar, +, top buttons).
+     Thin blur, bright edges where light catches it, a soft sheen across the top.
+   - Frosted glass (glassmorphism): the cards on Home, over warm shapes that drift slowly behind.
+   Home sets <html data-glass> while it's on screen. */
+.liquid {
+  position: relative;
+  isolation: isolate;
+  background: rgb(255 255 255 / 0.28);
+  -webkit-backdrop-filter: blur(14px) saturate(190%);
+  backdrop-filter: blur(14px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.95),
+    inset 0 -1px 0.5px rgb(255 255 255 / 0.4),
+    inset 1px 0 0.5px rgb(255 255 255 / 0.35),
+    inset -1px 0 0.5px rgb(255 255 255 / 0.35),
+    inset 0 0 14px rgb(255 255 255 / 0.28),
+    0 0 0 0.5px rgb(23 20 15 / 0.08),
+    0 10px 28px -10px rgb(60 28 8 / 0.32);
+}
+/* The sheen: light on the top-left edge, a faint glint at the bottom-right. */
+.liquid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 30% 0%, rgb(255 255 255 / 0.55), rgb(255 255 255 / 0) 60%),
+    radial-gradient(80% 60% at 90% 110%, rgb(255 255 255 / 0.22), rgb(255 255 255 / 0) 70%);
+}
+/* Tinted liquid glass: the + button, Persimmon showing through. */
+.liquid-tint { background: rgb(236 91 43 / 0.88); }
+.liquid-tint::before { background: radial-gradient(110% 70% at 35% 0%, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0) 58%); }
+/* The selected tab inside the capsule: a darker glass drop. */
+.liquid-active {
+  background: rgb(var(--pill) / 0.9);
+  box-shadow: inset 0 1px 0.5px rgb(255 255 255 / 0.28), inset 0 -1px 0.5px rgb(255 255 255 / 0.1), 0 4px 12px -6px rgb(0 0 0 / 0.5);
+}
+:root[data-theme='dark'] .liquid {
+  background: rgb(40 37 33 / 0.38);
+  box-shadow:
+    inset 0 1px 0.5px rgb(255 255 255 / 0.32),
+    inset 0 -1px 0.5px rgb(255 255 255 / 0.1),
+    inset 0 0 14px rgb(255 255 255 / 0.06),
+    0 0 0 0.5px rgb(255 255 255 / 0.1),
+    0 10px 28px -10px rgb(0 0 0 / 0.6);
+}
+:root[data-theme='dark'] .liquid::before { background: radial-gradient(120% 70% at 30% 0%, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0) 60%); }
+:root[data-theme='dark'] .liquid-tint { background: rgb(236 91 43 / 0.85); }
+:root[data-theme='dark'] .liquid-active { background: rgb(255 255 255 / 0.16); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .liquid {
+    background: rgb(40 37 33 / 0.38);
+    box-shadow:
+      inset 0 1px 0.5px rgb(255 255 255 / 0.32),
+      inset 0 -1px 0.5px rgb(255 255 255 / 0.1),
+      inset 0 0 14px rgb(255 255 255 / 0.06),
+      0 0 0 0.5px rgb(255 255 255 / 0.1),
+      0 10px 28px -10px rgb(0 0 0 / 0.6);
+  }
+  :root:not([data-theme='light']) .liquid::before { background: radial-gradient(120% 70% at 30% 0%, rgb(255 255 255 / 0.14), rgb(255 255 255 / 0) 60%); }
+  :root:not([data-theme='light']) .liquid-tint { background: rgb(236 91 43 / 0.85); }
+  :root:not([data-theme='light']) .liquid-active { background: rgb(255 255 255 / 0.16); }
+}
+
+/* Behind Home: three soft warm shapes that drift, plus a little grain so it feels like paper, not a screen. */
+.glass-backdrop { display: none; }
+:root[data-glass] .glass-backdrop { display: block; position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: rgb(var(--bg)); }
+:root[data-glass] body,
+:root[data-glass] #root > div.bg-bg { background: transparent; }
+.glass-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .4 0 0 0 0 .3 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.gb { position: absolute; border-radius: 50%; filter: blur(56px); will-change: transform; }
+.gb-1 { width: 380px; height: 380px; right: -120px; top: -90px; background: #EC5B2B; opacity: 0.7; animation: gb-drift-a 22s ease-in-out infinite alternate; }
+.gb-2 { width: 340px; height: 320px; left: -150px; top: 30vh; background: #F2A33C; opacity: 0.6; animation: gb-drift-b 26s ease-in-out infinite alternate; }
+.gb-3 { width: 400px; height: 360px; right: -160px; bottom: -80px; background: #E8826A; opacity: 0.55; animation: gb-drift-a 30s ease-in-out -8s infinite alternate; }
+@keyframes gb-drift-a { from { transform: translate(0, 0) scale(1); } to { transform: translate(-60px, 70px) scale(1.12); } }
+@keyframes gb-drift-b { from { transform: translate(0, 0) scale(1); } to { transform: translate(80px, -50px) scale(0.92); } }
+:root[data-theme='dark'] .gb { opacity: 0.3; }
+:root[data-theme='dark'] .glass-backdrop::after { mix-blend-mode: screen; opacity: 0.08; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .gb { opacity: 0.3; }
+  :root:not([data-theme='light']) .glass-backdrop::after { mix-blend-mode: screen; opacity: 0.08; }
+}
+@media (prefers-reduced-motion: reduce) { .gb { animation: none !important; } }
+
+/* Frosted cards on Home: every white card turns to frosted glass; the list sections sit on one too. */
+:root[data-glass] main .bg-surface,
+:root[data-glass] main .home-panel {
+  background: rgb(255 255 255 / 0.4);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border-color: rgb(255 255 255 / 0.65);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.85), 0 12px 32px -16px rgb(70 32 10 / 0.28);
+}
+:root[data-glass] main .home-panel { border: 1px solid rgb(255 255 255 / 0.65); border-radius: 22px; padding: 6px; }
+/* The two small tiles in the big card (per day, payday) become liquid drops inside the frost. */
+:root[data-glass] main .hero-card dl > div {
+  background: rgb(255 255 255 / 0.42);
+  box-shadow: inset 0 1px 0.5px rgb(255 255 255 / 0.95), inset 0 -1px 0.5px rgb(255 255 255 / 0.4), 0 6px 16px -10px rgb(60 28 8 / 0.3);
+}
+:root[data-glass] main .hero-card dl > div.bg-accent-soft { background: rgb(236 91 43 / 0.16); }
+:root[data-glass] main .row-btn:hover { background: rgb(255 255 255 / 0.45); }
+/* Rows and cards inside a frosted panel are clear, so there's only one layer of frost. */
+:root[data-glass] main .home-panel .bg-bg,
+:root[data-glass] main .home-panel .bg-surface { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; border-color: transparent; }
+:root[data-theme='dark'][data-glass] main .bg-surface,
+:root[data-theme='dark'][data-glass] main .home-panel {
+  background: rgb(30 28 25 / 0.5);
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+}
+:root[data-theme='dark'][data-glass] main .hero-card dl > div { background: rgb(255 255 255 / 0.06); box-shadow: inset 0 1px 0.5px rgb(255 255 255 / 0.18); }
+:root[data-theme='dark'][data-glass] main .hero-card dl > div.bg-accent-soft { background: rgb(236 91 43 / 0.18); }
+:root[data-theme='dark'][data-glass] main .row-btn:hover { background: rgb(255 255 255 / 0.06); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'])[data-glass] main .bg-surface,
+  :root:not([data-theme='light'])[data-glass] main .home-panel {
+    background: rgb(30 28 25 / 0.5);
+    border-color: rgb(255 255 255 / 0.1);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.1), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  }
+  :root:not([data-theme='light'])[data-glass] main .hero-card dl > div { background: rgb(255 255 255 / 0.06); box-shadow: inset 0 1px 0.5px rgb(255 255 255 / 0.18); }
+  :root:not([data-theme='light'])[data-glass] main .hero-card dl > div.bg-accent-soft { background: rgb(236 91 43 / 0.18); }
+  :root:not([data-theme='light'])[data-glass] main .row-btn:hover { background: rgb(255 255 255 / 0.06); }
+}
