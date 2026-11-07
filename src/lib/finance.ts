@@ -393,6 +393,42 @@ export interface PlanMetrics {
   short: string;
   projectedDate: ISODate | null;
   spent: number;
+  /** The monthly saves still to make (see planMonthSaves). */
+  saves: MonthSaves;
+}
+
+export interface MonthSaves {
+  /** How many monthly saves are left. */
+  count: number;
+  /** When each one falls (one a month from today; this month left out once its share is in). */
+  months: ISODate[];
+  /** This month's share is already in, so this month no longer counts. */
+  thisMonthIn: boolean;
+}
+
+/**
+ * The monthly saves left on a plan. Counted one a month from today until the target (as before), but
+ * once this calendar month's share is in, this month stops counting: ₹90,000 by 18 Jan, ₹30,180 put in
+ * on 4 Nov, today 7 Nov → December and January are left, ₹29,910 each (not ₹19,940 × 3).
+ * "This month's share" = money moved into the plan this month, less money taken out, at least the
+ * month's even share. A plan's starting amount isn't a move, so a new plan matches what the form said.
+ */
+export function planMonthSaves(s: State, p: Plan): MonthSaves {
+  const total = monthlySaves(s.today, p.targetDate);
+  const remaining = Math.max(0, p.target - p.saved);
+  const month = s.today.slice(0, 7);
+  const pot = `pot:${p.id}`;
+  let net = 0;
+  for (const t of s.transactions) {
+    if (t.type !== 'transfer' || t.toAccount !== pot || t.date.slice(0, 7) !== month || t.date > s.today) continue;
+    net += t.direction === 'in' ? -t.amount : t.amount;
+  }
+  const share = (remaining + net) / total;
+  const thisMonthIn = remaining > 0 && net > 0 && net >= share * 0.95;
+  const count = thisMonthIn ? Math.max(1, total - 1) : total;
+  const skip = thisMonthIn && total > 1 ? 1 : 0;
+  const months = Array.from({ length: count }, (_, i) => addMonths(s.today, i + skip));
+  return { count, months, thisMonthIn };
 }
 
 /**
@@ -441,7 +477,8 @@ export function planMetrics(s: State, p: Plan): PlanMetrics {
   const perDay = p.target / total;
   const diff = p.saved - expected;
   const daysAhead = Math.round(diff / perDay);
-  const monthly = perMonth(remaining, s.today, p.targetDate);
+  const saves = planMonthSaves(s, p);
+  const monthly = remaining > 0 ? roundMoney(remaining / saves.count) : 0;
   const weekExtra = diff < 0 ? roundMoney(-diff) : 0;
   const pace = elapsed > 0 ? p.saved / elapsed : 0;
   const projectedDate = remaining === 0 ? s.today : pace > 0 ? addDays(s.today, Math.ceil(remaining / pace)) : null;
@@ -479,7 +516,7 @@ export function planMetrics(s: State, p: Plan): PlanMetrics {
     status = 'Right on schedule.';
     short = 'On track';
   }
-  return { progress, remaining, daysLeft, expected, daysAhead, monthly, weekExtra, tone, status, short, projectedDate, spent: roundMoney(spent) };
+  return { progress, remaining, daysLeft, expected, daysAhead, monthly, weekExtra, tone, status, short, projectedDate, spent: roundMoney(spent), saves };
 }
 
 // ------------------------------------------------------------------

@@ -2,9 +2,9 @@ import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { roundMoney } from '../lib/currency';
 import { useUI } from '../store/ui';
-import { budgetState, defaultAccount, monthlySaves, nextPayday, weeklySaves, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { budgetState, defaultAccount, nextPayday, weeklySaves, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
 import { authorOf, groupSeat, inGroupOnPulse } from '../lib/friends';
-import { fmtDate, relDay, rupees } from '../lib/format';
+import { fmtDate, relDay, rupees, monthName } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
 import { EmptyState, MoneyStat, PersonAvatar, Ring, SectionHeader, Segmented, StatusPill, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
@@ -259,7 +259,15 @@ export function PlanDetail({ id }: { id: string }) {
   const pct = Math.round(m.progress * 100);
   // What it takes from today, in three sizes.
   const perDay = m.daysLeft > 0 ? m.remaining / m.daysLeft : m.remaining;
-  const months = monthlySaves(state.today, plan.targetDate);
+  const months = m.saves.count;
+  // Under the three amounts: which months are left, so "× 2" is clear.
+  const monName = (d: string, long = false) => (long ? monthName(d) : monthName(d).slice(0, 3));
+  const monthsNote =
+    months >= 2
+      ? m.saves.thisMonthIn
+        ? `${monName(state.today, true)}'s share is in. Next: ${m.saves.months.map((d) => monName(d)).join(', ')}`
+        : `Months left: ${m.saves.months.map((d) => monName(d)).join(', ')}`
+      : null;
   const weeks = weeklySaves(state.today, plan.targetDate);
   const pace = [
     months >= 2 && { label: `a month × ${months}`, value: m.monthly },
@@ -325,6 +333,7 @@ export function PlanDetail({ id }: { id: string }) {
             ))}
           </div>
         )}
+        {live && m.remaining > 0 && monthsNote && <p className="mt-2 text-center text-[12.5px] text-ink3" data-testid="plan-months-note">{monthsNote}</p>}
 
         {live && (quick.length > 0 || finish > 0) && (
           <div className="mt-4">
