@@ -57,12 +57,12 @@ export const LEXICON: { k: string[]; e: string; c: CategoryId; p?: boolean }[] =
   { k: ['dmart', 'grocery', 'groceries', 'kirana', 'ration', 'reliance fresh', 'reliance smart', 'more supermarket', 'big bazaar', 'star bazaar', 'spencers', 'nature basket', 'ratnadeep', 'supermarket'], e: '🛒', c: 'groceries' },
 
   // ---- transport / fuel ----
-  { k: ['petrol', 'diesel', 'fuel', 'cng', 'hp pump', 'indian oil', 'bharat petroleum', 'ev charge', 'ev charging', 'charging'], e: '⛽', c: 'fuel' },
+  { k: ['petrol', 'diesel', 'fuel', 'cng', 'hp pump', 'petrol pump', 'fuel station', 'indian oil', 'indianoil', 'iocl', 'bharat petroleum', 'bpcl', 'hpcl', 'hindustan petroleum', 'nayara', 'essar', 'shell', 'jio-bp', 'jio bp', 'ev charge', 'ev charging', 'charging station'], e: '⛽', c: 'fuel' },
   { k: ['auto', 'rickshaw', 'e-rickshaw', 'toto', 'rapido', 'tuk tuk', 'shared auto'], e: '🛺', c: 'transport' },
   { k: ['uber', 'ola', 'cab', 'taxi', 'blusmart', 'namma yatri', 'indrive', 'meru'], e: '🚕', c: 'transport' },
   { k: ['metro', 'metro card', 'metro card recharge', 'local train', 'train pass'], e: '🚇', c: 'transport' },
   { k: ['bus', 'redbus', 'best bus', 'bus pass'], e: '🚌', c: 'transport' },
-  { k: ['bike', 'scooty', 'car', 'parking', 'toll', 'fastag', 'fastag recharge', 'bike service', 'car service', 'servicing', 'service', 'puncture', 'car wash', 'bike wash', 'oil change', 'tyre', 'driver', 'valet', 'yulu', 'bounce', 'helmet', 'challan'], e: '🛵', c: 'transport' },
+  { k: ['bike', 'scooty', 'car', 'parking', 'toll', 'fastag', 'fastag recharge', 'bike service', 'car service', 'servicing', 'service', 'puncture', 'car wash', 'bike wash', 'oil change', 'engine oil', 'tyre', 'driver', 'valet', 'yulu', 'bounce', 'helmet', 'challan'], e: '🛵', c: 'transport' },
 
   // ---- travel ----
   { k: ['flight', 'indigo', 'air india', 'akasa', 'vistara', 'airport'], e: '✈️', c: 'travel' },

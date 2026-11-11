@@ -99,3 +99,21 @@ describe('categories PULSE guesses from what people type', () => {
     expect(categoryFor('salary', undefined, 'income')).toBe('salary');
   });
 });
+
+describe('fuel words', () => {
+  it('pump brands and fuel stations go to Fuel', () => {
+    for (const t of ['hpcl 500', 'iocl 400', 'bpcl 250', 'nayara 300', 'shell 900', 'jio-bp 300', 'jio bp 300', 'indianoil 200', 'petrol pump 200', 'essar 300', 'ev charging 180', 'cng 250', 'hp petrol pump'])
+      expect(categoryFor(t), t).toBe('fuel');
+  });
+  it('a charging cable or adapter is shopping, not fuel', () => {
+    expect(categoryFor('phone charging cable')).toBe('shopping');
+    expect(categoryFor('laptop charging adapter')).not.toBe('fuel');
+  });
+  it('engine oil is vehicle upkeep, not groceries', () => {
+    expect(categoryFor('engine oil')).toBe('transport');
+    expect(categoryFor('cooking oil')).toBe('groceries');
+  });
+  it('jio recharge is still a bill', () => {
+    expect(categoryFor('jio recharge 299')).toBe('bills');
+  });
+});
