@@ -527,7 +527,7 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
               {t.perKm.exact ? '' : ' (about)'}
             </p>
             <p className="num-hero mt-0.5 text-[30px] leading-none">{rupees(r.total)}</p>
-            {kind === 'shared' && who.length > 0 && <p className="mt-1 text-[14px] text-ink2">{rupees(r.shares[r.shares.length - 1])} each for {people} people</p>}
+            {kind === 'shared' && who.length > 0 && <p className="mt-1 text-[14px] text-ink2">{Math.min(...r.shares) === Math.max(...r.shares) ? `${rupees(r.shares[0])} each` : `${rupees(Math.min(...r.shares))} to ${rupees(Math.max(...r.shares))} each`} for {people} people</p>}
             <p className="mt-2 text-[12.5px] text-ink3">Fuel only. Add tolls or parking as their own split.</p>
           </>
         ) : (
