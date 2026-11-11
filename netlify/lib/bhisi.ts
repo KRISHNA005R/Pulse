@@ -229,6 +229,13 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   if (!meta) return fail(404, 'This bhisi link no longer works. Ask for a new one.');
   if (meta.deleted) return GONE;
 
+  // Before joining: the organiser's sealed box (only someone with the link's key can open it) and
+  // how many are in. The link carries only the key; the id comes from it, so this needs the link.
+  if (action === 'b-peek') {
+    const owner = seats.find((x) => x.mid === meta.owner)?.s;
+    return { status: 200, body: { ok: true, box: owner?.box ?? '', count: seatList(meta, seats, draws).length, locked: draws.length > 0 } };
+  }
+
   if (action === 'b-join') {
     if (mine) {
       if (mine.th !== th) return fail(409, 'taken');

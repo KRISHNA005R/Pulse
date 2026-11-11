@@ -19,11 +19,7 @@ test('two phones: invite, join, draw, same winner on both', async ({ browser, ba
   await form.getByRole('button', { name: /Start bhisi/ }).click();
   await expect.poll(async () => (await state(A)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
 
-  const invite = await A.evaluate(() => {
-    const bh = JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0];
-    const label = btoa(String.fromCharCode(...new TextEncoder().encode(bh.name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return `${location.origin}/#bhisi=${bh.share.bid}.${bh.share.key}.${label}`;
-  });
+  const invite = await A.evaluate(() => `${location.origin}/#b=${JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0].share.key}`);
 
   const B = await phone(browser, baseURL!, 'Priya');
   await B.goto(invite);

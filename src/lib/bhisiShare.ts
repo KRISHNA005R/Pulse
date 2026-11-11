@@ -8,12 +8,13 @@
 // the date comes; whoever is first, everyone gets the same chit.
 import type { Bhisi, BhisiShare, ISODate, Person, State, Transaction } from '../types';
 import { addMonths, uid as newId } from './format';
-import { api, hex, label, rand, seal, unseal } from './friends';
+import { api, hex, rand, seal, unseal } from './friends';
 import { fromB64Url, toB64Url } from './codec';
 import { pot } from './bhisi';
 import { applyMoney, defaultAccount } from './finance';
 import { okFace } from './photo';
 import { cleanVpa, okVpa } from './upi';
+import { sha256 } from './sha256';
 
 export interface MemberBox {
   v: 1;
@@ -48,11 +49,28 @@ export interface BhisiView {
   settled?: number;
 }
 
-export const newBhisiShare = (owner: boolean): BhisiShare => ({ bid: hex(rand(16)), key: toB64Url(rand(32)), mid: hex(rand(8)), token: toB64Url(rand(24)), owner, seats: {} });
+/**
+ * A new bhisi: a 16-byte key, and an id the server knows that comes from the key one way only
+ * (SHA-256). So the invite link carries just the key: short, and still never sent to a server.
+ */
+export const bidOf = (key: string) => sha256(new TextEncoder().encode(`pulse-bhisi:${key}`)).slice(0, 32);
+export const newBhisiShare = (owner: boolean): BhisiShare => {
+  const key = toB64Url(rand(16));
+  return { bid: bidOf(key), key, mid: hex(rand(8)), token: toB64Url(rand(24)), owner, seats: {} };
+};
 export const newGhostId = () => `g${hex(rand(6))}`;
 
-/** The key sits after the #, which browsers never send to a server. */
-export const bhisiUrl = (b: Bhisi) => (b.share ? `${location.origin}/#bhisi=${b.share.bid}.${b.share.key}.${label(b.name)}` : '');
+const unhex = (h: string) => Uint8Array.from(h.match(/../g) ?? [], (x) => parseInt(x, 16));
+/**
+ * The invite link. The key sits after the #, which browsers never send to a server. New bhisis:
+ * #b=<key> (22 characters). Older ones carry their id too: #b=<id><key> (65).
+ */
+export function bhisiLink(origin: string, b: Pick<Bhisi, 'name' | 'share'>): string {
+  const sh = b.share;
+  if (!sh) return '';
+  return `${origin}/#b=${bidOf(sh.key) === sh.bid ? sh.key : toB64Url(unhex(sh.bid)) + sh.key}`;
+}
+export const bhisiUrl = (b: Bhisi) => bhisiLink(location.origin, b);
 
 export interface BhisiInvite {
   bid: string;
@@ -60,6 +78,13 @@ export interface BhisiInvite {
   name: string;
 }
 export function parseBhisiLink(text: string): BhisiInvite | null {
+  const short = text.match(/(?:^|[#?&\s/]|^)b=([A-Za-z0-9_-]{65}|[A-Za-z0-9_-]{22})(?![A-Za-z0-9_-])/);
+  if (short) {
+    const x = short[1];
+    if (x.length === 22) return { bid: bidOf(x), key: x, name: '' };
+    return { bid: hex(fromB64Url(x.slice(0, 22))), key: x.slice(22), name: '' };
+  }
+  // Links sent before: #bhisi=<id>.<key>.<name>
   const m = text.match(/bhisi=([0-9a-f]{32})\.([A-Za-z0-9_-]{43})(?:\.([A-Za-z0-9_-]{0,160}))?/);
   if (!m) return null;
   let name = '';
@@ -74,9 +99,9 @@ const KEEP = 'pulse-bhisi-join-v1';
 /** A bhisi link in the address bar. Kept aside until the person has finished setting up. */
 export function takeBhisiLink(ready: boolean): BhisiInvite | null {
   try {
-    const m = location.hash.match(/^#(bhisi=.+)$/);
-    if (m) {
-      localStorage.setItem(KEEP, m[1]);
+    const m = location.hash.match(/^#((?:bhisi|b)=.+)$/);
+    if (m && parseBhisiLink(m[0])) {
+      localStorage.setItem(KEEP, m[0]);
       history.replaceState(history.state, '', location.pathname + location.search);
     }
     if (!ready) return null;
@@ -88,9 +113,46 @@ export function takeBhisiLink(ready: boolean): BhisiInvite | null {
     return null;
   }
 }
+/** The invite waiting for setup to finish, if any (left where it is). */
+export function pendingBhisiLink(): BhisiInvite | null {
+  try {
+    const m = location.hash.match(/^#((?:bhisi|b)=.+)$/);
+    return parseBhisiLink(m ? m[0] : localStorage.getItem(KEEP) ?? '');
+  } catch {
+    return null;
+  }
+}
 
 const cred = (sh: BhisiShare) => ({ bid: sh.bid, mid: sh.mid, token: sh.token });
 const OFFLINE = 'No connection. Check your internet and try again.';
+
+export interface BhisiPeek {
+  name?: string;
+  emoji?: string;
+  amount?: number;
+  /** The organiser's first name. */
+  org?: string;
+  count: number;
+  locked: boolean;
+}
+/** Before joining: what the invite is for (the organiser's sealed box, opened with the link's key). */
+export async function peekBhisi(inv: BhisiInvite): Promise<{ ok: true; peek: BhisiPeek } | { ok: false; error: string }> {
+  const r = await api({ action: 'b-peek', ...cred({ ...newBhisiShare(false), bid: inv.bid }) });
+  if (!r) return { ok: false, error: OFFLINE };
+  if (r.status !== 200) return { ok: false, error: String(r.data.error ?? 'This link did not work. Ask for a new one.') };
+  const box = typeof r.data.box === 'string' && r.data.box ? await unseal<MemberBox>(inv.key, r.data.box) : null;
+  return {
+    ok: true,
+    peek: {
+      ...(box?.n ? { name: box.n.slice(0, 40) } : {}),
+      ...(box?.e ? { emoji: box.e.slice(0, 8) } : {}),
+      ...(typeof box?.a === 'number' && box.a > 0 ? { amount: box.a } : {}),
+      ...(box?.name ? { org: box.name.split(' ')[0].slice(0, 24) } : {}),
+      count: Number(r.data.count) || 0,
+      locked: !!r.data.locked,
+    },
+  };
+}
 
 export async function createBhisiChannel(b: Bhisi, dev?: string): Promise<boolean> {
   if (!b.share) return false;

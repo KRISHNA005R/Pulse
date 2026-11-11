@@ -135,3 +135,21 @@ describe('two phones at the same moment', () => {
     expect(Object.keys(v.paid[0]).sort()).toEqual(people.map((p) => p.mid).sort());
   });
 });
+
+describe('opening an invite, before joining', () => {
+  it('shows the organiser’s sealed box and how many are in; nothing else, and nothing once deleted', async () => {
+    const store = memStore();
+    const c = ctx(store);
+    await call(c, seat(1), 'b-create', { start: '2026-11-10', ghosts: [G1] });
+    await call(c, seat(1), 'b-put', { box: 'f1.sealed.box' });
+    await call(c, seat(2), 'b-join');
+    const p = await call(c, seat(7), 'b-peek');
+    expect(p.status).toBe(200);
+    expect(p.body).toEqual({ ok: true, box: 'f1.sealed.box', count: 3, locked: false });
+    // A peek is not a seat.
+    expect((await call(c, seat(7), 'b-get')).status).toBe(403);
+    await call(c, seat(1), 'b-delete');
+    expect((await call(c, seat(7), 'b-peek')).status).toBe(410);
+    expect((await handleBhisi({ action: 'b-peek', bid: 'd'.repeat(32), ...seat(7) }, c as never)).status).toBe(404);
+  });
+});

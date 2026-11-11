@@ -5,8 +5,8 @@ import { useUI } from '../store/ui';
 import { addMonths, daysBetween, fmtDate, relDay, rupees } from '../lib/format';
 import { roundMoney } from '../lib/currency';
 import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot, replayUrl, ticketLabel, tickets, TICKETS, type DrawReplay } from '../lib/bhisi';
-import { bhisiUrl, seatOf, type BhisiInvite } from '../lib/bhisiShare';
-import { phoneKind, UPI_ICONS } from '../lib/upi';
+import { bhisiUrl, parseBhisiLink, peekBhisi, seatOf, type BhisiInvite, type BhisiPeek } from '../lib/bhisiShare';
+import { cleanVpa, okVpa, phoneKind, UPI_ICONS } from '../lib/upi';
 import { Icon } from './ui/Icon';
 import { UpiPay } from './UpiPay';
 import { Field, MoneyInput, PersonAvatar, TopNavigation } from './ui/bits';
@@ -86,6 +86,9 @@ export function BhisiList() {
         <button type="button" className="btn-accent mt-5 w-full" onClick={() => ui.openSheet({ type: 'bhisi-form' })}>
           <Icon name="plus" size={17} className="shrink-0" /> Start a bhisi
         </button>
+        <button type="button" className="btn-ghost mt-1 w-full" onClick={() => ui.openSheet({ type: 'bhisi-join' })}>
+          I have an invite link
+        </button>
         <p className="mt-3 text-[12px] text-ink3">PULSE keeps track and runs the draw. It never holds or moves your money.</p>
       </section>
     );
@@ -94,6 +97,9 @@ export function BhisiList() {
       {list.map((b) => (
         <BhisiCard key={b.id} b={b} />
       ))}
+      <button type="button" className="btn-ghost w-full text-[14px]" onClick={() => ui.openSheet({ type: 'bhisi-join' })}>
+        I have an invite link
+      </button>
     </div>
   );
 }
@@ -462,6 +468,7 @@ export function BhisiDetail({ id }: { id: string }) {
               );
             })}
           </ul>
+          {sh?.owner && upi && <OrganiserUpi />}
           {payShare && org && (
             <>
               <button type="button" className="btn-accent mt-2 flex w-full items-center justify-center gap-2.5" onClick={() => ui.openSheet({ type: 'bhisi-pay', bhisiId: b.id, round: i!, kind: 'share' })}>
@@ -653,6 +660,44 @@ export function DrawReplaySheet({ replay, onDone }: { replay: DrawReplay; onDone
   );
 }
 
+/** Organiser: the UPI ID everyone pays into. Shown so they can add it before anyone pays. */
+function OrganiserUpi() {
+  const store = useStore();
+  const saved = store.state.user.upi ?? '';
+  const [editing, setEditing] = useState(!saved);
+  const [typed, setTyped] = useState(saved);
+  const save = () => {
+    const v = cleanVpa(typed);
+    if (!okVpa(v)) return store.toast({ text: 'That doesn’t look like a UPI ID. It looks like name@bank.' });
+    store.updateUser({ upi: v });
+    setEditing(false);
+    store.toast({ text: 'Saved. Everyone in the bhisi can now pay you in one tap.', tone: 'good' });
+  };
+  if (!editing)
+    return (
+      <p className="mt-2 text-center text-[12.5px] text-ink3">
+        Everyone pays you by UPI at {saved} ·{' '}
+        <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => setEditing(true)}>
+          Change
+        </button>
+      </p>
+    );
+  return (
+    <div className="mt-3 rounded-2xl bg-sunk p-3.5">
+      <label htmlFor="bh-my-upi" className="text-[14px] font-semibold">
+        Your UPI ID
+      </label>
+      <p className="mt-0.5 text-[12.5px] text-ink3">Everyone pays you here before the draw. PULSE opens their UPI app with it and the amount filled in.</p>
+      <div className="mt-2.5 flex gap-2">
+        <input id="bh-my-upi" className="field min-w-0 flex-1" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="name@okaxis" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+        <button type="button" className="btn-primary shrink-0" disabled={!typed.trim()} onClick={save}>
+          Save
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Pay by UPI: a member pays the organiser their share, or the organiser sends the winner the pot. */
 export function BhisiPay({ bhisiId, round, kind, onDone }: { bhisiId: string; round: number; kind: 'share' | 'pot'; onDone: () => void }) {
   const store = useStore();
@@ -690,35 +735,97 @@ export function BhisiPay({ bhisiId, round, kind, onDone }: { bhisiId: string; ro
   );
 }
 
-/** Opened a bhisi invite link. */
-export function BhisiJoin({ invite, onDone }: { invite: BhisiInvite; onDone: () => void }) {
+/** Opened a bhisi invite link (or pasted one in). */
+export function BhisiJoin({ invite: given, onDone }: { invite?: BhisiInvite; onDone: () => void }) {
   const store = useStore();
   const ui = useUI();
+  const [text, setText] = useState('');
+  const invite = given ?? parseBhisiLink(text);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [peek, setPeek] = useState<BhisiPeek | null>(null);
+  const bid = invite?.bid;
+  // What it's for, before joining: the name, the amount and who made it.
+  useEffect(() => {
+    if (!invite) return;
+    let live = true;
+    setPeek(null);
+    setErr('');
+    void peekBhisi(invite).then((r) => {
+      if (!live) return;
+      if (r.ok) setPeek(r.peek);
+      else if (!/connection/i.test(r.error)) setErr(r.error);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bid]);
+  const have = invite ? store.state.bhisis?.find((x) => x.share?.bid === invite.bid) : undefined;
+  const name = peek?.name || invite?.name || '';
+  const paste = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      setText(t);
+      if (!parseBhisiLink(t)) setErr('That isn’t a bhisi link. Copy the whole message or link and try again.');
+      else setErr('');
+    } catch {
+      setErr('Couldn’t read what you copied. Long-press the box and tap Paste.');
+    }
+  };
+  const open = (id: string) => {
+    onDone();
+    ui.resetTo('plans');
+    ui.setPlansSegment('bhisi');
+    ui.push({ name: 'bhisi', id });
+  };
+
+  if (!invite)
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-[14px] text-ink2">Got a bhisi link from a friend? Paste it here to join.</p>
+        <div className="flex gap-2">
+          <input className="field min-w-0 flex-1" placeholder="Paste the link" value={text} onChange={(e) => { setText(e.target.value); setErr(''); }} aria-label="Bhisi invite link" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
+          <button type="button" className="btn-quiet min-h-[42px] shrink-0 px-4" onClick={() => void paste()}>
+            Paste
+          </button>
+        </div>
+        {err ? <p className="text-[13px] text-ink2">{err}</p> : text.trim() ? <p className="text-[13px] text-ink2">That isn’t a bhisi link. Copy the whole message or link and try again.</p> : null}
+      </div>
+    );
+
   return (
     <div className="text-center">
       <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" data-testid="matka-art" className="mx-auto h-[140px] w-auto" />
-      <p className="display mt-2 text-[22px] leading-tight">Join {invite.name || 'this bhisi'}?</p>
+      <p className="display mt-2 text-[22px] leading-tight">Join {name || 'this bhisi'}?</p>
+      {peek && (peek.org || peek.amount) ? (
+        <p className="num mt-1.5 text-[14px] text-ink2">
+          {[peek.org && `By ${peek.org}`, peek.amount && `${rupees(peek.amount)} a month`, peek.count > 0 && `${peek.count} in so far`].filter(Boolean).join(' · ')}
+        </p>
+      ) : null}
       <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Your chit goes into the matka. Every month one chit comes out, picked by PULSE’s server: random and locked. You get a notification if it’s yours.</p>
       {err && <p className="mx-auto mt-3 max-w-[300px] rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">{err}</p>}
-      <button
-        type="button"
-        className="btn-accent mt-5 w-full disabled:opacity-50"
-        disabled={busy}
-        onClick={async () => {
-          setBusy(true);
-          const res = await store.joinBhisi(invite);
-          setBusy(false);
-          if (res.error) return setErr(res.error);
-          onDone();
-          ui.resetTo('plans');
-          ui.setPlansSegment('bhisi');
-          if (res.id) ui.push({ name: 'bhisi', id: res.id });
-        }}
-      >
-        {busy ? 'Joining…' : 'Join the bhisi 🏺'}
-      </button>
+      {have ? (
+        <button type="button" className="btn-accent mt-5 w-full" onClick={() => open(have.id)}>
+          You’re in · open it
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-accent mt-5 w-full disabled:opacity-50"
+          disabled={busy || !!peek?.locked}
+          onClick={async () => {
+            setBusy(true);
+            const res = await store.joinBhisi({ ...invite, name: name || invite.name });
+            setBusy(false);
+            if (res.error) return setErr(res.error);
+            if (res.id) open(res.id);
+            else onDone();
+          }}
+        >
+          {busy ? 'Joining…' : peek?.locked ? 'The draws have started' : 'Join the bhisi 🏺'}
+        </button>
+      )}
       <button type="button" className="btn-ghost mt-2 w-full" onClick={onDone}>
         Not now
       </button>

@@ -5,7 +5,8 @@ import { useUI } from '../store/ui';
 import { haptic, rupees } from '../lib/format';
 import { reminderDeviceId } from '../lib/reminders';
 import { faceOf, okPhoto } from '../lib/photo';
-import { pendingBhisiOutbox } from '../lib/bhisiShare';
+import { parseBhisiLink, pendingBhisiOutbox } from '../lib/bhisiShare';
+import { BhisiJoin } from './Bhisi';
 import {
   clearFriendNews,
   clearJoinLink,
@@ -406,6 +407,9 @@ export function FriendJoin({ code, onDone }: { code?: string; onDone: () => void
       </div>
     );
 
+  // A bhisi link pasted here goes to the bhisi's own join screen.
+  const bhisi = parseBhisiLink(text);
+  if (bhisi) return <BhisiJoin invite={bhisi} onDone={close} />;
   if (inv?.kind === 'group') return <GroupJoin inv={inv} onDone={close} />;
 
   const settled = myOwn ? 'This is your own PULSE link. Send it to your friends; they open it on their phones.' : mine ? (mine.link?.status === 'linked' ? `You're already connected with ${mine.short}.` : door ? `You've already opened ${mine.short}'s link. You're connected as soon as they open PULSE.` : 'This is your own invite. Send it to your friend, they open it on their phone.') : '';

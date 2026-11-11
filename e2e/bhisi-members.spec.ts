@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { devices, expect, test, type Page } from '@playwright/test';
 import { blockedCalls, phone, setState, state, syncNow } from './helpers';
 
 // Shared bhisi between phones: someone the organiser added by name joins with the link (one seat,
@@ -14,11 +14,10 @@ async function start(A: Page, withRahul: boolean) {
   if (withRahul) await form.getByRole('button', { name: /Rahul/ }).first().click();
   await form.getByRole('button', { name: /Start bhisi/ }).click();
   await expect.poll(async () => (await state(A)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
-  return A.evaluate(() => {
-    const bh = JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0];
-    const label = btoa(String.fromCharCode(...new TextEncoder().encode(bh.name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    return `${location.origin}/#bhisi=${bh.share.bid}.${bh.share.key}.${label}`;
-  });
+  // The short link: just the key (the id comes from it).
+  const link = await A.evaluate(() => `${location.origin}/#b=${JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0].share.key}`);
+  expect(link.length).toBeLessThan(60);
+  return link;
 }
 async function join(B: Page, invite: string) {
   await B.goto(invite);
@@ -44,7 +43,15 @@ test('added by name, then joined with the link: one seat on every phone', async 
   const B = await phone(browser, baseURL!, 'Rahul');
   const P = await phone(browser, baseURL!, 'Priya');
   await join(B, invite);
-  await join(P, invite);
+  // Priya pastes the link inside PULSE instead (her home-screen app on iPhone).
+  await P.getByRole('button', { name: 'Plans', exact: true }).last().click();
+  await P.getByRole('radio', { name: 'Bhisi' }).or(P.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
+  await P.getByRole('button', { name: /I have an invite link/ }).click();
+  await P.getByRole('textbox', { name: /Bhisi invite link/ }).fill(`Join my bhisi "Hostel gang BC" on PULSE: ${invite}`);
+  await expect(P.getByText(/Join Hostel gang BC\?/)).toBeVisible();
+  await expect(P.getByText(/By Krishna · ₹2,000 a month/)).toBeVisible();
+  await P.getByRole('button', { name: /Join the bhisi/ }).click();
+  await expect.poll(async () => (await state(P)).bhisis?.length ?? 0, { timeout: 15_000 }).toBe(1);
   await expect.poll(async () => { await settle(B, A, P); return [await members(A), await members(B), await members(P)]; }, { timeout: 60_000 }).toEqual([3, 3, 3]);
   // Krishna's Rahul is "on PULSE" now, not "added by name".
   expect((await state(A)).bhisis[0].share.ghosts).toEqual([]);
@@ -61,6 +68,20 @@ test('added by name, then joined with the link: one seat on every phone', async 
   await expect.poll(async () => { await settle(B, A); return (await state(A)).bhisis[0].rounds[0].paid.length; }, { timeout: 30_000 }).toBe(1);
 
   expect(await blockedCalls(A)).toEqual([]);
+});
+
+test('opening the invite when not signed in: the invite shows on the sign-in screen', async ({ browser, baseURL }) => {
+  test.setTimeout(90_000);
+  const A = await phone(browser, baseURL!, 'Krishna');
+  const invite = await start(A, false);
+  await expect.poll(async () => { await syncNow(A); await A.waitForTimeout(800); return (await state(A)).bhisis[0].rounds.length; }).toBeGreaterThan(0);
+  const ctx = await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' });
+  const N = await ctx.newPage();
+  await N.goto(invite);
+  await expect(N.getByText(/You’re invited to Hostel gang BC/)).toBeVisible({ timeout: 15_000 });
+  // Straight to signing in (no intro pages first), with a way to use the home-screen app instead.
+  await expect(N.getByRole('button', { name: 'Get started' })).toHaveCount(0);
+  await expect(N.getByRole('button', { name: /Copy invite/ })).toBeVisible();
 });
 
 test('the organiser deletes it: it goes from every member’s PULSE', async ({ browser, baseURL }) => {

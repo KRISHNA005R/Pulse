@@ -12,6 +12,7 @@ import { JoinWithCode } from '../screens/Sync';
 import { takeSyncLink } from '../lib/sync';
 import { useAuth } from '../store/auth';
 import { LoginLegal, LoginPanel } from './Auth';
+import { bhisiLink, peekBhisi, pendingBhisiLink } from '../lib/bhisiShare';
 
 const REASONS = ['Track spending', 'Save more', 'Control subscriptions', 'Plan a goal', 'Manage shared expenses', 'All of these'];
 const PAY = ['Salary', 'Freelance', 'Allowance', 'Multiple sources', 'Other'];
@@ -54,9 +55,18 @@ export function Onboarding() {
   const needLogin = auth.on && !auth.session;
   // Opened from a sync QR/link: go straight to linking this device (accounts replace sync codes).
   const [linkCode] = useState(() => takeSyncLink());
-  const [step, setStep] = useState<Step>(linkCode && !auth.on ? 'join' : 'welcome');
+  // Opened a friend's bhisi invite: straight to signing in (the invite opens right after).
+  const [invite] = useState(() => pendingBhisiLink());
+  const [inviteName, setInviteName] = useState(invite?.name ?? '');
+  useEffect(() => {
+    if (!invite || inviteName) return;
+    void peekBhisi(invite).then((r) => r.ok && r.peek.name && setInviteName(r.peek.name));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [step, setStep] = useState<Step>(linkCode && !auth.on ? 'join' : invite && !hasOwnData ? 'trust' : 'welcome');
   // On iPhone the home-screen app keeps its own data, so it's better to install before setting up.
   const iosBrowser = isIOS() && !isStandalone() && !inFrame();
+  const [copied, setCopied] = useState(false);
   const [name, setName] = useState(state.mode === 'personal' ? state.user.fullName : (auth.session?.account.name ?? ''));
   // Just signed in and there's nothing saved anywhere yet: straight into setup. Google already told
   // us the name, so that question is skipped.
@@ -183,6 +193,39 @@ export function Onboarding() {
         <p className="display text-[20px] tracking-tight">
           PULSE<span className="text-accent-ink">.</span>
         </p>
+
+        {invite && (step === 'welcome' || step === 'trust') && (
+          <div className="mt-4 rounded-2xl border border-line bg-surface p-3.5" role="status">
+            <p className="flex items-center gap-3 text-[14.5px] leading-snug">
+              <span className="text-[26px]" aria-hidden="true">
+                🏺
+              </span>
+              <span className="min-w-0">
+                <b>You’re invited to {inviteName || 'a bhisi'}.</b> {needLogin ? 'Sign in and it opens right after.' : 'Finish setting up and it opens right after.'}
+              </span>
+            </p>
+            {iosBrowser && (
+              <div className="mt-2.5 border-t border-line pt-2.5 text-[13px] leading-snug text-ink2">
+                Already use PULSE from your Home Screen? Copy the invite, open PULSE there, then go to Plans → Bhisi → <b className="text-ink">I have an invite link</b>.
+                <br />
+                <button
+                  type="button"
+                  className="chip mt-2"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(bhisiLink(location.origin, { name: inviteName, share: { ...invite, mid: '', token: '', seats: {} } }));
+                      setCopied(true);
+                    } catch {
+                      /* nothing to copy to */
+                    }
+                  }}
+                >
+                  {copied ? 'Copied ✓' : 'Copy invite'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {step === 'welcome' && (
           <div className="flex flex-1 flex-col pt-8">
