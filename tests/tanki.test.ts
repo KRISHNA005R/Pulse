@@ -374,6 +374,5 @@ describe('simulation: 80 weekend cars (₹1,500 to a full tank, every few weeks)
     expect(covered).toBeGreaterThan(0.65);
     expect(q(0.25)).toBeGreaterThan(0.75);
     expect(q(0.75)).toBeLessThan(2);
-    require('node:fs').writeFileSync('/tmp/claude-0/carsim.json', JSON.stringify({ n: ratios.length, covered, q25: q(0.25), q50: q(0.5), q75: q(0.75) }));
   });
 });
