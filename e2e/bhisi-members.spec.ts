@@ -70,7 +70,7 @@ test('added by name, then joined with the link: one seat on every phone', async 
   expect(await blockedCalls(A)).toEqual([]);
 });
 
-test('opening the invite when not signed in: the invite shows on the sign-in screen', async ({ browser, baseURL }) => {
+test('opening the invite when not signed in: the bhisi invite is the first screen', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
   const A = await phone(browser, baseURL!, 'Krishna');
   const invite = await start(A, false);
@@ -78,10 +78,29 @@ test('opening the invite when not signed in: the invite shows on the sign-in scr
   const ctx = await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' });
   const N = await ctx.newPage();
   await N.goto(invite);
-  await expect(N.getByText(/You’re invited to Hostel gang BC/)).toBeVisible({ timeout: 15_000 });
-  // Straight to signing in (no intro pages first), with a way to use the home-screen app instead.
+  // The bhisi invite is the first screen (not PULSE's intro), with what it is and who made it.
+  await expect(N.getByRole('heading', { name: /Join Hostel gang BC/ })).toBeVisible({ timeout: 15_000 });
+  await expect(N.getByText(/By Krishna · ₹2,000 a month · 1 in so far/)).toBeVisible();
   await expect(N.getByRole('button', { name: 'Get started' })).toHaveCount(0);
   await expect(N.getByRole('button', { name: /Copy invite/ })).toBeVisible();
+});
+
+test('a new person opens the invite: set up, then they land in the bhisi, already joined', async ({ browser, baseURL }) => {
+  test.setTimeout(120_000);
+  const A = await phone(browser, baseURL!, 'Krishna');
+  const invite = await start(A, false);
+  await expect.poll(async () => { await syncNow(A); await A.waitForTimeout(800); return (await state(A)).bhisis[0].rounds.length; }).toBeGreaterThan(0);
+  const ctx = await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' });
+  const N = await ctx.newPage();
+  await N.goto(invite);
+  await N.getByRole('button', { name: /Join the bhisi/ }).click();
+  for (let i = 0; i < 5; i++) await N.getByRole('button', { name: 'Skip for now' }).click();
+  await N.getByRole('button', { name: 'Build my dashboard' }).click();
+  await N.getByRole('button', { name: /Open PULSE|Let’s go|Go to/ }).first().click({ timeout: 15_000 }).catch(() => {});
+  // No second "Join?" question: it's joined and open.
+  await expect.poll(async () => (await state(N)).bhisis?.length ?? 0, { timeout: 20_000 }).toBe(1);
+  await expect(N.getByText(/Hostel gang BC/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(N.getByRole('button', { name: /Join the bhisi/ })).toHaveCount(0);
 });
 
 test('the organiser deletes it: it goes from every member’s PULSE', async ({ browser, baseURL }) => {

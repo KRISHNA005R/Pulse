@@ -113,6 +113,32 @@ export function takeBhisiLink(ready: boolean): BhisiInvite | null {
     return null;
   }
 }
+export function clearBhisiLink() {
+  try {
+    localStorage.removeItem(KEEP);
+    localStorage.removeItem(AUTO);
+  } catch {
+    /* nothing kept */
+  }
+}
+// Opened the invite before signing in: the invite screen was the "yes", so once set up it joins by itself.
+const AUTO = 'pulse-bhisi-autojoin-v1';
+export function markBhisiAutoJoin() {
+  try {
+    localStorage.setItem(AUTO, '1');
+  } catch {
+    /* it asks instead */
+  }
+}
+export function takeBhisiAutoJoin(): boolean {
+  try {
+    const on = localStorage.getItem(AUTO) === '1';
+    localStorage.removeItem(AUTO);
+    return on;
+  } catch {
+    return false;
+  }
+}
 /** The invite waiting for setup to finish, if any (left where it is). */
 export function pendingBhisiLink(): BhisiInvite | null {
   try {

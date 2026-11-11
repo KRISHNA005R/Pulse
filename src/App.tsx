@@ -28,7 +28,7 @@ import { useFriends } from './components/Friends';
 import { RemindersScreen } from './screens/Reminders';
 import { BhisiDetail } from './components/Bhisi';
 import { takeReplay } from './lib/bhisi';
-import { takeBhisiLink } from './lib/bhisiShare';
+import { takeBhisiAutoJoin, takeBhisiLink } from './lib/bhisiShare';
 import { syncReminders } from './lib/reminders';
 import { FeedbackScreen } from './screens/Feedback';
 import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
@@ -231,7 +231,15 @@ function Shell() {
     const ready = state.onboarding.done && state.mode === 'personal';
     const check = () => {
       const inv = takeBhisiLink(ready);
-      if (inv) ui.openSheet({ type: 'bhisi-join', invite: inv });
+      if (!inv) return;
+      // Came in through the invite screen (signed in to join): join and open it, no second question.
+      if (!takeBhisiAutoJoin()) return ui.openSheet({ type: 'bhisi-join', invite: inv });
+      void store.joinBhisi(inv).then((res) => {
+        if (!res.id) return ui.openSheet({ type: 'bhisi-join', invite: inv });
+        ui.resetTo('plans');
+        ui.setPlansSegment('bhisi');
+        ui.push({ name: 'bhisi', id: res.id });
+      });
     };
     check();
     window.addEventListener('hashchange', check);

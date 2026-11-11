@@ -12,7 +12,7 @@ import { JoinWithCode } from '../screens/Sync';
 import { takeSyncLink } from '../lib/sync';
 import { useAuth } from '../store/auth';
 import { LoginLegal, LoginPanel } from './Auth';
-import { bhisiLink, peekBhisi, pendingBhisiLink } from '../lib/bhisiShare';
+import { bhisiLink, clearBhisiLink, markBhisiAutoJoin, peekBhisi, pendingBhisiLink, type BhisiPeek } from '../lib/bhisiShare';
 
 const REASONS = ['Track spending', 'Save more', 'Control subscriptions', 'Plan a goal', 'Manage shared expenses', 'All of these'];
 const PAY = ['Salary', 'Freelance', 'Allowance', 'Multiple sources', 'Other'];
@@ -30,7 +30,7 @@ const BILL_PICKS: BillPick[] = [
 ];
 const PRIORITIES = ['Save for something', 'Reduce unnecessary spending', 'Build emergency savings', 'Understand spending', 'Manage social expenses'];
 
-type Step = 'welcome' | 'trust' | 'join' | 'name' | 'reasons' | 'pay' | 'money' | 'bills' | 'priorities' | 'building' | 'done';
+type Step = 'invite' | 'welcome' | 'trust' | 'join' | 'name' | 'reasons' | 'pay' | 'money' | 'bills' | 'priorities' | 'building' | 'done';
 const FLOW: Step[] = ['name', 'reasons', 'pay', 'money', 'bills', 'priorities'];
 
 // Screen 1: what PULSE gives you, before any questions.
@@ -57,13 +57,20 @@ export function Onboarding() {
   const [linkCode] = useState(() => takeSyncLink());
   // Opened a friend's bhisi invite: straight to signing in (the invite opens right after).
   const [invite] = useState(() => pendingBhisiLink());
-  const [inviteName, setInviteName] = useState(invite?.name ?? '');
+  const [peek, setPeek] = useState<BhisiPeek | null>(null);
+  const [inviteGone, setInviteGone] = useState('');
   useEffect(() => {
-    if (!invite || inviteName) return;
-    void peekBhisi(invite).then((r) => r.ok && r.peek.name && setInviteName(r.peek.name));
+    if (!invite) return;
+    void peekBhisi(invite).then((r) => (r.ok ? setPeek(r.peek) : !/connection/i.test(r.error) && setInviteGone(r.error)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [step, setStep] = useState<Step>(linkCode && !auth.on ? 'join' : invite && !hasOwnData ? 'trust' : 'welcome');
+  const inviteName = peek?.name || invite?.name || '';
+  // The invite screen comes first; once signed in (and set up, if new) the bhisi joins and opens by itself.
+  const [step, setStep] = useState<Step>(linkCode && !auth.on ? 'join' : invite && !hasOwnData ? 'invite' : 'welcome');
+  useEffect(() => {
+    if (step === 'invite' && invite && !inviteGone) markBhisiAutoJoin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, inviteGone]);
   // On iPhone the home-screen app keeps its own data, so it's better to install before setting up.
   const iosBrowser = isIOS() && !isStandalone() && !inFrame();
   const [copied, setCopied] = useState(false);
@@ -72,7 +79,7 @@ export function Onboarding() {
   // us the name, so that question is skipped.
   const moved = useRef(false);
   useEffect(() => {
-    if (auth.outcome !== 'new' || !auth.session || (step !== 'welcome' && step !== 'trust') || moved.current) return;
+    if (auth.outcome !== 'new' || !auth.session || (step !== 'welcome' && step !== 'trust' && step !== 'invite') || moved.current) return;
     moved.current = true;
     const known = auth.session.account.name;
     if (known && !name.trim()) setName(known);
@@ -147,7 +154,7 @@ export function Onboarding() {
   const next = () => setStep(idx < FLOW.length - 1 ? FLOW[idx + 1] : 'building');
   const back = () => setStep(step === 'trust' ? 'welcome' : step === 'join' ? 'trust' : idx > 0 ? FLOW[idx - 1] : 'trust');
   // The phone's back gesture goes back one step of setup rather than out of PULSE.
-  const DEPTH: Record<Step, number> = { welcome: 0, trust: 1, join: 2, name: 2, reasons: 3, pay: 4, money: 5, bills: 6, priorities: 7, building: 8, done: 8 };
+  const DEPTH: Record<Step, number> = { invite: 0, welcome: 0, trust: 1, join: 2, name: 2, reasons: 3, pay: 4, money: 5, bills: 6, priorities: 7, building: 8, done: 8 };
   useBackSteps(DEPTH[step], () => (step === 'building' || step === 'done' ? setStep('priorities') : back()));
 
   const Choice = ({ label, on, onClick, multi }: { label: string; on: boolean; onClick: () => void; multi?: boolean }) => (
@@ -194,36 +201,60 @@ export function Onboarding() {
           PULSE<span className="text-accent-ink">.</span>
         </p>
 
-        {invite && (step === 'welcome' || step === 'trust') && (
-          <div className="mt-4 rounded-2xl border border-line bg-surface p-3.5" role="status">
-            <p className="flex items-center gap-3 text-[14.5px] leading-snug">
-              <span className="text-[26px]" aria-hidden="true">
-                🏺
-              </span>
-              <span className="min-w-0">
-                <b>You’re invited to {inviteName || 'a bhisi'}.</b> {needLogin ? 'Sign in and it opens right after.' : 'Finish setting up and it opens right after.'}
-              </span>
-            </p>
-            {iosBrowser && (
-              <div className="mt-2.5 border-t border-line pt-2.5 text-[13px] leading-snug text-ink2">
-                Already use PULSE from your Home Screen? Copy the invite, open PULSE there, then go to Plans → Bhisi → <b className="text-ink">I have an invite link</b>.
-                <br />
-                <button
-                  type="button"
-                  className="chip mt-2"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(bhisiLink(location.origin, { name: inviteName, share: { ...invite, mid: '', token: '', seats: {} } }));
-                      setCopied(true);
-                    } catch {
-                      /* nothing to copy to */
-                    }
-                  }}
-                >
-                  {copied ? 'Copied ✓' : 'Copy invite'}
-                </button>
-              </div>
+        {step === 'invite' && invite && (
+          <div className="flex flex-1 flex-col pt-6 text-center">
+            <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" className="mx-auto h-[150px] w-auto" />
+            <h1 id="ob-title" className="display mt-2 text-[28px] leading-tight">
+              Join {inviteName || 'this bhisi'}
+            </h1>
+            {peek && (peek.org || peek.amount) ? (
+              <p className="num mt-1.5 text-[14.5px] text-ink2">{[peek.org && `By ${peek.org}`, peek.amount && `${rupees(peek.amount)} a month`, peek.count > 0 && `${peek.count} in so far`].filter(Boolean).join(' · ')}</p>
+            ) : null}
+            {inviteGone ? (
+              <p className="mx-auto mt-4 max-w-[320px] rounded-2xl bg-sunk px-4 py-3 text-[14px] text-ink2" role="alert">
+                {inviteGone}
+              </p>
+            ) : (
+              <p className="mx-auto mt-3 max-w-[320px] text-[14.5px] text-ink2">{needLogin ? 'Sign in to join. The bhisi opens right after.' : 'Set up PULSE to join. The bhisi opens right after.'}</p>
             )}
+            <div className="mt-auto flex flex-col gap-3 pt-6 text-left">
+              {inviteGone ? (
+                <button type="button" className="btn-accent w-full" onClick={() => (clearBhisiLink(), setStep('welcome'))}>
+                  Continue to PULSE
+                </button>
+              ) : auth.loading ? (
+                <div className="grid min-h-[112px] place-items-center" role="status" aria-label="Loading">
+                  <span className="h-6 w-6 animate-spin rounded-full border-2 border-ink/20 border-t-ink" aria-hidden="true" />
+                </div>
+              ) : needLogin ? (
+                <LoginPanel />
+              ) : (
+                <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
+                  Join the bhisi 🏺
+                </button>
+              )}
+              {iosBrowser && !inviteGone && (
+                <p className="rounded-2xl bg-sunk p-3 text-[13px] leading-snug text-ink2">
+                  <b className="text-ink">Use PULSE from your Home Screen?</b> iPhone keeps that app separate from Safari. Copy the invite, open PULSE there, then Plans → Bhisi → I have an invite link.
+                  <br />
+                  <button
+                    type="button"
+                    className="chip mt-2"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(bhisiLink(location.origin, { name: inviteName, share: { ...invite, mid: '', token: '', seats: {} } }));
+                        setCopied(true);
+                      } catch {
+                        /* nothing to copy to */
+                      }
+                    }}
+                  >
+                    {copied ? 'Copied ✓' : 'Copy invite'}
+                  </button>
+                </p>
+              )}
+              {!auth.loading && needLogin && !inviteGone && <LoginLegal />}
+            </div>
           </div>
         )}
 
