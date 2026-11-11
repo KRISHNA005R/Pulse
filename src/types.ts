@@ -510,6 +510,8 @@ export interface BhisiShare {
   marks?: Record<string, number[]>;
   /** The server's seat list is locked (the draws have started). */
   locked?: boolean;
+  /** Members: the organiser, as a person here (members pay them; they pay the winner). */
+  org?: string;
 }
 
 export interface BhisiRound {
@@ -531,5 +533,10 @@ export interface BhisiRound {
   /** The transfer recorded when I paid this round / when I won it. */
   myTx?: string;
   wonTx?: string;
+  /** Shared: who the server had as paid at the last sync (person ids). Tells a change made on this
+   *  phone (send it) from one made by someone else (take it). */
+  srv?: string[];
+  /** Organiser: I've sent this round's pot to the winner. */
+  potSent?: boolean;
 }
 

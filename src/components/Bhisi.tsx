@@ -5,8 +5,10 @@ import { useUI } from '../store/ui';
 import { addMonths, daysBetween, fmtDate, relDay, rupees } from '../lib/format';
 import { roundMoney } from '../lib/currency';
 import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot, replayUrl, ticketLabel, tickets, TICKETS, type DrawReplay } from '../lib/bhisi';
-import { bhisiUrl, type BhisiInvite } from '../lib/bhisiShare';
+import { bhisiUrl, seatOf, type BhisiInvite } from '../lib/bhisiShare';
+import { phoneKind, UPI_ICONS } from '../lib/upi';
 import { Icon } from './ui/Icon';
+import { UpiPay } from './UpiPay';
 import { Field, MoneyInput, PersonAvatar, TopNavigation } from './ui/bits';
 import { MatkaDraw, type Chit } from './Matka';
 
@@ -102,6 +104,7 @@ function BhisiCard({ b }: { b: Bhisi }) {
   const g = roundGate(b, state.today);
   const r = g.i === undefined ? undefined : b.rounds[g.i];
   const unseen = b.rounds.some((x) => x.winner && !x.seen);
+  const loading = !b.rounds.length;
   return (
     <button type="button" onClick={() => ui.push({ name: 'bhisi', id: b.id })} className="tap w-full rounded-3xl border border-line bg-surface p-4 text-left hover:border-ink3/40">
       <div className="flex items-center gap-3">
@@ -112,14 +115,14 @@ function BhisiCard({ b }: { b: Bhisi }) {
         <span className="min-w-0 flex-1">
           <span className="display block truncate text-[17px]">{b.name}</span>
           <span className="num block text-[13.5px] text-ink2">
-            {b.amount ? `${rupees(pot(b))} pot` : 'Getting the details…'} · {g.i === undefined ? 'complete' : `round ${g.i + 1} of ${b.rounds.length}`}
+            {loading || !b.amount ? 'Getting the details…' : `${rupees(pot(b))} pot · ${g.i === undefined ? 'complete' : `round ${g.i + 1} of ${b.rounds.length}`}`}
           </span>
         </span>
         {r && (g.open ? <span className="animate-ring shrink-0 rounded-full bg-accent px-2.5 py-1 text-[12px] font-bold text-[#17140F]">Draw open</span> : <span className="shrink-0 rounded-full bg-sunk px-2.5 py-1 text-[12px] font-semibold">🔒 {g.days === 1 ? 'Tomorrow' : `${g.days} days`}</span>)}
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <Faces ids={b.members} />
-        <span className="text-[12.5px] text-ink3">{r ? `${r.paid.length}/${b.members.length} paid` : 'Everyone got their turn 🎉'}</span>
+        <span className="text-[12.5px] text-ink3">{loading ? '' : r ? `${r.paid.length}/${b.members.length} paid` : 'Everyone got their turn 🎉'}</span>
       </div>
     </button>
   );
@@ -288,15 +291,33 @@ export function BhisiDetail({ id }: { id: string }) {
   const me = myStanding(b);
   const odds = i === undefined ? [] : chances(b, i).sort((x, y) => y.pct - x.pct || name(x.id).localeCompare(name(y.id)));
   const canMark = (m: string) => !sh || m === 'me' || sh.owner;
-  const seatOf = (pid: string) => (sh ? Object.keys(sh.seats).find((k) => sh.seats[k] === pid) : undefined);
-  const byName = (pid: string) => !!sh && (sh.owner ? (sh.ghosts ?? []).some((x) => x.pid === pid) : !!seatOf(pid)?.startsWith('g'));
+  const byName = (pid: string) => !!sh && (sh.owner ? (sh.ghosts ?? []).some((x) => x.pid === pid) : !!seatOf(sh, pid)?.startsWith('g'));
+  // Money: everyone pays the organiser before the draw; the organiser sends the winner the pot.
+  const upi = (state.settings.currency ?? 'INR') === 'INR';
+  const org = sh && !sh.owner && sh.org ? state.people.find((p) => p.id === sh.org) : undefined;
+  const payShare = !!(upi && org && r && i !== undefined && !r.paid.includes('me') && b.amount > 0 && b.members.includes('me'));
+  const lastDrawn = b.rounds.reduce((k, x, j) => (x.winner ? j : k), -1);
+  const potRound = sh?.owner && upi && lastDrawn >= 0 && b.rounds[lastDrawn].winner !== 'me' && !b.rounds[lastDrawn].potSent ? lastDrawn : -1;
+  const potTo = potRound >= 0 ? state.people.find((p) => p.id === b.rounds[potRound].winner) : undefined;
   const unseen = b.rounds.map((x, k) => ({ x, k })).filter(({ x }) => x.winner && !x.seen);
   const invite = sh && !sh.locked ? bhisiUrl(b) : '';
   const nudge = r && r.paid.length < b.members.length ? `https://wa.me/?text=${encodeURIComponent(`Bhisi reminder 🏺 ${b.name}: ${rupees(b.amount)} for round ${(i ?? 0) + 1}. Draw on ${fmtDate(r.date, true)}. Pay up, bestie 🙏`)}` : '';
 
+  if (sh && !b.rounds.length)
+    return (
+      <div>
+        <TopNavigation title={`${b.name} ${b.emoji}`} onBack={ui.pop} sub="Shared bhisi" />
+        <section className="rounded-3xl border border-line bg-surface p-6 text-center" role="status">
+          <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" className="mx-auto h-[96px] w-auto" />
+          <p className="mt-2 text-[15px] font-semibold">Getting the details…</p>
+          <p className="mt-1 text-[13px] text-ink3">You’re in. The pot, the dates and who’s in show up here in a moment.</p>
+        </section>
+      </div>
+    );
+
   return (
     <div>
-      <TopNavigation title={`${b.name} ${b.emoji}`} onBack={ui.pop} sub={sh ? (sh.owner ? 'Shared · you made it' : 'Shared bhisi') : undefined} />
+      <TopNavigation title={`${b.name} ${b.emoji}`} onBack={ui.pop} sub={sh ? (sh.owner ? 'Shared · you made it' : org ? `Shared · made by ${org.short}` : 'Shared bhisi') : undefined} />
 
       {/* Hero */}
       <section className="relative overflow-hidden rounded-3xl border border-white/10 p-5 text-[#FFFBF4]" style={{ background: INK }} aria-label="This round">
@@ -344,6 +365,22 @@ export function BhisiDetail({ id }: { id: string }) {
           </span>
           <Icon name="play" size={20} />
         </button>
+      )}
+
+      {/* Organiser: send the winner the pot */}
+      {potTo && (
+        <section className="mt-3 flex items-center gap-3 rounded-3xl border border-line bg-surface p-4" aria-label="Send the pot">
+          <PersonAvatar person={potTo} size={40} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold">Send {potTo.short} the pot</span>
+            <span className="num block text-[13px] text-ink3">
+              {rupees(pot(b))} · round {potRound + 1}
+            </span>
+          </span>
+          <button type="button" className="btn-accent min-h-[40px] shrink-0 px-4 text-[14px]" onClick={() => ui.openSheet({ type: 'bhisi-pay', bhisiId: b.id, round: potRound, kind: 'pot' })}>
+            Pay
+          </button>
+        </section>
       )}
 
       {/* Invite */}
@@ -412,7 +449,7 @@ export function BhisiDetail({ id }: { id: string }) {
                     <span className="block truncate text-[15px]">
                       {name(m)} {won && <span title="Already won">🏆</span>}
                     </span>
-                    {sh && m !== 'me' && <span className="block text-[12px] text-ink3">{byName(m) ? 'Added by name · not joined yet' : 'On PULSE'}</span>}
+                    {sh && m !== 'me' && <span className="block text-[12px] text-ink3">{byName(m) ? 'Added by name · not joined yet' : m === sh.org ? 'Organiser · collects the money' : 'On PULSE'}</span>}
                   </span>
                   {canMark(m) ? (
                     <button type="button" aria-pressed={paid} onClick={() => store.toggleBhisiPaid(b.id, i!, m)} className={`tap min-h-[34px] rounded-full px-3.5 text-[13px] font-semibold ${paid ? 'bg-pos/12 text-pos' : 'border border-line text-ink2'}`}>
@@ -425,6 +462,15 @@ export function BhisiDetail({ id }: { id: string }) {
               );
             })}
           </ul>
+          {payShare && org && (
+            <>
+              <button type="button" className="btn-accent mt-2 flex w-full items-center justify-center gap-2.5" onClick={() => ui.openSheet({ type: 'bhisi-pay', bhisiId: b.id, round: i!, kind: 'share' })}>
+                <span className="upi-chip" aria-hidden="true" dangerouslySetInnerHTML={{ __html: UPI_ICONS.upi }} />
+                Pay {org.short} {rupees(b.amount)}
+              </button>
+              <p className="mt-2 text-center text-[12px] text-ink3">Everyone pays {org.short} before the draw. {org.short} sends the winner the pot.</p>
+            </>
+          )}
           {nudge && (
             <a href={nudge} target="_blank" rel="noreferrer" className="btn-quiet mt-2 w-full">
               <Icon name="send" size={16} /> Nudge on WhatsApp
@@ -484,7 +530,7 @@ export function BhisiDetail({ id }: { id: string }) {
             ui.openSheet({
               type: 'confirm',
               title: sh && !sh.owner ? `Leave ${b.name}?` : `Delete ${b.name}?`,
-              body: sh && !sh.owner ? 'You stop following this bhisi. Money already recorded stays in Activity.' : sh ? 'It’s deleted for everyone in it. Money already recorded stays in Activity.' : 'Who paid and who won is removed. Money already recorded stays in Activity.',
+              body: sh && !sh.owner ? (sh.locked && !b.rounds.some((x) => x.winner === 'me') ? 'You stop following this bhisi here. The draws have started, so your chit stays in the matka. Money already recorded stays in Activity.' : 'You stop following this bhisi. Money already recorded stays in Activity.') : sh ? 'It’s deleted for everyone in it, from their PULSE too. Money already recorded stays in Activity.' : 'Who paid and who won is removed. Money already recorded stays in Activity.',
               confirm: sh && !sh.owner ? 'Leave bhisi' : 'Delete bhisi',
               run: () => {
                 store.deleteBhisi(b.id);
@@ -603,6 +649,43 @@ export function DrawReplaySheet({ replay, onDone }: { replay: DrawReplay; onDone
           Done
         </button>
       )}
+    </div>
+  );
+}
+
+/** Pay by UPI: a member pays the organiser their share, or the organiser sends the winner the pot. */
+export function BhisiPay({ bhisiId, round, kind, onDone }: { bhisiId: string; round: number; kind: 'share' | 'pot'; onDone: () => void }) {
+  const store = useStore();
+  const { state } = store;
+  const [opened, setOpened] = useState(false);
+  const b = state.bhisis?.find((x) => x.id === bhisiId);
+  const r = b?.rounds[round];
+  const to = kind === 'share' ? b?.share?.org : r?.winner;
+  const person = to && to !== 'me' ? state.people.find((p) => p.id === to) : undefined;
+  if (!b || !r || !person) return <p className="text-ink3">Nothing to pay here.</p>;
+  const amount = kind === 'share' ? b.amount : pot(b);
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div className="flex items-center gap-3 py-2">
+        <PersonAvatar me size={44} />
+        <Icon name="chevron" size={20} className="text-ink3" />
+        <PersonAvatar person={person} size={44} />
+      </div>
+      <p className="mt-2 text-[15px] text-ink2">{kind === 'share' ? `Your ${month(r.date)} share of ${b.name}` : `${person.short} won round ${round + 1} of ${b.name}`}</p>
+      <p className="num-hero mt-1 text-[34px] leading-none">{rupees(amount)}</p>
+      <UpiPay person={person} amount={amount} note={`Bhisi ${b.name} round ${round + 1}`} onOpened={() => setOpened(true)} />
+      <button
+        type="button"
+        className={`${opened || phoneKind() === 'other' ? 'btn-accent' : 'btn-quiet'} mt-5 w-full`}
+        onClick={() => {
+          if (kind === 'share') {
+            if (!r.paid.includes('me')) store.toggleBhisiPaid(b.id, round, 'me');
+          } else store.markPotSent(b.id, round);
+          onDone();
+        }}
+      >
+        {kind === 'share' ? 'I’ve paid · mark it' : `I’ve sent it to ${person.short}`}
+      </button>
     </div>
   );
 }

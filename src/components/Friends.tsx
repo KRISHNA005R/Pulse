@@ -5,6 +5,7 @@ import { useUI } from '../store/ui';
 import { haptic, rupees } from '../lib/format';
 import { reminderDeviceId } from '../lib/reminders';
 import { faceOf, okPhoto } from '../lib/photo';
+import { pendingBhisiOutbox } from '../lib/bhisiShare';
 import {
   clearFriendNews,
   clearJoinLink,
@@ -70,7 +71,7 @@ export function useFriends() {
   const host = useHost();
   const ready = state.onboarding.done && state.mode === 'personal';
   // Anything to keep in step: a connected friend, a shared group, or my own link that people may have opened.
-  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door || !!state.bhisis?.some((b) => b.share);
+  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door || !!state.bhisis?.some((b) => b.share) || pendingBhisiOutbox();
 
   // The id other people's apps know me by.
   useEffect(() => {

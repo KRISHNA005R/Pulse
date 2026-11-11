@@ -45,6 +45,7 @@ export type SheetSpec =
   | { type: 'bhisi-draw'; bhisiId: string }
   | { type: 'bhisi-watch'; bhisiId: string; round: number }
   | { type: 'bhisi-join'; invite: import('../lib/bhisiShare').BhisiInvite }
+  | { type: 'bhisi-pay'; bhisiId: string; round: number; kind: 'share' | 'pot' }
   | { type: 'draw-replay'; replay: import('../lib/bhisi').DrawReplay }
   | { type: 'gullak-form' }
   | { type: 'group-people'; groupId: string }

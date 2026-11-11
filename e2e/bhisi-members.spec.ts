@@ -1,0 +1,92 @@
+import { expect, test, type Page } from '@playwright/test';
+import { blockedCalls, phone, setState, state, syncNow } from './helpers';
+
+// Shared bhisi between phones: someone the organiser added by name joins with the link (one seat,
+// not two), then the organiser deletes it and it goes from everyone's PULSE.
+
+async function start(A: Page, withRahul: boolean) {
+  await A.getByRole('button', { name: 'Plans', exact: true }).last().click();
+  await A.getByRole('radio', { name: 'Bhisi' }).or(A.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
+  await A.getByRole('button', { name: /Start a bhisi/ }).click();
+  const form = A.getByRole('dialog').last();
+  await A.fill('#bh-name', 'Hostel gang BC');
+  await form.locator('#bh-amount').fill('2000');
+  if (withRahul) await form.getByRole('button', { name: /Rahul/ }).first().click();
+  await form.getByRole('button', { name: /Start bhisi/ }).click();
+  await expect.poll(async () => (await state(A)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
+  return A.evaluate(() => {
+    const bh = JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0];
+    const label = btoa(String.fromCharCode(...new TextEncoder().encode(bh.name))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `${location.origin}/#bhisi=${bh.share.bid}.${bh.share.key}.${label}`;
+  });
+}
+async function join(B: Page, invite: string) {
+  await B.goto(invite);
+  await B.getByRole('button', { name: /Join the bhisi/ }).click();
+  await expect.poll(async () => (await state(B)).bhisis?.length ?? 0, { timeout: 15_000 }).toBe(1);
+}
+const members = async (p: Page) => ((await state(p)).bhisis?.[0]?.members ?? []).length;
+const settle = async (...ps: Page[]) => {
+  for (let k = 0; k < 2; k++)
+    for (const p of ps) {
+      await syncNow(p);
+      await p.waitForTimeout(1200);
+    }
+};
+
+test('added by name, then joined with the link: one seat on every phone', async ({ browser, baseURL }) => {
+  test.setTimeout(150_000);
+  const A = await phone(browser, baseURL!, 'Krishna');
+  await setState(A, 's.user.upi = a;', 'krishna@okaxis');
+  const invite = await start(A, true);
+  await expect.poll(() => members(A)).toBe(2); // me + Rahul (by name)
+
+  const B = await phone(browser, baseURL!, 'Rahul');
+  const P = await phone(browser, baseURL!, 'Priya');
+  await join(B, invite);
+  await join(P, invite);
+  await expect.poll(async () => { await settle(B, A, P); return [await members(A), await members(B), await members(P)]; }, { timeout: 60_000 }).toEqual([3, 3, 3]);
+  // Krishna's Rahul is "on PULSE" now, not "added by name".
+  expect((await state(A)).bhisis[0].share.ghosts).toEqual([]);
+
+  // Rahul pays Krishna by UPI: the button opens his UPI app with Krishna's UPI ID and the amount filled in.
+  await B.reload();
+  await B.getByRole('button', { name: /Hostel gang BC/ }).first().click();
+  await B.getByRole('button', { name: /Pay Krishna ₹2,000/ }).click();
+  const pay = B.getByRole('dialog').last();
+  const href = await pay.getByRole('link', { name: /Pay Krishna/ }).getAttribute('href');
+  expect(href).toContain('pa=krishna@okaxis');
+  expect(href).toContain('am=2000.00');
+  await pay.getByRole('button', { name: /I’ve paid/ }).click();
+  await expect.poll(async () => { await settle(B, A); return (await state(A)).bhisis[0].rounds[0].paid.length; }, { timeout: 30_000 }).toBe(1);
+
+  expect(await blockedCalls(A)).toEqual([]);
+});
+
+test('the organiser deletes it: it goes from every member’s PULSE', async ({ browser, baseURL }) => {
+  test.setTimeout(150_000);
+  const A = await phone(browser, baseURL!, 'Krishna');
+  const invite = await start(A, false);
+  const B = await phone(browser, baseURL!, 'Priya');
+  await join(B, invite);
+  await expect.poll(async () => { await settle(B, A); return [await members(A), await members(B)]; }, { timeout: 60_000 }).toEqual([2, 2]);
+
+  // Krishna deletes it.
+  await A.getByRole('button', { name: /Delete bhisi/ }).click();
+  await A.getByRole('dialog').last().getByRole('button', { name: /Delete bhisi/ }).click();
+  await expect.poll(async () => (await state(A)).bhisis.length).toBe(0);
+
+  // Priya's PULSE: gone after the next sync, with a line saying why.
+  await B.reload();
+  await B.getByRole('button', { name: 'Plans', exact: true }).last().click();
+  await B.getByRole('radio', { name: 'Bhisi' }).or(B.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
+  await expect.poll(async () => { await syncNow(B); return (await state(B)).bhisis.length; }, { timeout: 30_000 }).toBe(0);
+  await expect(B.getByText(/was deleted by the person who made it/)).toBeVisible();
+  await expect(B.getByRole('button', { name: /Start a bhisi/ })).toBeVisible();
+
+  // The old invite link now says so too.
+  const C = await phone(browser, baseURL!, 'Amit');
+  await C.goto(invite);
+  await C.getByRole('button', { name: /Join the bhisi/ }).click();
+  await expect(C.getByText(/deleted by the person who made it/)).toBeVisible();
+});

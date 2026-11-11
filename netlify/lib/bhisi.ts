@@ -10,8 +10,8 @@
 // So nobody can redraw, peek, or pick.
 //
 // Stored in the 'pulse-friends' blob store:
-//   b/<bid>/meta        { owner, start, ghosts, created }
-//   b/<bid>/m/<mid>     one member's seat and sealed box
+//   b/<bid>/meta        { owner, start, ghosts, created, deleted? }  (a deleted bhisi keeps only this, marked deleted)
+//   b/<bid>/m/<mid>     one member's seat and sealed box (was: the name-only seat they took, if any)
 //   b/<bid>/d/<round>   the draw for that round { w, at, by, odds, seats? }  (round 0 also locks the seat list)
 //   b/<bid>/p/<round>   when each seat paid that round (server time, so nobody can back-date it)
 //
@@ -35,6 +35,8 @@ interface Meta {
   /** Seat ids of people the organiser added by name (not on PULSE, or not joined yet). */
   ghosts: string[];
   created: string;
+  /** The organiser deleted it. Everyone else's PULSE is told so, and it can't be made again. */
+  deleted?: string;
 }
 interface Seat {
   th: string;
@@ -47,6 +49,8 @@ interface Seat {
   /** Left because they deleted their PULSE account: their chit comes out of the matka. */
   deleted?: boolean;
   removed?: boolean;
+  /** The name-only seat this person took when they joined (the organiser had added them by name). */
+  was?: string;
 }
 interface Draw {
   w: string;
@@ -125,7 +129,8 @@ export function fairPick<T>(xs: T[]): T {
 interface Ctx {
   store: {
     get(key: string, opts: { type: 'json' }): Promise<unknown>;
-    setJSON(key: string, value: unknown, opts?: { onlyIfNew?: boolean }): Promise<unknown>;
+    getWithMetadata(key: string, opts: { type: 'json' }): Promise<{ data: unknown; etag?: string } | null>;
+    setJSON(key: string, value: unknown, opts?: { onlyIfNew?: boolean; onlyIfMatch?: string }): Promise<unknown>;
     delete(key: string): Promise<void>;
     list(opts: { prefix: string }): Promise<{ blobs: { key: string }[] }>;
   };
@@ -144,9 +149,42 @@ async function load(ctx: Ctx, bid: string) {
   draws.sort((a, b) => a.r - b.r);
   const { blobs: ps } = await ctx.store.list({ prefix: `b/${bid}/p/` });
   const paid: Record<number, Record<string, string>> = {};
-  for (const b of ps) paid[Number(b.key.slice(`b/${bid}/p/`.length))] = ((await ctx.store.get(b.key, { type: 'json' })) as Record<string, string> | null) ?? {};
+  await Promise.all(ps.map(async (b) => void (paid[Number(b.key.slice(`b/${bid}/p/`.length))] = ((await ctx.store.get(b.key, { type: 'json' })) as Record<string, string> | null) ?? {})));
+  // A paid mark the organiser put on a name-only seat belongs to the person who took that seat.
+  const took = claims(seats);
+  for (const round of Object.values(paid))
+    for (const [ghost, m] of took)
+      if (round[ghost]) {
+        round[m] ??= round[ghost];
+        delete round[ghost];
+      }
   return { meta, seats, draws, paid };
 }
+
+/** Name-only seat → the member who took it (the first to, if two ever did). */
+function claims(seats: { mid: string; s: Seat }[]) {
+  const took = new Map<string, string>();
+  for (const x of seats) if (x.s.was && !took.has(x.s.was)) took.set(x.s.was, x.mid);
+  return took;
+}
+
+/**
+ * Change one blob without losing a change someone else made at the same moment: read it, change it,
+ * and write it only if nobody wrote in between (else read again). `fn` returns null for "nothing to write".
+ * Undefined if it stayed busy.
+ */
+async function update<T>(ctx: Ctx, key: string, fn: (cur: T | null) => T | null): Promise<{ value: T | null } | undefined> {
+  for (let i = 0; i < 8; i++) {
+    const got = (await ctx.store.getWithMetadata(key, { type: 'json' })) as { data: T; etag?: string } | null;
+    const next = fn(got ? structuredClone(got.data) : null);
+    if (next === null) return { value: got?.data ?? null };
+    // (A store that gives no etag, like the local test server, gets a plain write.)
+    const res = (await ctx.store.setJSON(key, next, !got ? { onlyIfNew: true } : got.etag ? { onlyIfMatch: got.etag } : undefined)) as { modified?: boolean } | undefined;
+    if (!res || res.modified !== false) return { value: next };
+  }
+  return undefined;
+}
+const BUSY = () => fail(503, 'Busy. Try again in a moment.');
 
 /** Everyone in the matka's list: locked at the first draw, otherwise members who are in plus name-only seats. */
 function seatList(meta: Meta, seats: { mid: string; s: Seat }[], draws: { r: number; d: Draw }[]) {
@@ -155,7 +193,9 @@ function seatList(meta: Meta, seats: { mid: string; s: Seat }[], draws: { r: num
   const deleted = new Set(seats.filter((x) => x.s.deleted).map((x) => x.mid));
   const won = new Set(draws.map((x) => x.d.w));
   if (locked) return locked.filter((s) => !deleted.has(s) || won.has(s));
-  return [...seats.filter((x) => !x.s.gone && !x.s.removed).map((x) => x.mid), ...meta.ghosts];
+  // A name-only seat someone has taken is that person's seat now: one chit, not two.
+  const took = claims(seats);
+  return [...seats.filter((x) => !x.s.gone && !x.s.removed).map((x) => x.mid), ...meta.ghosts.filter((g) => !took.has(g))];
 }
 
 export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Promise<Result> {
@@ -172,7 +212,10 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   const fresh = (extra: Partial<Seat>): Seat => ({ th, box: '', rev: 0, joined: now.toISOString(), devs: addDev([], body.dev), ...extra });
   const ghosts = (x: unknown) => (Array.isArray(x) ? x.filter((g): g is string => typeof g === 'string' && GHOST.test(g)).slice(0, MAX_SEATS) : []);
 
+  const GONE: Result = { status: 410, body: { ok: false, deleted: true, error: 'This bhisi was deleted by the person who made it.' } };
+
   if (action === 'b-create') {
+    if (meta?.deleted) return GONE;
     if (meta && !(mine && mine.th === th && mine.owner)) return fail(409, 'taken');
     const start = String(body.start ?? '');
     if (!DATE.test(start)) return fail(400, 'bad start');
@@ -184,6 +227,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   }
 
   if (!meta) return fail(404, 'This bhisi link no longer works. Ask for a new one.');
+  if (meta.deleted) return GONE;
 
   if (action === 'b-join') {
     if (mine) {
@@ -194,7 +238,7 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     }
     if (draws.length) return fail(403, 'The draws have started, so nobody new can join this bhisi.');
     if (seatList(meta, seats, draws).length >= MAX_SEATS) return fail(409, `This bhisi is full (${MAX_SEATS} people).`);
-    await store.setJSON(skey(bid, mid), fresh({}));
+    await store.setJSON(skey(bid, mid), fresh({}), { onlyIfNew: true });
     return { status: 200, body: { ok: true } };
   }
 
@@ -209,39 +253,50 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     ghosts: meta.ghosts,
     seats: seatList(meta, seats, draws),
     locked: draws.some((x) => x.r === 0),
-    members: seats.filter((x) => !x.s.removed).map((x) => ({ mid: x.mid, box: x.s.box, rev: x.s.rev, owner: !!x.s.owner, gone: !!x.s.gone, deleted: !!x.s.deleted })),
+    members: seats.filter((x) => !x.s.removed).map((x) => ({ mid: x.mid, box: x.s.box, rev: x.s.rev, owner: !!x.s.owner, gone: !!x.s.gone, deleted: !!x.s.deleted, ...(x.s.was ? { was: x.s.was } : {}) })),
     draws: draws.map((x) => ({ r: x.r, w: x.d.w, at: x.d.at, by: x.d.by, odds: x.d.odds })),
     paid,
   });
 
   if (action === 'b-get') {
     const devs = addDev(mine.devs ?? [], body.dev);
-    if (devs.join() !== (mine.devs ?? []).join()) await store.setJSON(skey(bid, mid), { ...mine, devs });
+    if (devs.join() !== (mine.devs ?? []).join()) await update<Seat>(ctx, skey(bid, mid), (cur) => (cur && cur.th === th ? { ...cur, devs: addDev(cur.devs ?? [], body.dev) } : null));
     return { status: 200, body: view() };
   }
 
   if (action === 'b-put') {
     const box = typeof body.box === 'string' ? body.box : '';
     if (!box || box.length > MAX_BOX) return fail(400, 'bad box');
-    const next: Seat = { ...mine, box, rev: mine.rev + 1, devs: addDev(mine.devs ?? [], body.dev), gone: false };
-    await store.setJSON(skey(bid, mid), next);
-    return { status: 200, body: { ok: true, rev: next.rev } };
+    const done = await update<Seat>(ctx, skey(bid, mid), (cur) => (cur && cur.th === th ? { ...cur, box, rev: cur.rev + 1, devs: addDev(cur.devs ?? [], body.dev), gone: false } : null));
+    if (!done) return BUSY();
+    return { status: 200, body: { ok: true, rev: done.value?.rev ?? mine.rev } };
   }
 
   // Who has paid a round. The time is the server's, so paying "early" can't be faked.
   // Members mark themselves; the organiser can mark anyone (including people added by name).
   if (action === 'b-paid') {
     const r = Number(body.round);
-    const target = typeof body.target === 'string' && body.target ? body.target : mid;
+    const asked = typeof body.target === 'string' && body.target ? body.target : mid;
     if (!Number.isInteger(r) || r < 0 || r >= MAX_SEATS) return fail(400, 'bad round');
-    if (target !== mid && !mine.owner) return fail(403, 'Only the person who made the bhisi can mark other people.');
+    if (asked !== mid && !mine.owner) return fail(403, 'Only the person who made the bhisi can mark other people.');
+    // A name-only seat someone has taken: the mark is theirs (an older PULSE may still send the old seat).
+    const took = claims(seats);
+    const target = took.get(asked) ?? asked;
+    const old = [...took].filter(([, m]) => m === target).map(([g]) => g);
     if (!seatList(meta, seats, draws).includes(target)) return fail(400, 'not in this bhisi');
     if (draws.some((x) => x.r === r)) return fail(409, 'That round has already been drawn.');
-    const cur = { ...(paid[r] ?? {}) };
-    if (body.paid === false) delete cur[target];
-    else if (!cur[target]) cur[target] = now.toISOString();
-    await store.setJSON(pkey(bid, r), cur);
-    return { status: 200, body: { ok: true, paid: cur } };
+    // Each mark is written only if nobody else wrote this round's list in between: two people paying
+    // at the same moment both count.
+    const done = await update<Record<string, string>>(ctx, pkey(bid, r), (cur0) => {
+      const cur = cur0 ?? {};
+      const at = cur[target] ?? old.map((g) => cur[g]).find(Boolean);
+      for (const g of old) delete cur[g];
+      if (body.paid === false) delete cur[target];
+      else cur[target] = at ?? now.toISOString();
+      return cur;
+    });
+    if (!done) return BUSY();
+    return { status: 200, body: { ok: true, paid: done.value } };
   }
 
   // Organiser: people added by name, and the first draw date (both only before the draws start).
@@ -249,7 +304,31 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
     if (!mine.owner) return fail(403, 'Only the person who made the bhisi can change this.');
     if (draws.length) return fail(403, 'The draws have started. The list is locked now.');
     const start = String(body.start ?? meta.start);
-    await store.setJSON(mkey(bid), { ...meta, ghosts: body.ghosts === undefined ? meta.ghosts : ghosts(body.ghosts), start: DATE.test(start) ? start : meta.start });
+    // Never over a deletion made a moment ago.
+    const done = await update<Meta>(ctx, mkey(bid), (cur) => (!cur || cur.deleted ? null : { ...cur, ghosts: body.ghosts === undefined ? cur.ghosts : ghosts(body.ghosts), start: DATE.test(start) ? start : cur.start }));
+    if (!done) return BUSY();
+    if (!done.value || (done.value as Meta).deleted) return GONE;
+    return { status: 200, body: { ok: true } };
+  }
+
+  // Someone the organiser added by name has joined with the link: they take that name-only seat, so
+  // they're in the matka once, and the paid marks made for them stay theirs. They do it themselves
+  // when they join; the organiser's PULSE does it too when it recognises them (target = their seat).
+  if (action === 'b-link') {
+    const ghost = String(body.ghost ?? '');
+    const target = typeof body.target === 'string' && body.target ? body.target : mid;
+    if (target !== mid && !mine.owner) return fail(403, 'Only the person who made the bhisi can do this.');
+    if (draws.length) return fail(403, 'The draws have started. The list is locked now.');
+    if (!GHOST.test(ghost) || !meta.ghosts.includes(ghost)) return fail(400, 'not a name-only seat here');
+    const them = seats.find((x) => x.mid === target)?.s;
+    if (!them || them.owner || them.gone || them.removed) return fail(400, 'not in this bhisi');
+    const other = seats.find((x) => x.mid !== target && x.s.was === ghost);
+    if (other) return fail(409, 'Someone else already took that seat.');
+    if (them.was && them.was !== ghost) return fail(409, 'Already linked to someone else.');
+    if (them.was === ghost) return { status: 200, body: { ok: true } };
+    const done = await update<Seat>(ctx, skey(bid, target), (cur) => (!cur ? null : cur.was === ghost ? null : { ...cur, was: cur.was ?? ghost }));
+    if (!done) return BUSY();
+    if (done.value?.was !== ghost) return fail(409, 'Already linked to someone else.');
     return { status: 200, body: { ok: true } };
   }
 
@@ -311,14 +390,18 @@ export async function handleBhisi(body: Record<string, unknown>, ctx: Ctx): Prom
   if (action === 'b-leave') {
     // The organiser can only leave by deleting their account (their box stays, so the bhisi keeps its name and amount).
     if (mine.owner && body.deleted !== true) return fail(403, 'You made this bhisi. Delete it instead.');
-    await store.setJSON(skey(bid, mid), { ...mine, gone: true, devs: [], rev: mine.rev + 1, ...(body.deleted === true ? { deleted: true } : {}) });
+    const done = await update<Seat>(ctx, skey(bid, mid), (cur) => (cur ? { ...cur, gone: true, devs: [], rev: cur.rev + 1, ...(body.deleted === true ? { deleted: true } : {}) } : null));
+    if (!done) return BUSY();
     return { status: 200, body: { ok: true } };
   }
 
   if (action === 'b-delete') {
     if (!mine.owner) return fail(403, 'Only the person who made the bhisi can delete it.');
-    const keys = [mkey(bid), ...seats.map((x) => skey(bid, x.mid)), ...draws.map((x) => dkey(bid, x.r)), ...Object.keys(paid).map((r) => pkey(bid, Number(r)))];
-    await Promise.all(keys.map((k) => store.delete(k)));
+    // First mark it deleted, so from this moment every member's PULSE is told so (even if clearing
+    // the rest stops halfway). That mark stays: an old phone of the organiser can't make it again.
+    await store.setJSON(mkey(bid), { ...meta, ghosts: [], deleted: now.toISOString() } satisfies Meta);
+    const { blobs } = await store.list({ prefix: `b/${bid}/` });
+    await Promise.all(blobs.map((b) => b.key).filter((k) => k !== mkey(bid)).map((k) => store.delete(k)));
     return { status: 200, body: { ok: true } };
   }
 

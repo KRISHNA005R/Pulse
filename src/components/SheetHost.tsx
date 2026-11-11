@@ -1,7 +1,7 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
 import { GroupPeople } from '../screens/Plans';
-import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './Bhisi';
+import { BhisiDraw, BhisiForm, BhisiJoin, BhisiPay, BhisiWatch, DrawReplaySheet } from './Bhisi';
 import { GullakForm } from './Gullak';
 import { InstallPrompt } from './InstallPrompt';
 import { useUI, type SheetSpec } from '../store/ui';
@@ -124,6 +124,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Bhisi invite" onClose={close} size="sm" z={z}>
           <BhisiJoin invite={spec.invite} onDone={close} />
+        </Sheet>
+      );
+    case 'bhisi-pay':
+      return (
+        <Sheet title={spec.kind === 'pot' ? 'Send the pot' : 'Pay your share'} onClose={close} z={z}>
+          <BhisiPay bhisiId={spec.bhisiId} round={spec.round} kind={spec.kind} onDone={close} />
         </Sheet>
       );
     case 'draw-replay':

@@ -14,7 +14,7 @@ const Logo = ({ id }: { id: UpiApp }) => (
  * On a computer (no UPI apps) it shows a UPI QR code to scan with the phone. Recording the payment stays a separate tap
  * ("I paid"), since PULSE can't see whether the payment went through.
  */
-export function UpiPay({ person, amount, onOpened }: { person: Person; amount: number; onOpened: () => void }) {
+export function UpiPay({ person, amount, onOpened, note = 'Settle up via PULSE' }: { person: Person; amount: number; onOpened: () => void; note?: string }) {
   const store = useStore();
   const phone = phoneKind();
   const [editing, setEditing] = useState(!person.upi);
@@ -34,7 +34,7 @@ export function UpiPay({ person, amount, onOpened }: { person: Person; amount: n
 
   if (amount <= 0) return null;
   const vpa = person.upi ?? '';
-  const pay = { vpa, name: person.name, amount, note: 'Settle up via PULSE' };
+  const pay = { vpa, name: person.name, amount, note };
 
   const opened = () => {
     setStuck(false);

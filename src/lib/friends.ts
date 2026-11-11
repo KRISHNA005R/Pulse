@@ -19,7 +19,7 @@ import { roundMoney } from './currency';
 import { daysBetween, rupees } from './format';
 import { okFace, okGif } from './photo';
 import { cleanVpa, okVpa } from './upi';
-import { syncBhisi, type BhisiHost } from './bhisiShare';
+import { flushBhisiOutbox, syncBhisi, type BhisiHost } from './bhisiShare';
 
 // ---------------------------------------------------------------------------------------------
 // Invites
@@ -488,6 +488,7 @@ async function run(host: FriendHost) {
   const dev = host.dev();
   if (first.user.door && !(await readDoor(host, first.user.door, dev))) return;
   for (const g of (host.state()?.groups ?? []).filter((x) => x.shared)) if (!(await syncGroup(host, g.id, dev))) return;
+  await flushBhisiOutbox(); // a leave or delete made offline
   for (const b of (host.state()?.bhisis ?? []).filter((x) => x.share)) if (!(await syncBhisi(host, b.id, dev))) return;
   for (const person of (host.state()?.people ?? []).filter((p) => p.link)) {
     const link = person.link!;

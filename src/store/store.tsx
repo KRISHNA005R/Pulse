@@ -37,7 +37,7 @@ import { loadSession } from '../lib/auth';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
-import { applyBhisi as applyBhisiIn, createBhisiChannel, deleteBhisiChannel, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { applyBhisi as applyBhisiIn, createBhisiChannel, dropBhisi, leaveOrDeleteBhisi, seatOf, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
 import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
 import { holdingAccounts, mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
@@ -798,7 +798,7 @@ function useStoreImpl() {
         if (sh && person !== 'me') {
           // Shared: only the organiser marks other people, and it travels as their marks.
           if (!sh.owner) return;
-          const seat = Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+          const seat = seatOf(sh, person);
           if (!seat) return;
           sh.marks ??= {};
           const cur = sh.marks[seat] ?? [];
@@ -817,7 +817,7 @@ function useStoreImpl() {
             s.transactions = s.transactions.filter((t) => t.id !== tx.id);
           }
           delete r.myTx;
-        } else if (!was) {
+        } else if (!was && !(r.myTx && s.transactions.some((t) => t.id === r.myTx))) {
           const tx: Transaction = { id: uid('t'), merchant: `Bhisi · ${b.name}`, amount: b.amount, type: 'transfer', direction: 'out', category: 'transfer', date: s.today, account: defaultAccount(s), recurring: false, status: 'completed', notes: `Round ${round + 1} of ${b.rounds.length}` };
           s.transactions.unshift(tx);
           applyMoney(s, tx, 1);
@@ -828,7 +828,7 @@ function useStoreImpl() {
       const b = next.bhisis?.find((x) => x.id === id);
       const sh = b?.share;
       if (sh) {
-        const seat = person === 'me' ? sh.mid : Object.keys(sh.seats).find((k) => sh.seats[k] === person);
+        const seat = seatOf(sh, person);
         if (seat && (person === 'me' || sh.owner)) void markPaidShared(sh, round, seat, !!b.rounds[round]?.paid.includes(person));
       }
     },
@@ -887,7 +887,7 @@ function useStoreImpl() {
   );
   const applyBhisiView = useCallback(
     (id: string, view: BhisiView) => {
-      let out: { news: BhisiNews[]; ghosts?: string[] } = { news: [] };
+      let out: { news: BhisiNews[] } = { news: [] };
       commit((s) => void (out = applyBhisiIn(s, id, view)));
       return out;
     },
@@ -895,11 +895,9 @@ function useStoreImpl() {
   );
   const bhisiGone = useCallback(
     (id: string, why: string) => {
-      commit((s) => {
-        const b = s.bhisis?.find((x) => x.id === id);
-        if (b) delete b.share;
-      });
-      toast({ text: why });
+      // Deleted by the organiser, or I'm out: it goes from here too. Money already recorded stays in Activity.
+      commit((s) => dropBhisi(s, id));
+      if (why) toast({ text: why });
     },
     [commit, toast],
   );
@@ -915,6 +913,15 @@ function useStoreImpl() {
       } else toast({ text: `${who} won round ${last.round + 1} of ${b.name}. Tap the bhisi to watch the chit.`, emoji: '🏺' });
     },
     [toast],
+  );
+  /** Organiser: this round's pot has gone to the winner (paid outside PULSE, by UPI or cash). */
+  const markPotSent = useCallback(
+    (id: string, round: number) =>
+      commit((s) => {
+        const r = s.bhisis?.find((x) => x.id === id)?.rounds[round];
+        if (r) r.potSent = true;
+      }),
+    [commit],
   );
   const markRoundSeen = useCallback(
     (id: string, round: number) =>
@@ -944,7 +951,8 @@ function useStoreImpl() {
   const deleteBhisi = useCallback(
     (id: string) => {
       const b = ref.current.bhisis?.find((x) => x.id === id);
-      if (b?.share) void deleteBhisiChannel(b.share);
+      // Sent now, or with the next sync if the phone is offline (lib/bhisiShare.ts → outbox).
+      if (b?.share) void leaveOrDeleteBhisi(b.share);
       commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
       if (b) toast({ text: b.share && !b.share.owner ? `You left ${b.name}. Money already recorded stays in Activity.` : `${b.name} deleted. Money already recorded stays in Activity.` });
     },
@@ -2105,6 +2113,7 @@ function useStoreImpl() {
     markRoundSeen,
     joinBhisi,
     deleteBhisi,
+    markPotSent,
     startGullak,
     markTried,
     dropCoin,
