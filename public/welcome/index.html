@@ -917,8 +917,13 @@
     };
     els.forEach(function (el, i) {
       el.addEventListener('input', calc);
-      // Select the number on focus, so typing replaces it.
-      el.addEventListener('focus', function () { setTimeout(function () { el.select(); }, 0); });
+      // Select the number the moment the field gets focus, so typing replaces it. (Selecting a moment later,
+      // on a timer, raced with fast typing on busy phones: new digits got mixed into the old number.)
+      // Safari drops the selection on the tap's mouseup, so that one mouseup is stopped.
+      var fresh = false;
+      el.addEventListener('focus', function () { fresh = true; el.select(); });
+      el.addEventListener('mouseup', function (e) { if (fresh) e.preventDefault(); fresh = false; });
+      el.addEventListener('keydown', function () { fresh = false; });
       el.addEventListener('blur', function () { var v = val(el); el.value = i === 4 ? String(Math.max(1, v || 1)) : v.toLocaleString('en-IN'); calc(); });
     });
 

@@ -509,7 +509,7 @@ function Faces({ ids, max = 5 }: { ids: string[]; max?: number }) {
 type GroupTab = 'expenses' | 'balances' | 'settled';
 
 export function GroupDetail({ id }: { id: string }) {
-  const { state } = useStore();
+  const { state, deleteSplit } = useStore();
   const ui = useUI();
   const [tab, setTab] = useState<GroupTab>('expenses');
   const group = state.groups.find((g) => g.id === id);
@@ -634,6 +634,11 @@ export function GroupDetail({ id }: { id: string }) {
                             <span className="text-[12px] text-ink3">not in it</span>
                           )}
                         </span>
+                        {!s.transactionId && !s.remote && (
+                          <button type="button" className="tap -mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label={`Remove ${s.description}`} onClick={() => deleteSplit(s.id)}>
+                            <Icon name="trash" size={15} />
+                          </button>
+                        )}
                       </li>
                     );
                   })}
@@ -830,7 +835,7 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
 // Person
 // ------------------------------------------------------------------
 export function PersonDetail({ id }: { id: string }) {
-  const { state } = useStore();
+  const { state, deleteSplit } = useStore();
   const ui = useUI();
   const p = state.people.find((x) => x.id === id);
   if (!p) return <TopNavigation title="Person" onBack={ui.pop} />;
@@ -894,6 +899,12 @@ export function PersonDetail({ id }: { id: string }) {
                 </span>
               </span>
               <span className="num shrink-0">{rupees(s.amount)}</span>
+              {/* A split with no spend of yours (a friend paid, or a ride) can only be removed here. */}
+              {!s.transactionId && !s.remote && (
+                <button type="button" className="tap -mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label={`Remove ${s.description}`} onClick={() => deleteSplit(s.id)}>
+                  <Icon name="trash" size={15} />
+                </button>
+              )}
             </li>
           ))}
         </ul>
