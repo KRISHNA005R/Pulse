@@ -1386,6 +1386,16 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** Remove a split that has no spend attached (one a friend paid). Splits with a spend go with that spend. */
+  const deleteSplit = useCallback(
+    (id: string) => {
+      const sp = ref.current.splits.find((x) => x.id === id);
+      if (!sp || sp.transactionId || sp.remote) return;
+      commit((s) => void (s.splits = s.splits.filter((x) => x.id !== id)));
+      toast({ text: `${sp.description} removed.`, action: { label: 'Undo', run: () => commit((s) => void s.splits.unshift(sp)) } });
+    },
+    [commit, toast],
+  );
   /** One settle-up: the record, and the money moving in or out of the account. */
   const settleOne = (s: State, st: Omit<Settlement, 'id' | 'date'>, accountId?: string) => {
     const account = accountId ?? defaultAccount(s);
@@ -2160,6 +2170,7 @@ function useStoreImpl() {
     saveInsurance,
     payInsurance,
     deleteInsurance,
+    deleteSplit,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

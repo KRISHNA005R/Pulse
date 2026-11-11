@@ -119,3 +119,19 @@ test('SEO: indexable, its own title and description, canonical, and valid struct
   expect(await (await request.get('/sitemap.xml')).text()).toContain('<loc>https://pulsemoney.in/welcome/</loc>');
   for (const path of ['/about/', '/privacy/']) expect(await (await request.get(path)).text()).toContain('href="/welcome/"');
 });
+
+test('tapping a calculator field and typing at once replaces the number (no digits mixed in)', async ({ page }) => {
+  await open(page);
+  // Act like a busy phone, where timers run late: anything the page puts off "for a moment" waits 300 ms.
+  await page.evaluate(() => {
+    const later = window.setTimeout.bind(window);
+    (window as unknown as { setTimeout: unknown }).setTimeout = (f: () => void, ms?: number) => later(f, Math.max(ms ?? 0, 300));
+  });
+  const bank = field(page, 'Money in bank + cash');
+  await bank.click();
+  await page.keyboard.type('5000', { delay: 0 }); // straight after the tap
+  await expect(bank).toHaveValue('5000');
+  await field(page, 'Days until payday').click();
+  await page.keyboard.type('3', { delay: 0 });
+  await expect(field(page, 'Days until payday')).toHaveValue('3');
+});
