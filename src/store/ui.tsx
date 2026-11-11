@@ -15,6 +15,7 @@ export type Route =
   | { name: 'networth' }
   | { name: 'investments' }
   | { name: 'insurance' }
+  | { name: 'tanki' }
   | { name: 'feedback' }
   | { name: 'reminders' }
   | { name: 'income' }
@@ -68,6 +69,8 @@ export type SheetSpec =
   | { type: 'inv-growth' }
   | { type: 'inv-debits' }
   | { type: 'insurance-form'; insuranceId?: string }
+  | { type: 'vehicle-form'; vehicleId?: string }
+  | { type: 'ride-cost'; vehicleId?: string }
   | { type: 'install' }
   | { type: 'card-form'; cardId?: string }
   | { type: 'debt-form'; debtId?: string }

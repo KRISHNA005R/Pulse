@@ -2,14 +2,15 @@ import { playSfx, preloadSfx, sfxFor } from '../lib/sfx';
 import { useEffect, useMemo, useState } from 'react';
 import { RECEIPT_SCAN_ON } from '../lib/features';
 import { hasCents, scaled, sym } from '../lib/currency';
-import type { CategoryId, SplitMode, TxType } from '../types';
+import type { CategoryId, SplitMode, State, Transaction, TxType } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { parseEntry } from '../lib/parse';
 import { categoryFor, emojiFor } from '../lib/lexicon';
 import { addDays, fmtDate, haptic, rupees } from '../lib/format';
-import { BACK_WORDS, budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
+import { applyMoney, BACK_WORDS, budgetFor, budgetState, defaultAccount, safeToSpend } from '../lib/finance';
 import { Icon } from './ui/Icon';
+import { VEHICLE_KINDS } from '../screens/Tanki';
 import { HScroll } from './ui/HScroll';
 import { PeoplePicker } from './People';
 import { SwipeToConfirm } from './ui/SwipeToConfirm';
@@ -30,6 +31,8 @@ export interface ComposerPreset {
   openPanel?: 'people';
   /** Transfers: preselect where the money goes (account id or 'pot:<planId>'). */
   toAccount?: string;
+  /** Fuel: which vehicle it's for (Tanki). */
+  vehicle?: string;
 }
 
 type Panel = null | 'category' | 'date' | 'plan' | 'people' | 'paidby';
@@ -87,6 +90,13 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const [saved, setSaved] = useState(false);
   /** Money in: null lets the words decide (a "refund" is money back), true/false once picked by hand. */
   const [back, setBack] = useState<boolean | null>(null);
+  // Fuel: which vehicle, and an optional meter reading (Tanki). Default: the vehicle of the last fuel entry.
+  const vehicles = (state.vehicles ?? []).filter((v) => !v.paused);
+  const [veh, setVeh] = useState<string>(() => {
+    const lastTagged = state.transactions.find((t) => t.category === 'fuel' && t.vehicle && (t.vehicle === 'none' || vehicles.some((v) => v.id === t.vehicle)))?.vehicle;
+    return preset?.vehicle ?? lastTagged ?? vehicles[0]?.id ?? '';
+  });
+  const [meter, setMeter] = useState('');
 
   const parsed = useMemo(() => parseEntry(text, { people: state.people, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions }), [text, state.people, state.plans, state.today, state.categories, state.transactions]);
 
@@ -109,6 +119,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const offerSplit = people === null && namedPeople.length > 0;
   const participants = ['me', ...effPeople];
   const hasSplit = effType === 'expense' && (effPeople.length > 0 || pendingNew.length > 0);
+  const fuelRow = effType === 'expense' && !effBack && effCat === 'fuel' && vehicles.length > 0 && !hasSplit;
 
   const label = parsed.label || parsed.merchant || (effBack ? 'Got back' : effType === 'income' ? 'Money in' : categoryLabel(state.categories.find((c) => c.id === effCat)?.name));
   const merchant = parsed.merchant && !parsed.label.toLowerCase().includes(parsed.merchant.toLowerCase()) ? `${parsed.merchant} · ${parsed.label}` : label;
@@ -144,6 +155,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
 
   const save = () => {
     if (!effAmount || err) return;
+    const fuelBits = fuelRow ? { vehicle: veh || undefined, meterKm: parseFloat(meter) > 0 ? Math.round(parseFloat(meter)) : undefined } : {};
     // Create any new people typed in the description
     const created = pendingNew.map((n) => store.addPerson(n).id);
     const ids = [...effPeople, ...created];
@@ -158,7 +170,12 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       store.addSplit({ group: preset?.group, description: merchant, amount: effAmount, paidBy, date: effDate, mode, shares: finalShares, category: effCat, plan: effPlan ?? undefined, account: from, notes: undefined });
       void ids;
     } else {
-      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined, back: effBack || undefined });
+      store.addTransaction({ merchant, amount: effAmount, type: effType, category: effCat, date: effDate, account: from, plan: effPlan ?? undefined, recurring, people: ids.length ? ids : undefined, back: effBack || undefined, ...fuelBits });
+      // Second fuel entry and no vehicle yet: offer Tanki, once.
+      if (effType === 'expense' && effCat === 'fuel' && !effBack && !vehicles.length && !(state.vehicles ?? []).length && !state.dismissedDetections.includes('tanki-invite') && state.transactions.some((t) => t.category === 'fuel' && t.type === 'expense')) {
+        store.dismissDetection('tanki-invite');
+        window.setTimeout(() => store.toast({ text: 'Fuel for a scooter, bike or car? Tanki can plan your next fill.', emoji: '⛽', action: { label: 'Set it up', run: () => ui.openSheet({ type: 'vehicle-form' }) } }), 1800);
+      }
     }
     if (preset?.replaceTx) store.deleteTransaction(preset.replaceTx, { quiet: true });
     // Sounds: played straight from the swipe, so phones allow it. Asked about once, after a first log.
@@ -214,7 +231,15 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     { value: 'income', label: 'Got', emoji: '🤑' },
     { value: 'transfer', label: 'Moved', emoji: '🔁' },
   ];
-  const afterSafe = Math.max(0, sts.safe - impact);
+  // A fuel fill for a Tanki vehicle comes out of the fuel kept aside, so work out the real safe-to-spend after it.
+  const afterSafe = useMemo(() => {
+    if (!(fuelRow && veh && veh !== 'none' && impact > 0)) return Math.max(0, sts.safe - impact);
+    const from = account === NEW_CASH ? state.accounts[0]?.id ?? '' : account;
+    const tx = { id: '__preview', merchant, amount: impact, type: 'expense', category: 'fuel', date: effDate, account: from, recurring: false, status: 'completed', vehicle: veh } as Transaction;
+    const sim: State = { ...state, accounts: state.accounts.map((a) => ({ ...a })), cards: state.cards.map((c) => ({ ...c })), transactions: [tx, ...state.transactions] };
+    applyMoney(sim, tx, 1);
+    return safeToSpend(sim).safe;
+  }, [fuelRow, veh, impact, sts.safe, account, state, merchant, effDate]);
 
   return (
     <div className="flex flex-col">
@@ -257,7 +282,17 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       </div>
       {effType === 'expense' && (
         <p className="mx-auto -mt-1 inline-flex items-center gap-1.5 self-center rounded-full bg-accent-soft px-3 py-1 text-[12.5px] font-semibold text-accent-ink" aria-live="polite">
-          {impact > 0 ? (
+          {impact > 0 && fuelRow && veh && veh !== 'none' && afterSafe >= sts.safe ? (
+            <>
+              {afterSafe > sts.safe ? (
+                <>
+                  Fuel kept aside covers it, and <span className="num">{rupees(afterSafe - sts.safe)}</span> frees up
+                </>
+              ) : (
+                'Comes out of fuel kept aside'
+              )}
+            </>
+          ) : impact > 0 ? (
             <>
               Safe to spend after: <span className="num">{rupees(afterSafe)}</span>
             </>
@@ -420,6 +455,24 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
                 ? `PULSE shows ${rupees(Math.max(0, source.balance ?? 0))} in cash. Took cash out of the bank? Log that with Moved.`
                 : `That's more than the ${rupees(Math.max(0, source.balance ?? 0))} PULSE shows in ${source.label === 'Bank' ? 'your bank' : source.label}.`}
             </p>
+          )}
+        </div>
+      )}
+
+      {fuelRow && (
+        <div className="mt-4 flex flex-col gap-2" data-testid="composer-vehicle">
+          <div className="no-scrollbar -mx-5 flex gap-1.5 overflow-x-auto px-5" role="radiogroup" aria-label="Vehicle">
+            {[...vehicles.map((v) => ({ id: v.id, label: `${VEHICLE_KINDS.find((k) => k.id === v.kind)?.emoji ?? '⛽'} ${v.name}` })), { id: 'none', label: 'Not mine' }].map((o) => (
+              <button key={o.id} type="button" role="radio" aria-checked={veh === o.id} className="chip shrink-0" onClick={() => { haptic(6); setVeh(o.id); }}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          {veh !== 'none' && (
+            <label className="flex items-center gap-2 text-[13px] text-ink3">
+              <span className="shrink-0">Meter reading (optional)</span>
+              <input inputMode="numeric" aria-label="Meter reading in km" className="field num h-9 min-h-0 w-28 rounded-xl px-3 py-1 text-[14px]" value={meter} onChange={(e) => setMeter(e.target.value.replace(/\D/g, '').slice(0, 7))} placeholder="km" />
+            </label>
           )}
         </div>
       )}

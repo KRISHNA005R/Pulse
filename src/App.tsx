@@ -23,6 +23,7 @@ import { DemoGuideScreen, InstallScreen } from './screens/Learn';
 import { MIGRATED_FLAG } from './lib/migrate';
 import { applyUpdate, onUpdateReady } from './lib/update';
 import { InsuranceScreen } from './screens/Insurance';
+import { TankiScreen } from './screens/Tanki';
 import { useInstallNudge } from './components/InstallPrompt';
 import { useFriends } from './components/Friends';
 import { RemindersScreen } from './screens/Reminders';
@@ -54,6 +55,8 @@ function Screen() {
         return <InvestmentsScreen />;
       case 'insurance':
         return <InsuranceScreen />;
+      case 'tanki':
+        return <TankiScreen />;
       case 'feedback':
         return <FeedbackScreen />;
       case 'reminders':

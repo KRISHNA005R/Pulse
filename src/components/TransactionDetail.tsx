@@ -125,6 +125,27 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
             ))}
         </select>
       </Row>
+      {/* Fuel: which vehicle it went into, and the meter reading (Tanki). */}
+      {tx.type === 'expense' && tx.category === 'fuel' && !tx.back && (state.vehicles ?? []).length > 0 && (
+        <>
+          <Row label="Vehicle">
+            <select aria-label="Vehicle" className="rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" value={tx.vehicle ?? ((state.vehicles ?? []).filter((v) => !v.paused).length === 1 ? '' : '__pick')} onChange={(e) => store.updateTransaction(tx.id, { vehicle: e.target.value === '' || e.target.value === '__pick' ? undefined : e.target.value })}>
+              {(state.vehicles ?? []).filter((v) => !v.paused).length === 1 ? <option value="">{(state.vehicles ?? []).find((v) => !v.paused)?.name}</option> : <option value="__pick">Pick one</option>}
+              {(state.vehicles ?? []).filter((v) => !v.paused && ((state.vehicles ?? []).filter((x) => !x.paused).length > 1 || v.id === tx.vehicle)).map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+              <option value="none">Not mine</option>
+            </select>
+          </Row>
+          {tx.vehicle !== 'none' && (
+            <Row label="Meter (km)">
+              <input aria-label="Meter reading in km" inputMode="numeric" className="w-28 rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" defaultValue={tx.meterKm ?? ''} placeholder="Optional" onBlur={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); store.updateTransaction(tx.id, { meterKm: n > 0 ? n : undefined }); }} />
+            </Row>
+          )}
+        </>
+      )}
       {/* Only on an older spend that was tagged with a plan (spent on it). New spends don't get one:
           money goes into a plan with Add money, or Moved → the plan. */}
       {tx.type === 'expense' && tx.plan && (

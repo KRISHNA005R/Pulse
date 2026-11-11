@@ -21,6 +21,7 @@ import type {
   Insurance,
   ISODate,
   Investment,
+  Vehicle,
 } from '../types';
 import { CATEGORIES, createSeed } from '../data/seed';
 import { roundMoney, setCurrency } from '../lib/currency';
@@ -32,6 +33,7 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
+import { tanki } from '../lib/tanki';
 import { cleanDemoMix } from '../lib/demoMix';
 import { loadSession } from '../lib/auth';
 import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
@@ -1386,6 +1388,34 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /**
+   * A ride's fuel cost from Tanki: friends owe their share, but it's not a spend of mine (the fuel was
+   * logged at the pump), so no transaction is made. Balances come from splits, so it shows up there.
+   */
+  const addRideSplit = useCallback(
+    (input: { description: string; amount: number; shares: { person: string; amount: number }[]; ride: NonNullable<SplitExpense['ride']> }) => {
+      const id = uid('s');
+      if (ref.current.mode === 'personal') track('split');
+      commit((s) => {
+        s.splits.unshift({ id, description: input.description, amount: input.amount, paidBy: 'me', date: s.today, mode: 'exact', shares: input.shares, category: 'fuel', ride: input.ride });
+      });
+      haptic(12);
+      const owed = input.shares.filter((x) => x.person !== 'me').reduce((a, x) => a + x.amount, 0);
+      toast({ text: `Ride split. ${rupees(owed)} to come back to you.`, tone: 'good', emoji: '⛽' });
+      return id;
+    },
+    [commit, toast],
+  );
+  /** Remove a split that has no spend attached (a ride from Tanki). Splits with a spend go with that spend. */
+  const deleteSplit = useCallback(
+    (id: string) => {
+      const sp = ref.current.splits.find((x) => x.id === id);
+      if (!sp || sp.transactionId || sp.remote) return;
+      commit((s) => void (s.splits = s.splits.filter((x) => x.id !== id)));
+      toast({ text: `${sp.description} removed.`, action: { label: 'Undo', run: () => commit((s) => void s.splits.unshift(sp)) } });
+    },
+    [commit, toast],
+  );
   /** One settle-up: the record, and the money moving in or out of the account. */
   const settleOne = (s: State, st: Omit<Settlement, 'id' | 'date'>, accountId?: string) => {
     const account = accountId ?? defaultAccount(s);
@@ -1712,6 +1742,50 @@ function useStoreImpl() {
           label: 'Undo',
           run: () => commit((s) => void (s.insurance = [...(s.insurance ?? []), p])),
         },
+      });
+    },
+    [commit, toast],
+  );
+
+  // ---------- vehicles (Tanki) ----------
+  const saveVehicle = useCallback(
+    (v: Omit<Vehicle, 'id' | 'createdAt'> & { id?: string }) => {
+      let id = v.id ?? '';
+      const next = commit((s) => {
+        s.vehicles = s.vehicles ?? [];
+        if (v.id) Object.assign(s.vehicles.find((x) => x.id === v.id)!, v);
+        else {
+          id = uid('veh');
+          s.vehicles.push({ ...v, id, createdAt: s.today } as Vehicle);
+        }
+      });
+      haptic(12);
+      if (!v.id) {
+        const veh = (next.vehicles ?? []).find((x) => x.id === id)!;
+        const t = tanki(next, veh);
+        toast({
+          text: t.learning
+            ? `${veh.name} added. Tanki learns its rhythm from your fuel entries${t.learning.fillsNeeded ? `: ${t.learning.fillsNeeded} more fill${t.learning.fillsNeeded > 1 ? 's' : ''}` : ''}.`
+            : t.reserve > 0
+              ? `${veh.name} added. ${rupees(t.reserve)} kept aside for fuel, so filling up won't dent your daily number.`
+              : `${veh.name} added. Next fill around ${fmtDate(t.nextFill!)}.`,
+          tone: 'good',
+          emoji: '⛽',
+        });
+      } else toast({ text: `${v.name} updated.`, tone: 'good' });
+      return id;
+    },
+    [commit, toast],
+  );
+  const deleteVehicle = useCallback(
+    (id: string) => {
+      const before = ref.current;
+      const v = (before.vehicles ?? []).find((x) => x.id === id);
+      if (!v) return;
+      commit((s) => void (s.vehicles = (s.vehicles ?? []).filter((x) => x.id !== id)));
+      toast({
+        text: `${v.name} removed. Its fuel entries stay in your history.`,
+        action: { label: 'Undo', run: () => commit((s) => void (s.vehicles = [...(s.vehicles ?? []), v])) },
       });
     },
     [commit, toast],
@@ -2160,6 +2234,10 @@ function useStoreImpl() {
     saveInsurance,
     payInsurance,
     deleteInsurance,
+    saveVehicle,
+    addRideSplit,
+    deleteSplit,
+    deleteVehicle,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

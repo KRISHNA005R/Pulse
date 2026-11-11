@@ -263,6 +263,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
 
 export function SafeBreakdown() {
   const { state } = useStore();
+  const ui = useUI();
   const sts = safeToSpend(state);
   const Row = ({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) => (
     <div className={`flex items-baseline justify-between gap-3 py-3 ${strong ? '' : 'border-b border-line'}`}>
@@ -287,6 +288,11 @@ export function SafeBreakdown() {
         />
       )}
       {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={sts.cardItems.map((c) => `${c.name} ${rupees(c.balance)}`).join(' · ') || 'Nothing owed'} />}
+      {(state.vehicles ?? []).some((v) => !v.paused) && (
+        <button type="button" className="block w-full text-left" onClick={() => ui.push({ name: 'tanki' })} data-testid="safe-fuel">
+          <Row label="Fuel till payday" value={`−${rupees(sts.fuel)}`} sub={sts.fuelItems.length ? sts.fuelItems.map((x) => `${x.vehicle.name} ${rupees(x.amount)}`).join(' · ') : 'Nothing needed: the tank should last until payday'} />
+        </button>
+      )}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />

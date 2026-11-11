@@ -1,5 +1,6 @@
 import { useStore } from '../store/store';
 import { InsuranceForm } from '../screens/Insurance';
+import { RideCostForm, VehicleForm } from '../screens/Tanki';
 import { GroupPeople } from '../screens/Plans';
 import { BhisiDraw, BhisiForm, BhisiJoin, BhisiWatch, DrawReplaySheet } from './Bhisi';
 import { GullakForm } from './Gullak';
@@ -210,6 +211,18 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Keep PULSE on your home screen" onClose={close} size="sm" z={z}>
           <InstallPrompt onDone={close} />
+        </Sheet>
+      );
+    case 'vehicle-form':
+      return (
+        <Sheet title={spec.vehicleId ? 'Edit vehicle' : 'Add a vehicle'} onClose={close} z={z}>
+          <VehicleForm vehicleId={spec.vehicleId} onDone={close} />
+        </Sheet>
+      );
+    case 'ride-cost':
+      return (
+        <Sheet title="Split a ride" onClose={close} z={z}>
+          <RideCostForm vehicleId={spec.vehicleId} onDone={close} />
         </Sheet>
       );
     case 'insurance-form':

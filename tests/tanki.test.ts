@@ -202,6 +202,11 @@ describe('money kept aside: occasional fillers (weekend car)', () => {
     const t = tanki(world(car, 10, { vehicles: [swift], payday: 55 }), swift);
     expect(t.reserve).toBe(3300);
   });
+  it('a car added today does not catch up on the days before it was added (no sudden drop on setup)', () => {
+    // last fill day 0, added on day 10 (today), next fill day 50, payday day 30: save from day 10, so 20/40 of ₹3,000
+    const added = { ...swift, createdAt: day(10) };
+    expect(tanki(world(car, 10, { vehicles: [added] }), added).reserve).toBe(1500);
+  });
   it('blends smoothly between 12 and 16 days, so a vehicle near 14 days never jumps between modes', () => {
     const every = (g: number) => Array.from({ length: 6 }, (_, i) => fill(i * g - 5 * g, 600));
     const at = (g: number) => tanki(world(every(g), 1, { vehicles: [swift] }), swift);
@@ -298,5 +303,32 @@ describe('simulation: 120 scooter riders with random fill amounts, checked again
     const avgFill = fillSizes.reduce((a, b) => a + b, 0) / fillSizes.length;
     expect(median(off)).toBeLessThan(0.85 * avgFill); // measured: ₹193 with fills averaging ₹238
     expect(Math.abs(bias.reduce((a, b) => a + b, 0) / bias.length)).toBeLessThan(0.2 * avgFill); // measured: ₹34 low
+  });
+});
+
+describe('two phones (sync)', () => {
+  it('vehicles merge like other lists: added on one phone, edited on the other, both kept; a removal sticks', async () => {
+    const { merge3 } = await import('../src/lib/sync');
+    const base = world(steady(4), 16);
+    const local = structuredClone(base);
+    const remote = structuredClone(base);
+    local.vehicles!.push({ id: 'v2', name: 'Swift', kind: 'car', fuel: 'petrol', createdAt: D0 });
+    remote.vehicles![0] = { ...remote.vehicles![0], name: 'My Activa' };
+    const out = merge3(base, local, remote);
+    expect(out.vehicles!.map((v) => v.name).sort()).toEqual(['My Activa', 'Swift']);
+    const gone = structuredClone(out);
+    gone.vehicles = gone.vehicles!.filter((v) => v.id !== 'v2');
+    expect(merge3(out, gone, out).vehicles!.map((v) => v.id)).toEqual(['v1']);
+  });
+  it('an old save without vehicles still works everywhere (no crash, no fuel line)', () => {
+    const s = world(steady(4), 16);
+    delete s.vehicles;
+    expect(fuelReserve(s)).toEqual({ total: 0, items: [] });
+    expect(safeToSpend(s).fuel).toBe(0);
+  });
+  it('no payday set: keeps fuel aside until the end of the month, like safe-to-spend', () => {
+    const s = world(steady(4), 17);
+    s.incomes = [];
+    expect(tanki(s, activa).reserve).toBeGreaterThan(0);
   });
 });

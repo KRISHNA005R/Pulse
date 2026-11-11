@@ -1,3 +1,4 @@
+import { TankiHomeCard } from './Tanki';
 import { GuessCard, NewStuffCard, PaydayWin } from '../components/Fun';
 import { useMemo } from 'react';
 import { ex, scaled } from '../lib/currency';
@@ -90,6 +91,7 @@ export function HomeScreen() {
         </ul>
       </section>
 
+      <TankiHomeCard />
       <FriendNewsCard />
       <GuessCard />
 

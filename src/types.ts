@@ -344,6 +344,8 @@ export interface SplitExpense {
   transactionId?: ID;
   /** Recorded by a connected friend or a group member in their PULSE (the channel or group it came through). Only they can change it. */
   remote?: string;
+  /** A ride's fuel cost split from Tanki. No spend of its own: the fuel was logged at the pump. */
+  ride?: { vehicleId: ID; km: number; perKm: number; kind: 'shared' | 'detour' };
 }
 
 export interface Settlement {

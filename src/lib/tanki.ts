@@ -246,7 +246,8 @@ export function tanki(s: State, v: Vehicle): TankiStatus {
   // B. Occasional fillers: save each coming fill from the fill before it, pro rata by payday (like insurance
   // premiums). Depends only on the fill dates and payday, so it's the same every day of the pay cycle.
   let occasional = 0;
-  let start = last.date;
+  // Saving starts at the last fill, or the day the vehicle was added if later (no catch-up for days before it).
+  let start = last.date > v.createdAt ? last.date : v.createdAt;
   let due = nextFill;
   for (let k = 0; k < 24 && start < payday; k++) {
     occasional += usualFill * Math.min(1, Math.max(0, daysBetween(start, payday)) / Math.max(1, daysBetween(start, due)));
