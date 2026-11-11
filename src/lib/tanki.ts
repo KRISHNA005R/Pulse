@@ -97,14 +97,15 @@ export function vehicleFills(s: State, v: Vehicle): Fill[] {
   return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-/** Fills that are wildly bigger than the rest (more than 5× the usual fill). */
+/** Fills that are wildly bigger than the rest (more than 5× the usual fill), among the last 180 days. */
 function findSuspicious(fills: Fill[]): Set<Fill> {
   const out = new Set<Fill>();
   if (fills.length < 4) return out;
-  for (const f of fills) {
-    const others = fills.filter((x) => x !== f).map((x) => x.amount);
-    if (f.amount > 5 * median(others)) out.add(f);
-  }
+  const from = addDays(fills[fills.length - 1].date, -180);
+  const recent = fills.filter((f) => f.date >= from);
+  if (recent.length < 4) return out;
+  const usual = median(recent.map((f) => f.amount));
+  for (const f of recent) if (f.amount > 5 * usual) out.add(f);
   return out;
 }
 
@@ -112,9 +113,11 @@ function findSuspicious(fills: Fill[]): Set<Fill> {
 function windowOf(fills: Fill[]): Fill[] {
   if (!fills.length) return [];
   const last = fills[fills.length - 1].date;
-  const recent = fills.filter((f) => f.date >= addDays(last, -60));
+  const d60 = addDays(last, -60);
+  const recent = fills.filter((f) => f.date >= d60);
   if (recent.length >= 6) return recent;
-  return fills.filter((f) => f.date >= addDays(last, -180)).slice(-6);
+  const d180 = addDays(last, -180);
+  return fills.filter((f) => f.date >= d180).slice(-6);
 }
 
 /** Tank level in rupees after each fill, carrying what was left over: left = max(0, left − used) + fill. */
@@ -200,12 +203,18 @@ function perKmOf(v: Vehicle, fills: Fill[], odd: Gap[]): { value: number; exact:
   return { value: v.price / kmpl, exact: false };
 }
 
+/** Same amount on the same day, in the last 90 days: maybe logged twice. One pass, so it stays fast with years of history. */
 function findDuplicates(s: State, v: Vehicle): [ID, ID][] {
   const out: [ID, ID][] = [];
-  const list = s.transactions.filter((t) => isFuel(t) && t.date <= s.today && belongs(s, t, v));
-  for (let i = 0; i < list.length; i++)
-    for (let j = i + 1; j < list.length; j++)
-      if (list[i].date === list[j].date && list[i].amount === list[j].amount) out.push([list[i].id, list[j].id]);
+  const since = addDays(s.today, -90);
+  const seen = new Map<string, ID>();
+  for (const t of s.transactions) {
+    if (t.date < since || t.date > s.today || !isFuel(t) || !belongs(s, t, v)) continue;
+    const key = `${t.date}|${t.amount}`;
+    const first = seen.get(key);
+    if (first) out.push([first, t.id]);
+    else seen.set(key, t.id);
+  }
   return out;
 }
 
@@ -214,7 +223,8 @@ export function tanki(s: State, v: Vehicle): TankiStatus {
   const all = vehicleFills(s, v);
   const sus = findSuspicious(all);
   const fills = all.filter((f) => !sus.has(f));
-  const untagged = activeVehicles(s).length > 1 ? s.transactions.filter((t) => isFuel(t) && !t.vehicle && t.date <= s.today && t.date >= addDays(s.today, -60)).length : 0;
+  const d60 = addDays(s.today, -60);
+  const untagged = activeVehicles(s).length > 1 ? s.transactions.filter((t) => isFuel(t) && !t.vehicle && t.date <= s.today && t.date >= d60).length : 0;
   const base: TankiStatus = {
     vehicle: v, learning: null, perDay: null, usualGap: null, left: 0, nextFill: null, nextRange: null, askFilled: false, inactive: false,
     reserve: 0, mode: null, perKm: null, oddGaps: [], duplicates: findDuplicates(s, v), suspicious: [...sus].flatMap((f) => f.ids), untagged, fills,

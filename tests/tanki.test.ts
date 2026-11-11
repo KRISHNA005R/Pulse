@@ -332,3 +332,48 @@ describe('two phones (sync)', () => {
     expect(tanki(s, activa).reserve).toBeGreaterThan(0);
   });
 });
+
+describe('simulation: 80 weekend cars (₹1,500 to a full tank, every few weeks)', () => {
+  function rng(seed: number) { let x = seed >>> 0; return () => ((x = (x * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
+  it('just before each fill, most of it is already kept aside', () => {
+    const swift: Vehicle = { id: 'v1', name: 'Swift', kind: 'car', fuel: 'petrol', createdAt: addDays(D0, -400), price: 102.12 };
+    const ratios: number[] = [];
+    for (let seed = 1; seed <= 80; seed++) {
+      const R = rng(seed);
+      const cap = 37, price = 102.12;
+      let tank = cap / 2;
+      const all: Transaction[] = [];
+      for (let d = 0; d < 400; d++) {
+        const km = d % 7 >= 5 ? [0, 0, 80, 120, 40][Math.floor(R() * 5)] : R() < 0.15 ? 15 : 0;
+        const lit = km / 15;
+        if (tank - lit < cap * (0.1 + R() * 0.15)) {
+          const room = Math.round(((cap - tank) * price) / 10) * 10;
+          const amt = R() < 0.5 ? room : Math.min(room, [1500, 2000, 2500][Math.floor(R() * 3)]);
+          tank += amt / price;
+          all.push(fill(d - 400, amt));
+        }
+        tank -= lit;
+      }
+      // Paydays on the 1st of each month; look at every fill in the last 200 days.
+      for (const f of all.filter((t) => t.date >= day(-200))) {
+        const before = addDays(f.date, -1);
+        const s = world(all.filter((t) => t.date <= before), 0, { vehicles: [swift] });
+        s.today = before;
+        s.incomes[0].nextDate = `${before.slice(0, 8)}01`;
+        const t = tanki(s, swift);
+        if (t.learning || t.mode !== 'occasional') continue;
+        ratios.push(t.reserve / f.amount);
+      }
+    }
+    const sorted = [...ratios].sort((a, b) => a - b);
+    const q = (p: number) => sorted[Math.floor(p * (sorted.length - 1))];
+    const covered = ratios.filter((r) => r >= 0.9).length / ratios.length;
+    // Measured (648 fills): 72% of fills find at least 90% of themselves already kept aside; the lowest quarter
+    // still finds 86%. Above 100% is the start of saving for the fill after, which is on purpose.
+    expect(ratios.length).toBeGreaterThan(100);
+    expect(covered).toBeGreaterThan(0.65);
+    expect(q(0.25)).toBeGreaterThan(0.75);
+    expect(q(0.75)).toBeLessThan(2);
+    require('node:fs').writeFileSync('/tmp/claude-0/carsim.json', JSON.stringify({ n: ratios.length, covered, q25: q(0.25), q50: q(0.5), q75: q(0.75) }));
+  });
+});
