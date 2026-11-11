@@ -104,6 +104,32 @@ export interface Transaction {
   principal?: number;
   /** A bill or subscription recorded on its due date. */
   subscriptionId?: ID;
+  /** Fuel only: which vehicle it went into ('none' = not one of mine, e.g. a friend's car). Missing = the only vehicle, if there's one. */
+  vehicle?: ID;
+  /** Fuel only: the odometer reading at this fill, in km (optional). */
+  meterKm?: number;
+  /** Fuel only: filled to the top (optional). */
+  fullTank?: boolean;
+}
+
+export type VehicleKind = 'scooter' | 'bike' | 'car';
+export type FuelKind = 'petrol' | 'diesel' | 'cng';
+
+/** A vehicle Tanki plans fuel for. Only what the person told us: everything learned is worked out from fills each time. */
+export interface Vehicle {
+  id: ID;
+  name: string;
+  kind: VehicleKind;
+  fuel: FuelKind;
+  createdAt: ISODate;
+  /** Price per litre (per kg for CNG) the person confirmed, and when. Used for ₹ per km only. */
+  price?: number;
+  priceDate?: ISODate;
+  /** The person's own mileage (km per litre/kg), if they know it. Beats the typical figure. */
+  kmpl?: number;
+  paused?: boolean;
+  /** false = don't keep fuel money aside in safe-to-spend for this vehicle. */
+  keepAside?: boolean;
 }
 
 export type BudgetPeriod = 'monthly' | 'weekly' | 'custom';
@@ -465,6 +491,8 @@ export interface State {
   paydays?: { date: ISODate; left: number }[];
   /** "Guess the bill" answers, one per week. */
   guesses?: { week: ISODate; cat: string; guess: number; actual: number }[];
+  /** Vehicles for Tanki (fuel planning). Missing until the first one. */
+  vehicles?: Vehicle[];
 }
 
 export interface Gullak {

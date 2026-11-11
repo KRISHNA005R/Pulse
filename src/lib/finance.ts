@@ -1,7 +1,8 @@
-import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
+import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction, Vehicle } from '../types';
 import { hasCents, roundMoney, scaled } from './currency';
 import { bhisiDues } from './bhisi';
 import { INSURANCE_ON } from './features';
+import { fuelReserve } from './tanki';
 import { investmentLabel, kindMeta } from './invest';
 import {
   addDays,
@@ -348,6 +349,9 @@ export interface SafeToSpend {
   cardItems: CreditCard[];
   goals: number;
   goalItems: { plan: Plan; amount: number }[];
+  /** Fuel kept aside until payday (Tanki), per vehicle. */
+  fuel: number;
+  fuelItems: { vehicle: Vehicle; amount: number }[];
   buffer: number;
   safe: number;
   daily: number;
@@ -370,10 +374,11 @@ export function safeToSpend(s: State): SafeToSpend {
   const goals = goalItems.reduce((a, g) => a + g.amount, 0);
   const setAsideItems = (INSURANCE_ON ? (s.insurance ?? []) : []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
   const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
+  const { total: fuel, items: fuelItems } = fuelReserve(s);
   const buffer = s.settings.buffer;
-  const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
+  const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - fuel - buffer));
   const daysLeft = Math.max(1, daysBetween(s.today, payday));
-  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, fuel, fuelItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
 }
 
 // ------------------------------------------------------------------
