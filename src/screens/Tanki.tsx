@@ -152,76 +152,79 @@ function VehicleCard({ v }: { v: Vehicle }) {
           </div>
         )}
 
-        <dl className="mt-5 grid grid-cols-3 gap-2 border-t border-line pt-4">
-          <div>
-            <dt className="text-[12.5px] text-ink3">{t.perKm && !t.perKm.exact ? 'About ₹/km' : '₹ per km'}</dt>
-            <dd className="num text-[18px] font-semibold">{t.perKm ? per(t.perKm.value) : '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-[12.5px] text-ink3">{t.perKm?.exact ? `km/${unitOf(v) === 'kg' ? 'kg' : 'litre'}` : `About km/${unitOf(v) === 'kg' ? 'kg' : 'L'}`}</dt>
-            <dd className="num text-[18px] font-semibold">{kmpl ? Math.round(kmpl) : '—'}</dd>
-          </div>
+        {/* Only the numbers Tanki actually knows. ₹ per km appears once there's a price (asked at the first ride split). */}
+        <dl className={`mt-5 grid gap-2 border-t border-line pt-4 ${t.perKm ? 'grid-cols-3' : 'grid-cols-1'}`}>
           <div>
             <dt className="text-[12.5px] text-ink3">Fuel a day</dt>
             <dd className="num text-[18px] font-semibold">{t.perDay ? rupees(roundMoney(t.perDay)) : '—'}</dd>
           </div>
+          {t.perKm && (
+            <>
+              <div>
+                <dt className="text-[12.5px] text-ink3">{t.perKm.exact ? '₹ per km' : 'About ₹/km'}</dt>
+                <dd className="num text-[18px] font-semibold">{per(t.perKm.value)}</dd>
+              </div>
+              <div>
+                <dt className="text-[12.5px] text-ink3">{t.perKm.exact ? `km/${unitOf(v) === 'kg' ? 'kg' : 'litre'}` : `About km/${unitOf(v) === 'kg' ? 'kg' : 'L'}`}</dt>
+                <dd className="num text-[18px] font-semibold">{kmpl ? Math.round(kmpl) : '—'}</dd>
+              </div>
+            </>
+          )}
         </dl>
         {t.perKm && !t.perKm.exact && (
-          <p className="mt-2 text-[12.5px] text-ink3">Make it exact: add the meter reading when you fill up, 3 times.</p>
+          <button type="button" role="switch" aria-checked={!!v.trackMileage} className="mt-2 text-left text-[12.5px] text-ink3 underline underline-offset-2" onClick={() => store.saveVehicle({ ...v, trackMileage: !v.trackMileage })}>
+            {v.trackMileage ? 'Tracking real mileage: add the meter reading at your next 3 fills. Turn off' : 'Track my real mileage'}
+          </button>
         )}
-        {!t.perKm && <p className="mt-2 text-[12.5px] text-ink3">Add today's fuel price in Edit to see what a kilometre costs.</p>}
 
-        <button type="button" className="btn-quiet mt-4 min-h-[44px] w-full text-[14.5px]" onClick={() => ui.openSheet({ type: 'ride-cost', vehicleId: v.id })} disabled={!t.perKm}>
+        <button type="button" className="btn-quiet mt-4 min-h-[44px] w-full text-[14.5px]" onClick={() => ui.openSheet({ type: 'ride-cost', vehicleId: v.id })}>
           <Icon name="split" size={16} /> Split a ride
         </button>
       </div>
 
-      {(showGap || t.duplicates.length > 0 || t.suspicious.length > 0 || t.untagged > 0) && (
-        <ul className="mt-3 flex flex-col gap-2" aria-label="Things to check">
-          {showGap && (
-            <li className="flex items-center gap-2 rounded-2xl bg-sunk px-4 py-3 text-[14px]">
-              <span className="min-w-0 flex-1">Filled up between {fmtDate(gap.from)} and {fmtDate(gap.to)}? That gap is left out of the rhythm.</span>
-              <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'composer', preset: { type: 'expense', category: 'fuel', text: 'Petrol', vehicle: v.id, date: gap.from } })}>
-                Log it
-              </button>
-              <button type="button" className="btn-ghost min-h-[36px] px-2 text-[13.5px]" onClick={() => store.dismissDetection(gapKey)}>
-                No
-              </button>
-            </li>
-          )}
-          {t.duplicates.slice(0, 1).map(([, b]) => {
-            const tx = state.transactions.find((x) => x.id === b);
-            return tx ? (
-              <li key={b} className="flex items-center gap-2 rounded-2xl bg-sunk px-4 py-3 text-[14px]">
-                <span className="min-w-0 flex-1">
-                  {rupees(tx.amount)} twice on {fmtDate(tx.date)}. Logged twice?
-                </span>
-                <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'tx', id: b })}>
-                  Check
-                </button>
-              </li>
-            ) : null;
-          })}
-          {t.suspicious.slice(0, 1).map((id) => {
-            const tx = state.transactions.find((x) => x.id === id);
-            return tx ? (
-              <li key={id} className="flex items-center gap-2 rounded-2xl bg-sunk px-4 py-3 text-[14px]">
-                <span className="min-w-0 flex-1">
-                  {rupees(tx.amount)} on {fmtDate(tx.date)} is much bigger than your usual fill, so it's left out. A typo?
-                </span>
-                <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'tx', id })}>
-                  Check
-                </button>
-              </li>
-            ) : null;
-          })}
-          {t.untagged > 0 && (
-            <li className="rounded-2xl bg-sunk px-4 py-3 text-[14px]">
-              {t.untagged} fuel {t.untagged === 1 ? 'entry isn’t' : 'entries aren’t'} tagged to a vehicle, so {t.untagged === 1 ? 'it isn’t' : 'they aren’t'} counted. Open {t.untagged === 1 ? 'it' : 'one'} in Activity to pick the vehicle.
-            </li>
-          )}
-        </ul>
-      )}
+      {/* One thing to check at a time, most important first. */}
+      {(() => {
+        const dup = t.duplicates[0] ? state.transactions.find((x) => x.id === t.duplicates[0][1]) : undefined;
+        const typo = t.suspicious[0] ? state.transactions.find((x) => x.id === t.suspicious[0]) : undefined;
+        const note = typo ? (
+          <>
+            <span className="min-w-0 flex-1">
+              {rupees(typo.amount)} on {fmtDate(typo.date)} is much bigger than your usual fill, so it's left out. A typo?
+            </span>
+            <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'tx', id: typo.id })}>
+              Check
+            </button>
+          </>
+        ) : dup ? (
+          <>
+            <span className="min-w-0 flex-1">
+              {rupees(dup.amount)} twice on {fmtDate(dup.date)}. Logged twice?
+            </span>
+            <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'tx', id: dup.id })}>
+              Check
+            </button>
+          </>
+        ) : showGap ? (
+          <>
+            <span className="min-w-0 flex-1">Filled up between {fmtDate(gap.from)} and {fmtDate(gap.to)}?</span>
+            <button type="button" className="btn-quiet min-h-[36px] px-3 text-[13.5px]" onClick={() => ui.openSheet({ type: 'composer', preset: { type: 'expense', category: 'fuel', text: 'Petrol', vehicle: v.id, date: gap.from } })}>
+              Log it
+            </button>
+            <button type="button" className="btn-ghost min-h-[36px] px-2 text-[13.5px]" onClick={() => store.dismissDetection(gapKey)}>
+              No
+            </button>
+          </>
+        ) : t.untagged > 0 ? (
+          <span className="min-w-0 flex-1">
+            {t.untagged} fuel {t.untagged === 1 ? 'entry isn’t' : 'entries aren’t'} tagged to a vehicle. Open {t.untagged === 1 ? 'it' : 'one'} in Activity to pick the vehicle.
+          </span>
+        ) : null;
+        return note ? (
+          <div className="mt-3 flex items-center gap-2 rounded-2xl bg-sunk px-4 py-3 text-[14px]" data-testid="tanki-check">
+            {note}
+          </div>
+        ) : null;
+      })()}
 
       {recent.length > 0 && (
         <div className="mt-6">
@@ -314,6 +317,7 @@ export function VehicleForm({ vehicleId, onDone }: { vehicleId?: string; onDone:
 
   const save = () => {
     store.saveVehicle({
+      ...(ex ?? {}),
       id: ex?.id,
       name: name.trim(),
       kind,
@@ -362,6 +366,7 @@ export function VehicleForm({ vehicleId, onDone }: { vehicleId?: string; onDone:
       <Field label="Name" htmlFor="veh-name">
         <input id="veh-name" className="field" value={name} maxLength={24} onChange={(e) => setName(e.target.value)} placeholder={VEHICLE_KINDS.find((x) => x.id === kind)?.hint} />
       </Field>
+      {ex && (
       <div className="grid grid-cols-2 gap-2.5">
         <Field label={`Price per ${unit} (optional)`} htmlFor="veh-price" hint={priceOk ? 'Today’s price at your pump' : `Between ${sym()}20 and ${sym()}300`}>
           <input id="veh-price" inputMode="decimal" className="field num" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
@@ -370,10 +375,14 @@ export function VehicleForm({ vehicleId, onDone }: { vehicleId?: string; onDone:
           <input id="veh-kmpl" inputMode="decimal" className="field num" value={kmpl} onChange={(e) => setKmpl(e.target.value.replace(/[^\d.]/g, ''))} placeholder={typical ? String(typical) : ''} />
         </Field>
       </div>
+      )}
+      {ex && (
       <div className="divide-y divide-line overflow-hidden rounded-2xl bg-sunk/60">
         <Switch on={keep} set={setKeep} label="Keep money aside for fuel" hint={keep ? 'Safe to spend counts the next fills, so filling up doesn’t dent it' : 'Off: fills come straight out of your daily number'} />
-        {ex && <Switch on={paused} set={setPaused} label="Paused" hint={paused ? 'Not using it now: nothing kept aside' : 'Pause when it’s sold or not used for a while'} />}
+        <Switch on={paused} set={setPaused} label="Paused" hint={paused ? 'Not using it now: nothing kept aside' : 'Pause when it’s sold or not used for a while'} />
       </div>
+      )}
+      {!ex && <p className="text-[13px] text-ink3">That’s all. Keep logging petrol as usual: Tanki learns the rest.</p>}
       {removing && ex ? (
         <div className="flex min-h-[48px] items-center gap-2 rounded-2xl bg-sunk py-1 pl-4 pr-1" role="alert">
           <span className="min-w-0 flex-1 leading-tight">
@@ -424,11 +433,16 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
   const [km, setKm] = useState('');
   const [round, setRound] = useState(false);
   const [kind, setKind] = useState<'shared' | 'detour'>('shared');
+  // No price yet: ask for today's price here, the one time it's needed, and save it on the vehicle.
+  const [priceIn, setPriceIn] = useState('');
+  const typed = parseFloat(priceIn);
+  const typedOk = typed >= 20 && typed <= 300;
+  const typicalKm = v ? (v.kmpl && v.kmpl > 0 ? v.kmpl : TYPICAL_KMPL[v.kind][v.fuel]) : undefined;
   const [who, setWho] = useState<string[]>([]);
   const [what, setWhat] = useState('');
   const dist = (parseFloat(km) || 0) * (round && kind === 'shared' ? 2 : 1);
   // Rounded to the paise shown on screen, so "170 km × ₹6.81" adds up to exactly the total shown.
-  const perKm = roundTo2(t?.perKm?.value ?? 0);
+  const perKm = roundTo2(t?.perKm?.value ?? (typedOk && typicalKm ? typed / typicalKm : 0));
   const people = kind === 'shared' ? who.length + 1 : 1;
   const r = rideCost({ km: dist, perKm, people, kind });
   const friends = [...state.people].sort((a, b) => a.name.localeCompare(b.name));
@@ -437,6 +451,7 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
 
   const save = () => {
     if (!r || !v) return;
+    if (!t?.perKm && typedOk) store.saveVehicle({ ...v, price: roundTo2(typed), priceDate: state.today });
     // Me first: if the total doesn't split evenly, the extra rupee is mine, not a friend's.
     const shares =
       kind === 'shared'
@@ -451,12 +466,7 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
     onDone();
   };
 
-  if (!v || !t?.perKm)
-    return (
-      <p className="text-[14.5px] text-ink2">
-        Add today's fuel price to your vehicle first (Tanki → Edit). Then a ride's fuel cost is worked out from it.
-      </p>
-    );
+  if (!v) return <p className="text-[14.5px] text-ink2">Add a vehicle first.</p>;
 
   return (
     <div className="flex flex-col gap-3">
@@ -469,29 +479,24 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
           ))}
         </div>
       )}
-      <div className="flex gap-2" role="radiogroup" aria-label="Kind of ride">
-        {(
-          [
-            ['shared', 'Going together'],
-            ['detour', 'A lift on my way'],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            role="radio"
-            aria-checked={kind === id}
-            onClick={() => {
-              setKind(id);
-              setWho((c) => (id === 'detour' ? c.slice(0, 1) : c));
-            }}
-            className={`tap flex-1 rounded-full border-[1.5px] px-3 py-2 text-[14px] font-semibold ${kind === id ? 'border-ink bg-ink text-bg' : 'border-line text-ink2'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="-mt-1 text-[12.5px] text-ink3">{kind === 'shared' ? 'Fuel for the whole trip, split between everyone in the vehicle, you included.' : 'Only the extra km you drove for them, paid by them.'}</p>
+      <p className="-mt-1 text-[13px] text-ink3">
+        {kind === 'shared' ? 'Petrol for the whole trip, split between everyone, you included. ' : 'Only the extra km you drove for them, paid by them. '}
+        <button
+          type="button"
+          className="font-semibold text-ink2 underline underline-offset-2"
+          onClick={() => {
+            setKind(kind === 'shared' ? 'detour' : 'shared');
+            setWho((c) => (kind === 'shared' ? c.slice(0, 1) : c));
+          }}
+        >
+          {kind === 'shared' ? 'Just gave a lift?' : 'Going together instead?'}
+        </button>
+      </p>
+      {!t?.perKm && (
+        <Field label={`Petrol price today (per ${unitOf(v)})`} htmlFor="ride-price" hint={!priceIn || typedOk ? 'Asked once. Change it any time in Edit.' : `Between ${sym()}20 and ${sym()}300`}>
+          <input id="ride-price" inputMode="decimal" className="field num" value={priceIn} onChange={(e) => setPriceIn(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`${sym().trim()} e.g. 102.12`} />
+        </Field>
+      )}
       <div className="grid grid-cols-[1fr_auto] items-end gap-2.5">
         <Field label={kind === 'shared' ? 'Distance (km)' : 'Extra km'} htmlFor="ride-km">
           <input id="ride-km" inputMode="decimal" className="field num" value={km} onChange={(e) => setKm(e.target.value.replace(/[^\d.]/g, ''))} placeholder="0" />
@@ -524,7 +529,7 @@ export function RideCostForm({ vehicleId, onDone }: { vehicleId?: string; onDone
           <>
             <p className="text-[13.5px] text-ink3">
               {roundTo2(dist)} km × {per(perKm)}
-              {t.perKm.exact ? '' : ' (about)'}
+              {t?.perKm?.exact ? '' : ' (about)'}
             </p>
             <p className="num-hero mt-0.5 text-[30px] leading-none">{rupees(r.total)}</p>
             {kind === 'shared' && who.length > 0 && <p className="mt-1 text-[14px] text-ink2">{Math.min(...r.shares) === Math.max(...r.shares) ? `${rupees(r.shares[0])} each` : `${rupees(Math.min(...r.shares))} to ${rupees(Math.max(...r.shares))} each`} for {people} people</p>}
@@ -551,6 +556,25 @@ export function TankiHomeCard() {
     .filter((v) => !v.paused)
     .map((v) => ({ v, t: tanki(state, v) }))
     .filter(({ v, t }) => !t.learning && !t.inactive && t.nextFill && (t.askFilled || daysBetween(state.today, t.nextFill) <= 2) && !state.dismissedDetections.includes(`tanki-home:${v.id}:${t.nextFill}`));
+  // The first time money is kept aside for a vehicle, say so once, so a lower daily number never puzzles anyone.
+  const firstAside = (state.vehicles ?? [])
+    .filter((v) => !v.paused && v.keepAside !== false && !state.dismissedDetections.includes(`tanki-explained:${v.id}`))
+    .map((v) => ({ v, t: tanki(state, v) }))
+    .find(({ t }) => t.reserve > 0);
+  if (firstAside)
+    return (
+      <section className="flex items-center gap-3 rounded-3xl border border-line bg-surface p-4" aria-label="Fuel kept aside" data-testid="tanki-explain">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sunk text-[20px]" aria-hidden="true">
+          ⛽
+        </span>
+        <p className="min-w-0 flex-1 text-[14px] leading-snug">
+          <span className="font-semibold">{rupees(firstAside.t.reserve)} kept aside for {firstAside.v.name}’s petrol.</span> So filling up won’t dent your daily number.
+        </p>
+        <button type="button" className="btn-quiet min-h-[40px] shrink-0 px-3.5 text-[14px]" onClick={() => dismissDetection(`tanki-explained:${firstAside.v.id}`)}>
+          Got it
+        </button>
+      </section>
+    );
   if (!items.length) return null;
   const { v, t } = items[0];
   return (

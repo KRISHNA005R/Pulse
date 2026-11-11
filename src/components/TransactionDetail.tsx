@@ -139,7 +139,7 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
               <option value="none">Not mine</option>
             </select>
           </Row>
-          {tx.vehicle !== 'none' && (
+          {tx.vehicle !== 'none' && (tx.meterKm || (state.vehicles ?? []).find((v) => v.id === tx.vehicle || (!tx.vehicle && !v.paused))?.trackMileage) && (
             <Row label="Meter (km)">
               <input aria-label="Meter reading in km" inputMode="numeric" className="w-28 rounded-lg bg-transparent py-1 text-right font-medium hover:bg-sunk" defaultValue={tx.meterKm ?? ''} placeholder="Optional" onBlur={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); store.updateTransaction(tx.id, { meterKm: n > 0 ? n : undefined }); }} />
             </Row>

@@ -130,6 +130,8 @@ export interface Vehicle {
   paused?: boolean;
   /** false = don't keep fuel money aside in safe-to-spend for this vehicle. */
   keepAside?: boolean;
+  /** The person turned on "Track my real mileage": fuel entries then ask for the meter reading. */
+  trackMileage?: boolean;
 }
 
 export type BudgetPeriod = 'monthly' | 'weekly' | 'custom';

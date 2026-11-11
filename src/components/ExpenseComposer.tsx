@@ -283,15 +283,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       {effType === 'expense' && (
         <p className="mx-auto -mt-1 inline-flex items-center gap-1.5 self-center rounded-full bg-accent-soft px-3 py-1 text-[12.5px] font-semibold text-accent-ink" aria-live="polite">
           {impact > 0 && fuelRow && veh && veh !== 'none' && afterSafe >= sts.safe ? (
-            <>
-              {afterSafe > sts.safe ? (
-                <>
-                  Fuel kept aside covers it, and <span className="num">{rupees(afterSafe - sts.safe)}</span> frees up
-                </>
-              ) : (
-                'Comes out of fuel kept aside'
-              )}
-            </>
+            <>Comes out of fuel kept aside</>
           ) : impact > 0 ? (
             <>
               Safe to spend after: <span className="num">{rupees(afterSafe)}</span>
@@ -468,7 +460,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
               </button>
             ))}
           </div>
-          {veh !== 'none' && (
+          {veh !== 'none' && vehicles.find((v) => v.id === veh)?.trackMileage && (
             <label className="flex items-center gap-2 text-[13px] text-ink3">
               <span className="shrink-0">Meter reading (optional)</span>
               <input inputMode="numeric" aria-label="Meter reading in km" className="field num h-9 min-h-0 w-28 rounded-xl px-3 py-1 text-[14px]" value={meter} onChange={(e) => setMeter(e.target.value.replace(/\D/g, '').slice(0, 7))} placeholder="km" />

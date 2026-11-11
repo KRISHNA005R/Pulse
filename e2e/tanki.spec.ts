@@ -31,7 +31,9 @@ test('add a vehicle from You → Tanki; safe-to-spend gets a "Fuel till payday" 
   await page.getByRole('button', { name: 'Add a vehicle' }).click();
   await page.getByRole('radio', { name: /Scooter/ }).click();
   await page.locator('#veh-name').fill('Activa');
-  await page.locator('#veh-price').fill('102.12');
+  // Just type and name: no price or mileage questions when adding.
+  await expect(page.locator('#veh-price')).toHaveCount(0);
+  await expect(page.locator('#veh-kmpl')).toHaveCount(0);
   await page.getByRole('button', { name: 'Add vehicle' }).click();
   await expect(page.getByText(/Activa added\./)).toBeVisible();
   // Untagged past fuel counts for the only vehicle: it knows the rhythm straight away.
@@ -45,7 +47,7 @@ test('add a vehicle from You → Tanki; safe-to-spend gets a "Fuel till payday" 
 
 test('logging a fill that fits what was kept aside leaves the daily number where it was, and the preview says so', async ({ page }) => {
   await openDemo(page);
-  await setState(page, SCOOTER);
+  await setState(page, SCOOTER.replace("price: 102.12,", "price: 102.12, trackMileage: true,"));
   const before = await daily(page);
   const entry = await log(page, 200, 'petrol');
   // The vehicle chip is there and picked; the preview shows the real number, not "safe − ₹200".
@@ -59,23 +61,15 @@ test('logging a fill that fits what was kept aside leaves the daily number where
   expect(Math.abs((await daily(page)) - before)).toBeLessThanOrEqual(1);
 });
 
-test('the add-screen preview for a fuel fill matches safe-to-spend after saving', async ({ page }) => {
+test('the add-screen preview for a fuel fill says it comes out of fuel kept aside, and safe-to-spend does not drop', async ({ page }) => {
   await openDemo(page);
   await setState(page, SCOOTER);
-  await page.getByRole('button', { name: 'How it works' }).first().click();
-  const now = Number(((await page.locator('p.num').filter({ hasText: '₹' }).last().textContent()) ?? '').replace(/[^\d]/g, ''));
-  await page.keyboard.press('Escape');
-  await log(page, 300, 'petrol');
-  // ₹300 now pushes the next fill past payday, so part of what was kept aside isn't needed any more.
-  const pill = (await page.getByText(/Fuel kept aside covers it|Comes out of fuel kept aside|Safe to spend after/).textContent()) ?? '';
-  const freed = pill.match(/₹([\d,]+) frees up/);
-  const after = pill.match(/Safe to spend after: ₹([\d,]+)/);
-  const shown = freed ? now + Number(freed[1].replace(/,/g, '')) : after ? Number(after[1].replace(/,/g, '')) : now;
+  const before = await daily(page);
+  await log(page, 200, 'petrol');
+  await expect(page.getByText('Comes out of fuel kept aside')).toBeVisible();
   await page.locator('#composer-text').press('Enter');
   await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 5000 });
-  await page.getByRole('button', { name: 'How it works' }).first().click();
-  const real = Number(((await page.locator('p.num').filter({ hasText: '₹' }).last().textContent()) ?? '').replace(/[^\d]/g, ''));
-  expect(shown).toBe(real);
+  expect(await daily(page)).toBeGreaterThanOrEqual(before - 1);
 });
 
 test('a ride split: friends owe their share, no new spend is made, and it can be removed', async ({ page }) => {
@@ -117,12 +111,16 @@ test('a fuel entry can be moved to another vehicle, or marked "not mine", from i
 test('Home shows the next-fill card only when a fill is near, and it can be hidden', async ({ page }) => {
   await openDemo(page);
   await setState(page, SCOOTER);
+  // First, once: why the daily number is a bit lower.
+  await expect(page.getByTestId('tanki-explain')).toContainText('kept aside for Activa’s petrol');
+  await page.getByTestId('tanki-explain').getByRole('button', { name: 'Got it' }).click();
+  await expect(page.getByTestId('tanki-explain')).toHaveCount(0);
   const card = page.getByTestId('tanki-home');
   await expect(card).toContainText('Next fill in 2 days');
   await card.getByRole('button', { name: 'Hide for now' }).click();
   await expect(card).toHaveCount(0);
   // Fill just now: next fill is 5 days away, so no card.
-  await setState(page, SCOOTER.replace('[-33, -28, -23, -18, -13, -8, -3]', '[-35, -30, -25, -20, -15, -10, -5, 0]'));
+  await setState(page, SCOOTER.replace('[-33, -28, -23, -18, -13, -8, -3]', '[-35, -30, -25, -20, -15, -10, -5, 0]') + " s.dismissedDetections.push('tanki-explained:v1');");
   await expect(page.getByTestId('tanki-home')).toHaveCount(0);
 });
 
@@ -134,4 +132,60 @@ test('Tanki screen opens in dark mode with no sideways scroll', async ({ page })
   await page.getByRole('button', { name: /Tanki: fuel and rides/ }).click();
   await expect(page.getByTestId('tanki-next')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBe(0);
+});
+
+test('the meter reading only shows for people who turned on "Track my real mileage"', async ({ page }) => {
+  await openDemo(page);
+  await setState(page, SCOOTER);
+  await log(page, 200, 'petrol');
+  await expect(page.getByTestId('composer-vehicle')).toBeVisible();
+  await expect(page.getByLabel('Meter reading in km')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.locator('nav:visible').getByRole('button', { name: 'You' }).click();
+  await page.getByRole('button', { name: /Tanki: fuel and rides/ }).click();
+  await page.getByRole('switch', { name: 'Track my real mileage' }).click();
+  expect((await state(page)).vehicles[0].trackMileage).toBe(true);
+  await log(page, 200, 'petrol');
+  await expect(page.getByLabel('Meter reading in km')).toBeVisible();
+});
+
+test('no price yet: the ride sheet asks for today\'s price once, and saves it on the vehicle', async ({ page }) => {
+  await openDemo(page);
+  await setState(page, SCOOTER.replace("price: 102.12, priceDate: d(-1)", "createdAt2: 0"));
+  const friend = (await state(page)).people[0];
+  await page.locator('nav:visible').getByRole('button', { name: 'You' }).click();
+  await page.getByRole('button', { name: /Tanki: fuel and rides/ }).click();
+  await page.getByRole('button', { name: 'Split a ride' }).click();
+  await page.locator('#ride-price').fill('102.12');
+  await page.locator('#ride-km').fill('28');
+  await page.getByRole('dialog').getByRole('button', { name: friend.short ?? friend.name, exact: true }).click();
+  // 28 km × (₹102.12 ÷ about 45 km/L = ₹2.27) = ₹63.56 → ₹64
+  await expect(page.getByTestId('ride-result')).toContainText('₹64');
+  await page.getByRole('button', { name: /^Split ₹32 with/ }).click();
+  const v = (await state(page)).vehicles[0];
+  expect(v.price).toBe(102.12);
+  // Next time it doesn't ask.
+  await page.getByRole('button', { name: 'Split a ride' }).click();
+  await expect(page.locator('#ride-price')).toHaveCount(0);
+});
+
+test('"Going together" is the default; a lift is one small link away', async ({ page }) => {
+  await openDemo(page);
+  await setState(page, SCOOTER);
+  await page.locator('nav:visible').getByRole('button', { name: 'You' }).click();
+  await page.getByRole('button', { name: /Tanki: fuel and rides/ }).click();
+  await page.getByRole('button', { name: 'Split a ride' }).click();
+  await expect(page.getByRole('dialog')).toContainText('split between everyone, you included');
+  await page.getByRole('button', { name: 'Just gave a lift?' }).click();
+  await expect(page.getByLabel('Extra km')).toBeVisible();
+});
+
+test('only one thing to check shows at a time', async ({ page }) => {
+  await openDemo(page);
+  // A typo-sized fill AND the same fill logged twice: only the typo is asked about first.
+  await setState(page, SCOOTER + " s.transactions.unshift({ ...s.transactions.find((t) => t.id === 'fx6'), id: 'dup1' }); s.transactions.unshift({ ...s.transactions.find((t) => t.id === 'fx4'), id: 'typo1', amount: 20000, date: s.transactions.find((t) => t.id === 'fx4').date });");
+  await page.locator('nav:visible').getByRole('button', { name: 'You' }).click();
+  await page.getByRole('button', { name: /Tanki: fuel and rides/ }).click();
+  await expect(page.getByTestId('tanki-check')).toHaveCount(1);
+  await expect(page.getByTestId('tanki-check')).toContainText('much bigger than your usual fill');
 });
