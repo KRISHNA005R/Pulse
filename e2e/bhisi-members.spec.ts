@@ -4,14 +4,13 @@ import { blockedCalls, phone, setState, state, syncNow } from './helpers';
 // Shared bhisi between phones: someone the organiser added by name joins with the link (one seat,
 // not two), then the organiser deletes it and it goes from everyone's PULSE.
 
-async function start(A: Page, withRahul: boolean) {
+async function start(A: Page) {
   await A.getByRole('button', { name: 'Plans', exact: true }).last().click();
   await A.getByRole('radio', { name: 'Bhisi' }).or(A.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
   await A.getByRole('button', { name: /Start a bhisi/ }).click();
   const form = A.getByRole('dialog').last();
   await A.fill('#bh-name', 'Hostel gang BC');
   await form.locator('#bh-amount').fill('2000');
-  if (withRahul) await form.getByRole('button', { name: /Rahul/ }).first().click();
   await form.getByRole('button', { name: /Start bhisi/ }).click();
   await expect.poll(async () => (await state(A)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
   // The short link: just the key (the id comes from it).
@@ -33,12 +32,12 @@ const settle = async (...ps: Page[]) => {
     }
 };
 
-test('added by name, then joined with the link: one seat on every phone', async ({ browser, baseURL }) => {
+test('people join with the link (opened, or pasted in PULSE): everyone sees the same three, and pays by UPI', async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const A = await phone(browser, baseURL!, 'Krishna');
   await setState(A, 's.user.upi = a;', 'krishna@okaxis');
-  const invite = await start(A, true);
-  await expect.poll(() => members(A)).toBe(2); // me + Rahul (by name)
+  const invite = await start(A);
+  await expect.poll(() => members(A)).toBe(1); // just me, until people join with the link
 
   const B = await phone(browser, baseURL!, 'Rahul');
   const P = await phone(browser, baseURL!, 'Priya');
@@ -53,8 +52,8 @@ test('added by name, then joined with the link: one seat on every phone', async 
   await P.getByRole('button', { name: /Join the bhisi/ }).click();
   await expect.poll(async () => (await state(P)).bhisis?.length ?? 0, { timeout: 15_000 }).toBe(1);
   await expect.poll(async () => { await settle(B, A, P); return [await members(A), await members(B), await members(P)]; }, { timeout: 60_000 }).toEqual([3, 3, 3]);
-  // Krishna's Rahul is "on PULSE" now, not "added by name".
-  expect((await state(A)).bhisis[0].share.ghosts).toEqual([]);
+  // Everyone is a real PULSE person: no names typed in.
+  expect((await state(A)).bhisis[0].share.ghosts ?? []).toEqual([]);
 
   // Rahul pays Krishna by UPI: the button opens his UPI app with Krishna's UPI ID and the amount filled in.
   await B.reload();
@@ -73,7 +72,7 @@ test('added by name, then joined with the link: one seat on every phone', async 
 test('opening the invite when not signed in: the bhisi invite is the first screen', async ({ browser, baseURL }) => {
   test.setTimeout(90_000);
   const A = await phone(browser, baseURL!, 'Krishna');
-  const invite = await start(A, false);
+  const invite = await start(A);
   await expect.poll(async () => { await syncNow(A); await A.waitForTimeout(800); return (await state(A)).bhisis[0].rounds.length; }).toBeGreaterThan(0);
   const ctx = await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' });
   const N = await ctx.newPage();
@@ -88,7 +87,7 @@ test('opening the invite when not signed in: the bhisi invite is the first scree
 test('a new person opens the invite: set up, then they land in the bhisi, already joined', async ({ browser, baseURL }) => {
   test.setTimeout(120_000);
   const A = await phone(browser, baseURL!, 'Krishna');
-  const invite = await start(A, false);
+  const invite = await start(A);
   await expect.poll(async () => { await syncNow(A); await A.waitForTimeout(800); return (await state(A)).bhisis[0].rounds.length; }).toBeGreaterThan(0);
   const ctx = await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' });
   const N = await ctx.newPage();
@@ -106,7 +105,7 @@ test('a new person opens the invite: set up, then they land in the bhisi, alread
 test('the organiser deletes it: it goes from every member’s PULSE', async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const A = await phone(browser, baseURL!, 'Krishna');
-  const invite = await start(A, false);
+  const invite = await start(A);
   const B = await phone(browser, baseURL!, 'Priya');
   await join(B, invite);
   await expect.poll(async () => { await settle(B, A); return [await members(A), await members(B)]; }, { timeout: 60_000 }).toEqual([2, 2]);

@@ -313,12 +313,72 @@ export function mergePeople(s: State, fromId: string, intoId: string) {
   }
   for (const tx of s.transactions) if (tx.people?.includes(fromId)) tx.people = [...new Set(tx.people.map(sw))];
   if (!into.link && from.link) into.link = from.link;
+  // Bhisis: their seat, the organiser, and who paid and won each round.
+  const swKeys = <T,>(o: Record<string, T> | undefined) => (o ? Object.fromEntries(Object.entries(o).map(([k, v]) => [sw(k), v])) : o);
+  for (const b of s.bhisis ?? []) {
+    b.members = [...new Set(b.members.map(sw))];
+    if (b.share) {
+      for (const k of Object.keys(b.share.seats)) b.share.seats[k] = sw(b.share.seats[k]);
+      if (b.share.org) b.share.org = sw(b.share.org);
+      for (const g of b.share.ghosts ?? []) g.pid = sw(g.pid);
+    }
+    for (const r of b.rounds) {
+      r.paid = [...new Set(r.paid.map(sw))];
+      if (r.winner) r.winner = sw(r.winner);
+      if (r.drawnBy) r.drawnBy = sw(r.drawnBy);
+      if (r.srv) r.srv = [...new Set(r.srv.map(sw))];
+      if (r.paidAt) r.paidAt = swKeys(r.paidAt)!;
+      if (r.odds) r.odds = swKeys(r.odds)!;
+    }
+  }
   if (!into.uid && from.uid) into.uid = from.uid;
   if (!into.photo && from.photo) {
     into.photo = from.photo;
     if (from.gif) into.gif = from.gif;
   }
+  if (!into.upi && from.upi) {
+    into.upi = from.upi;
+    if (from.upiTyped) into.upiTyped = true;
+  }
   s.people = s.people.filter((p) => p.id !== fromId);
+}
+
+/**
+ * Keep the people list real (not the demo): the same PULSE person in it twice becomes one, and
+ * names that nobody is connected to and nothing refers to go. Connected (or invited) friends and
+ * anyone with history stay. Run once when the app opens, and when a bhisi or group goes.
+ */
+export function tidyPeople(s: State) {
+  if (s.mode !== 'personal') return;
+  // The same PULSE id twice: fold into the connected one (or the first). Two connected ones are two people.
+  const byUid = new Map<string, Person[]>();
+  for (const p of s.people) if (p.uid) byUid.set(p.uid, [...(byUid.get(p.uid) ?? []), p]);
+  for (const same of byUid.values()) {
+    if (same.length < 2) continue;
+    const keep = same.find((p) => p.link) ?? same[0];
+    for (const p of same) if (p.id !== keep.id && !p.link) mergePeople(s, p.id, keep.id);
+  }
+  const used = new Set<string>();
+  for (const sp of s.splits) {
+    used.add(sp.paidBy);
+    for (const x of sp.shares) used.add(x.person);
+  }
+  for (const st of s.settlements) {
+    used.add(st.from);
+    used.add(st.to);
+  }
+  for (const g of s.groups) for (const m of g.members) used.add(m);
+  for (const b of s.bhisis ?? []) {
+    for (const m of b.members) used.add(m);
+    for (const v of Object.values(b.share?.seats ?? {})) used.add(v);
+    if (b.share?.org) used.add(b.share.org);
+    for (const r of b.rounds) {
+      for (const x of r.paid) used.add(x);
+      if (r.winner) used.add(r.winner);
+    }
+  }
+  for (const t of s.transactions) for (const x of t.people ?? []) used.add(x);
+  s.people = s.people.filter((p) => p.link || used.has(p.id));
 }
 
 /** One entry in words, from the point of view of the person reading it. `who` is the other person. */

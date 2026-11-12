@@ -713,12 +713,11 @@ export function GroupDetail({ id }: { id: string }) {
   );
 }
 
-/** Sheet: who's in the group, the invite link, adding by name, and deleting the group. */
+/** Sheet: who's in the group, the invite link, and deleting the group. People join with the link. */
 export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () => void }) {
   const store = useStore();
   const { state } = store;
   const ui = useUI();
-  const [friend, setFriend] = useState('');
   const group = state.groups.find((g) => g.id === groupId);
   const [title, setTitle] = useState(group?.name ?? '');
   const [emoji, setEmoji] = useState(group?.emoji ?? '🍜');
@@ -792,10 +791,10 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
           </ul>
         </div>
       )}
-      <div className="mt-5">
-        <p className="mb-1 px-1 text-[12.5px] font-semibold text-ink3">{group.shared ? 'Added by name' : 'In this group'}</p>
-        {byName.length > 0 && (
-          <ul className="mb-2 flex flex-col">
+      {byName.length > 0 && (
+        <div className="mt-5">
+          <p className="mb-1 px-1 text-[12.5px] font-semibold text-ink3">{group.shared ? 'Added by name earlier' : 'In this group'}</p>
+          <ul className="flex flex-col">
             {byName.map((pid) => (
               <li key={pid} className="flex items-center gap-3 px-1 py-1.5">
                 <PersonAvatar person={state.people.find((p) => p.id === pid)} size={28} />
@@ -804,26 +803,9 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
               </li>
             ))}
           </ul>
-        )}
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!friend.trim()) return;
-            store.addGroupMember(groupId, friend);
-            setFriend('');
-          }}
-        >
-          <label htmlFor="gm-name" className="sr-only">
-            Add someone by name
-          </label>
-          <input id="gm-name" className="field py-2" placeholder="Add someone by name" value={friend} onChange={(e) => setFriend(e.target.value)} autoComplete="off" />
-          <button type="submit" className="btn-quiet min-h-[42px] shrink-0 px-4">
-            <Icon name="user-plus" size={16} /> Add
-          </button>
-        </form>
-        <p className="mt-1.5 px-1 text-[12.5px] text-ink3">For friends who aren’t on PULSE. You track their share for them.</p>
-      </div>
+        </div>
+      )}
+      <p className="mt-3 px-1 text-[12.5px] text-ink3">New people join with the group’s link, so everyone here is a real PULSE friend.</p>
       <button type="button" className="btn-ghost mt-6 w-full text-neg" onClick={del}>
         <Icon name="trash" size={16} /> Delete group
       </button>

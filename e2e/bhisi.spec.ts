@@ -14,7 +14,8 @@ test('two phones: invite, join, draw, same winner on both', async ({ browser, ba
   const form = A.getByRole('dialog').last();
   await A.fill('#bh-name', 'Hostel gang BC');
   await form.locator('#bh-amount').fill('2000');
-  await form.getByRole('button', { name: /Rahul/ }).first().click();
+  // Nobody is picked or typed in: everyone joins with the link.
+  await expect(form.getByRole('textbox', { name: /Add someone by name/ })).toHaveCount(0);
   await form.getByRole('button', { name: 'Today', exact: true }).click(); // first draw today, so it's open
   await form.getByRole('button', { name: /Start bhisi/ }).click();
   await expect.poll(async () => (await state(A)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
@@ -28,7 +29,7 @@ test('two phones: invite, join, draw, same winner on both', async ({ browser, ba
   await syncNow(B);
   await A.waitForTimeout(1500);
   await syncNow(A);
-  await expect.poll(async () => { await syncNow(A); return (await state(A)).bhisis[0].share.seats ? Object.keys((await state(A)).bhisis[0].share.seats).length : 0; }, { timeout: 20_000 }).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => { await syncNow(A); return (await state(A)).bhisis[0].share.seats ? Object.keys((await state(A)).bhisis[0].share.seats).length : 0; }, { timeout: 20_000 }).toBeGreaterThanOrEqual(2);
 
   // A draws. The server picks; the animation then shows it.
   await A.getByRole('button', { name: /Draw the chitti/ }).click();

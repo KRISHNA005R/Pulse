@@ -466,7 +466,7 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
       </Field>
       <div>
         <p className="mb-1 text-[13px] font-semibold text-ink2">Who's in?</p>
-        <p className="mb-2 text-[12.5px] text-ink3">Pick or add names now, or skip this: after creating the group you can share one link and everyone who opens it joins by themselves.</p>
+        <p className="mb-2 text-[12.5px] text-ink3">Pick friends on PULSE now, or skip this: after creating the group you can share one link and everyone who opens it joins by themselves.</p>
         <PeoplePicker selected={members} onChange={setMembers} inputId="group-friend" />
       </div>
       <Field label="Link to a plan (optional)" htmlFor="group-plan" hint="Group expenses will count toward this plan automatically.">

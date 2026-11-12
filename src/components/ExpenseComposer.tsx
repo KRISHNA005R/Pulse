@@ -79,7 +79,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const [plan] = useState<string | null | undefined>(preset?.plan);
   const [people, setPeople] = useState<string[] | null>(preset?.people ?? null);
   /** New names the hint added to a split (made into friends when it's saved). */
-  const [extraNew, setExtraNew] = useState<string[]>([]);
   const [recurring, setRecurring] = useState(false);
   const [mode, setMode] = useState<SplitMode>('equal');
   const [values, setValues] = useState<Record<string, string>>({});
@@ -88,7 +87,10 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   /** Money in: null lets the words decide (a "refund" is money back), true/false once picked by hand. */
   const [back, setBack] = useState<boolean | null>(null);
 
-  const parsed = useMemo(() => parseEntry(text, { people: state.people, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions }), [text, state.people, state.plans, state.today, state.categories, state.transactions]);
+  // "with Rahul" finds a friend on PULSE (on a real account, connected friends only). A name that
+  // isn't a friend isn't added: people join with your PULSE link.
+  const friends = useMemo(() => (state.mode === 'personal' ? state.people.filter((p) => p.link?.status === 'linked') : state.people), [state.mode, state.people]);
+  const parsed = useMemo(() => parseEntry(text, { people: friends, plans: state.plans, today: state.today, categories: state.categories, history: state.transactions }), [text, friends, state.plans, state.today, state.categories, state.transactions]);
 
   // Inference fills anything the user hasn't set by hand.
   const effAmount = parseFloat(amount) || (parsed.amount ?? 0);
@@ -104,8 +106,8 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
   const effDate = preset?.date || date !== state.today ? date : parsed.date ?? date;
   // Friends named in the text don't make a split by themselves: the hint below offers it.
   const effPeople = people ?? [];
-  const pendingNew = extraNew;
-  const namedPeople = [...parsed.people.map((id) => state.people.find((p) => p.id === id)?.short ?? state.people.find((p) => p.id === id)?.name ?? ''), ...parsed.newPeople].filter(Boolean);
+  const pendingNew: string[] = [];
+  const namedPeople = parsed.people.map((id) => state.people.find((p) => p.id === id)?.short ?? state.people.find((p) => p.id === id)?.name ?? '').filter(Boolean);
   const offerSplit = people === null && namedPeople.length > 0;
   const participants = ['me', ...effPeople];
   const hasSplit = effType === 'expense' && (effPeople.length > 0 || pendingNew.length > 0);
@@ -373,7 +375,6 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
             onClick={() => {
               haptic(6);
               setPeople(parsed.people);
-              setExtraNew(parsed.newPeople);
               setPanel('people');
             }}
           >

@@ -23,21 +23,25 @@ function useRecency() {
 const SHOWN = 10;
 
 /**
- * Pick people for a split or a group. With a few people it is a row of names to tap. With many, it
- * shows the ones picked and the most recent, and the box below searches the rest (and still adds
- * someone new).
+ * Pick people for a split or a group: friends connected on PULSE only (no typed names, so no
+ * doubles and nobody made up). With a few it is a row of names to tap; with many, the ones picked
+ * and the most recent show, and the box searches the rest. New friends come through your PULSE link.
  */
 export function PeoplePicker({ selected, onChange, inputId, center }: { selected: string[]; onChange: (ids: string[]) => void; inputId: string; center?: boolean }) {
   const store = useStore();
   const { state } = store;
+  const ui = useUI();
   const recent = useRecency();
   const [q, setQ] = useState('');
   const [all, setAll] = useState(false);
-  const many = state.people.length > SHOWN;
+  // The demo's people are pretend; on a real account, only friends who are connected (plus anyone
+  // already picked here, e.g. editing an old split).
+  const pool = useMemo(() => (state.mode === 'personal' ? state.people.filter((p) => p.link?.status === 'linked' || selected.includes(p.id)) : state.people), [state.mode, state.people, selected]);
+  const many = pool.length > SHOWN;
   const needle = q.trim().toLowerCase();
   const sorted = useMemo(
-    () => [...state.people].sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)) || (recent.get(b.id) ?? '').localeCompare(recent.get(a.id) ?? '') || a.name.localeCompare(b.name)),
-    [state.people, selected, recent],
+    () => [...pool].sort((a, b) => Number(selected.includes(b.id)) - Number(selected.includes(a.id)) || (recent.get(b.id) ?? '').localeCompare(recent.get(a.id) ?? '') || a.name.localeCompare(b.name)),
+    [pool, selected, recent],
   );
   const match = needle ? sorted.filter((p) => p.name.toLowerCase().includes(needle)) : sorted;
   const shown = all || needle ? match.slice(0, 60) : match.filter((p, i) => i < SHOWN || selected.includes(p.id));
@@ -45,19 +49,22 @@ export function PeoplePicker({ selected, onChange, inputId, center }: { selected
   // Two friends with the same first name show their full names, so it's clear who is who.
   const twins = useMemo(() => {
     const seen = new Map<string, number>();
-    for (const p of state.people) seen.set(p.short.toLowerCase(), (seen.get(p.short.toLowerCase()) ?? 0) + 1);
+    for (const p of pool) seen.set(p.short.toLowerCase(), (seen.get(p.short.toLowerCase()) ?? 0) + 1);
     return seen;
-  }, [state.people]);
+  }, [pool]);
   const label = (p: { name: string; short: string }) => ((twins.get(p.short.toLowerCase()) ?? 0) > 1 ? p.name : p.short);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  const submit = () => {
-    if (!needle) return;
-    // Typed the name of someone already here: pick them. Otherwise it's someone new.
-    const known = state.people.find((p) => p.name.toLowerCase() === needle || p.short.toLowerCase() === needle);
-    const id = known ? known.id : store.addPerson(q).id;
-    if (!selected.includes(id)) onChange([...selected, id]);
-    setQ('');
-  };
+  const invite = () => ui.openSheet({ type: 'friend-invite' });
+  if (!pool.length)
+    return (
+      <div className={`rounded-2xl bg-sunk p-4 ${center ? 'mx-auto max-w-[340px] text-center' : ''}`}>
+        <p className="text-[14px] font-semibold">No friends on PULSE yet</p>
+        <p className="mt-1 text-[13px] text-ink3">Send your PULSE link. Whoever opens it shows up here with their own name, ready to split with.</p>
+        <button type="button" className="btn-accent mt-3 w-full" onClick={invite}>
+          <Icon name="user-plus" size={16} /> Add a friend
+        </button>
+      </div>
+    );
   return (
     <div>
       <div className={`flex flex-wrap gap-2 ${center ? 'justify-center' : ''}`}>
@@ -71,23 +78,21 @@ export function PeoplePicker({ selected, onChange, inputId, center }: { selected
             +{hidden} more
           </button>
         )}
-        {needle && !match.length && <p className="w-full text-[13px] text-ink3">Nobody called “{q.trim()}” yet. Tap Add to add them.</p>}
+        {state.mode === 'personal' && (
+          <button type="button" className="chip text-ink2" onClick={invite}>
+            <Icon name="user-plus" size={15} /> Add a friend
+          </button>
+        )}
+        {needle && !match.length && <p className="w-full text-[13px] text-ink3">No friend called “{q.trim()}”. New friends join with your PULSE link.</p>}
       </div>
-      <form
-        className={`mt-3 flex gap-2 ${center ? 'mx-auto max-w-[320px]' : ''}`}
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-      >
-        <label htmlFor={inputId} className="sr-only">
-          {many ? 'Search or add a friend' : 'Add a friend by name'}
-        </label>
-        <input id={inputId} className="field py-2" placeholder={many ? 'Search or add a friend' : 'Add a friend by name'} value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
-        <button type="submit" className="btn-quiet min-h-[42px] shrink-0 px-4">
-          <Icon name="user-plus" size={16} /> Add
-        </button>
-      </form>
+      {many && (
+        <div className={`mt-3 ${center ? 'mx-auto max-w-[320px]' : ''}`}>
+          <label htmlFor={inputId} className="sr-only">
+            Search friends
+          </label>
+          <input id={inputId} type="search" className="field py-2" placeholder="Search friends" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
+        </div>
+      )}
     </div>
   );
 }

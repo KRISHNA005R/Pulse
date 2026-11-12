@@ -34,7 +34,7 @@ import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, rem
 import { suggestEmoji } from '../lib/lexicon';
 import { cleanDemoMix } from '../lib/demoMix';
 import { loadSession } from '../lib/auth';
-import { acceptKnock, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
+import { acceptKnock, tidyPeople, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
 import { applyBhisi as applyBhisiIn, createBhisiChannel, dropBhisi, leaveOrDeleteBhisi, seatOf, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
@@ -412,7 +412,12 @@ function load(): State {
     raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (isState(parsed)) return refresh(parsed);
+      if (isState(parsed)) {
+        const s = refresh(parsed);
+        // Copies of the same friend, and names nobody uses, go (lib/friends.ts → tidyPeople).
+        tidyPeople(s);
+        return s;
+      }
     }
   } catch {
     /* storage unavailable, or the saved data couldn't be opened */
@@ -896,7 +901,7 @@ function useStoreImpl() {
   const bhisiGone = useCallback(
     (id: string, why: string) => {
       // Deleted by the organiser, or I'm out: it goes from here too. Money already recorded stays in Activity.
-      commit((s) => dropBhisi(s, id));
+      commit((s) => (dropBhisi(s, id), tidyPeople(s)));
       if (why) toast({ text: why });
     },
     [commit, toast],
@@ -953,7 +958,7 @@ function useStoreImpl() {
       const b = ref.current.bhisis?.find((x) => x.id === id);
       // Sent now, or with the next sync if the phone is offline (lib/bhisiShare.ts → outbox).
       if (b?.share) void leaveOrDeleteBhisi(b.share);
-      commit((s) => void (s.bhisis = (s.bhisis ?? []).filter((x) => x.id !== id)));
+      commit((s) => (dropBhisi(s, id), tidyPeople(s)));
       if (b) toast({ text: b.share && !b.share.owner ? `You left ${b.name}. Money already recorded stays in Activity.` : `${b.name} deleted. Money already recorded stays in Activity.` });
     },
     [commit, toast],
@@ -1262,7 +1267,7 @@ function useStoreImpl() {
       const g = ref.current.groups.find((x) => x.id === groupId);
       if (!g) return;
       if (g.shared && personal(ref.current)) void deleteGroupChannel(g.shared);
-      commit((s) => removeGroup(s, groupId));
+      commit((s) => (removeGroup(s, groupId), tidyPeople(s)));
       toast({ text: `${g.name} deleted.` });
     },
     [commit, toast],

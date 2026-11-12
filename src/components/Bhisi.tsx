@@ -145,7 +145,6 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [people, setPeople] = useState<string[]>([]);
-  const [typed, setTyped] = useState('');
   const nextFirst = addMonths(state.today.slice(0, 8) + '01', 1);
   const [start, setStart] = useState(state.today);
   // Friends you already split with first: people in your groups, then everyone else.
@@ -156,14 +155,8 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
   }, [state.people, state.groups, state.splits]);
   const groups = state.groups.filter((g) => g.members.some((m) => m !== 'me'));
   const toggle = (id: string) => setPeople((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
-  const addTyped = () => {
-    const n = typed.trim();
-    if (!n) return;
-    const known = state.people.find((p) => p.name.toLowerCase() === n.toLowerCase() || p.short.toLowerCase() === n.toLowerCase());
-    const id = known ? known.id : store.addPerson(n).id;
-    setPeople((xs) => (xs.includes(id) ? xs : [...xs, id]));
-    setTyped('');
-  };
+  // On a real account nobody is picked or typed in: everyone joins with the link, as themselves.
+  const real = state.mode === 'personal';
   const n = people.length + 1;
   const amt = parseFloat(amount) || 0;
   const valid = name.trim() && amt > 0 && start;
@@ -184,52 +177,53 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
         <p className="-mt-1 text-center text-[13px] text-ink3">each person, every month</p>
       </div>
 
-      <div>
-        <div className="mb-2 flex items-baseline justify-between">
+      {real ? (
+        <div className="rounded-2xl bg-sunk p-4">
           <p className="text-[13px] font-semibold text-ink2">Who’s in?</p>
-          <p className="text-[12.5px] text-ink3">You + {people.length}</p>
+          <p className="mt-1 text-[13.5px] text-ink2">You, and everyone who joins with the invite link. Each person joins from their own PULSE, so every name is real. Joining closes at the first draw.</p>
         </div>
-        {groups.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {groups.map((g) => {
-              const others = g.members.filter((m) => m !== 'me');
-              const all = others.every((m) => people.includes(m));
-              return (
-                <button key={g.id} type="button" aria-pressed={all} onClick={() => setPeople((xs) => (all ? xs.filter((x) => !others.includes(x)) : [...new Set([...xs, ...others])]))} className={`tap flex min-w-0 max-w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left ${all ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
-                  <span className="text-[18px]" aria-hidden="true">
-                    {g.emoji}
-                  </span>
-                  <span>
-                    <span className="block max-w-[120px] truncate text-[13.5px] font-semibold">{g.name}</span>
-                    <span className="block text-[11.5px] text-ink3">{all ? 'All added ✓' : `Add all ${others.length}`}</span>
-                  </span>
-                </button>
-              );
-            })}
+      ) : (
+        <div>
+          <div className="mb-2 flex items-baseline justify-between">
+            <p className="text-[13px] font-semibold text-ink2">Who’s in?</p>
+            <p className="text-[12.5px] text-ink3">You + {people.length}</p>
           </div>
-        )}
-        {friends.length > 0 && (
-          <div className="grid grid-cols-4 gap-2">
-            {friends.slice(0, 16).map((p) => {
-              const on = people.includes(p.id);
-              return (
-                <button key={p.id} type="button" aria-pressed={on} onClick={() => toggle(p.id)} className={`tap relative flex flex-col items-center gap-1 rounded-2xl px-1 py-2 ${on ? 'bg-accent-soft' : 'bg-sunk/60'}`}>
-                  <PersonAvatar person={p} size={40} />
-                  <span className="max-w-full truncate text-[12px] font-semibold">{p.short}</span>
-                  {on && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-[#17140F]"><Icon name="check" size={12} strokeWidth={3} /></span>}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <div className="mt-2 flex gap-2">
-          <input className="field min-w-0 flex-1 py-2" placeholder="Someone else? Type a name" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTyped())} aria-label="Add someone by name" />
-          <button type="button" className="btn-quiet min-h-[42px] shrink-0 px-4" onClick={addTyped} disabled={!typed.trim()}>
-            Add
-          </button>
+          {groups.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {groups.map((g) => {
+                const others = g.members.filter((m) => m !== 'me');
+                const all = others.every((m) => people.includes(m));
+                return (
+                  <button key={g.id} type="button" aria-pressed={all} onClick={() => setPeople((xs) => (all ? xs.filter((x) => !others.includes(x)) : [...new Set([...xs, ...others])]))} className={`tap flex min-w-0 max-w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left ${all ? 'border-accent bg-accent-soft' : 'border-line bg-surface'}`}>
+                    <span className="text-[18px]" aria-hidden="true">
+                      {g.emoji}
+                    </span>
+                    <span>
+                      <span className="block max-w-[120px] truncate text-[13.5px] font-semibold">{g.name}</span>
+                      <span className="block text-[11.5px] text-ink3">{all ? 'All added ✓' : `Add all ${others.length}`}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {friends.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {friends.slice(0, 16).map((p) => {
+                const on = people.includes(p.id);
+                return (
+                  <button key={p.id} type="button" aria-pressed={on} onClick={() => toggle(p.id)} className={`tap relative flex flex-col items-center gap-1 rounded-2xl px-1 py-2 ${on ? 'bg-accent-soft' : 'bg-sunk/60'}`}>
+                    <PersonAvatar person={p} size={40} />
+                    <span className="max-w-full truncate text-[12px] font-semibold">{p.short}</span>
+                    {on && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-[#17140F]"><Icon name="check" size={12} strokeWidth={3} /></span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-2 text-[12.5px] text-ink3">After you start it, share the invite link. Friends join from their own PULSE and get a notification when they win.</p>
         </div>
-        <p className="mt-2 text-[12.5px] text-ink3">After you start it, share the invite link. Friends join from their own PULSE and get a notification when they win.</p>
-      </div>
+      )}
 
       <div>
         <p className="mb-2 text-[13px] font-semibold text-ink2">First draw</p>
