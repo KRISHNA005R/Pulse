@@ -8,7 +8,7 @@
 // the date comes; whoever is first, everyone gets the same chit.
 import type { Bhisi, BhisiShare, ISODate, Person, State, Transaction } from '../types';
 import { addMonths, uid as newId } from './format';
-import { api, hex, rand, seal, unseal } from './friends';
+import { api, hex, ownName, rand, seal, unseal } from './friends';
 import { fromB64Url, toB64Url } from './codec';
 import { pot } from './bhisi';
 import { applyMoney, defaultAccount } from './finance';
@@ -415,6 +415,8 @@ export function applyBhisi(s: State, id: string, v: BhisiView): { news: BhisiNew
     }
     // Their PULSE id, so the next bhisi, group or split finds the same person.
     if (box?.uid && !p.uid && !s.people.some((x) => x.uid === box.uid)) p.uid = box.uid;
+    // Shown by the name they use on PULSE (a connected friend's comes from what they share with you).
+    if (box && !p.link) ownName(p, box.full || box.name);
     if (box) {
       if (box.face && okFace(box.face) && !p.photo) p.photo = box.face;
       // Their own UPI ID wins over one typed here; taking theirs off removes only the one they shared.

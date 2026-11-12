@@ -271,8 +271,12 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
     }
   }
   p.link.status = 'linked';
-  const name = clip(box.name, 40);
-  if (name) p.link.theirName = name;
+  const name = clip(box.name, 40).trim();
+  if (name) {
+    p.link.theirName = name;
+    // Shown by the name they use on PULSE (not one typed for them when they were invited).
+    ownName(p, name);
+  }
   setFace(p, box);
   // The same friend may already be here from a shared group: keep one of them.
   if (typeof box.uid === 'string' && UID.test(box.uid)) {
@@ -280,6 +284,14 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
     p.uid = box.uid;
   }
   return fresh;
+}
+
+/** Call a friend on PULSE what they call themselves. */
+export function ownName(p: Person, name: string | undefined) {
+  const n = (name ?? '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  if (!n || p.name === n) return;
+  p.name = n;
+  p.short = n.split(' ')[0];
 }
 
 /** Two names in the list are the same person: everything recorded with `fromId` moves to `intoId`. */
@@ -358,6 +370,8 @@ export function tidyPeople(s: State) {
     const keep = same.find((p) => p.link) ?? same[0];
     for (const p of same) if (p.id !== keep.id && !p.link) mergePeople(s, p.id, keep.id);
   }
+  // A connected friend goes by the name they use on PULSE.
+  for (const p of s.people) if (p.link?.theirName) ownName(p, p.link.theirName);
   const used = new Set<string>();
   for (const sp of s.splits) {
     used.add(sp.paidBy);
@@ -871,8 +885,10 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
       }
     }
     if (uid && !p.uid) p.uid = uid;
-    // Someone who left stopped updating this group, so what it says about their photo may be old.
+    // Someone who left stopped updating this group, so what it says about their photo (and name) may be old.
     if (!m.gone) setFace(p, m.box);
+    // Shown by the name they use on PULSE; a connected friend's comes from what they share with you.
+    if (!m.gone && !p.link) ownName(p, m.box.name);
     sh.refs[m.mid] = p.id;
     if (!known && !m.gone) news.push({ person: p.id, group: group.id, title: `${p.short} joined ${group.name}`, body: 'They see the group’s expenses and can add their own.' });
     if (m.deleted && (sh.on ?? []).includes(m.mid)) news.push({ person: p.id, group: group.id, title: `${p.short} deleted their PULSE account`, body: `They’ve left ${group.name}. What they added stays.` });

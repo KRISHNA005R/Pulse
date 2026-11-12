@@ -154,8 +154,8 @@ describe('deleting a bhisi reaches everyone', () => {
     await leaveOrDeleteBhisi(bh(amit).share!);
     dropBhisi(amit.s, bh(amit).id);
     await sync(krishna, priya);
-    expect(names(krishna)).toEqual(['Priya', 'me(Krishna)']);
-    expect(names(priya)).toEqual(['Krishna', 'me(Priya)']);
+    expect(names(krishna)).toEqual(['Priya Shah', 'me(Krishna)']);
+    expect(names(priya)).toEqual(['Krishna Rao', 'me(Priya)']);
   });
 });
 
@@ -176,8 +176,8 @@ describe('added by name, then joined with the link', () => {
     await join(rahul, bh(krishna));
     await sync(rahul, krishna, priya, rahul);
 
-    expect(names(krishna)).toEqual(['Priya', 'Rahul Verma', 'me(Krishna)']);
-    expect(names(rahul)).toEqual(['Krishna', 'Priya', 'me(Rahul)']);
+    expect(names(krishna)).toEqual(['Priya Shah', 'Rahul Verma', 'me(Krishna)']);
+    expect(names(rahul)).toEqual(['Krishna Rao', 'Priya Shah', 'me(Rahul)']);
     expect(bh(priya).members).toHaveLength(3);
     expect(krishna.s.people.filter((p) => /rahul/i.test(p.name))).toHaveLength(1);
     expect(priya.s.people.filter((p) => /rahul/i.test(p.name))).toHaveLength(1);
@@ -270,9 +270,9 @@ describe('UPI: paying the organiser, and the organiser paying the winner', () =>
     await join(rahul, bh(krishna));
     await sync(krishna, rahul, krishna, rahul);
     const org = rahul.s.people.find((p) => p.id === bh(rahul).share!.org);
-    expect(org?.name).toBe('Krishna');
+    expect(org?.name).toBe('Krishna Rao'); // the name they use on PULSE
     expect(org?.upi).toBe('krishna@okaxis');
-    expect(krishna.s.people.find((p) => p.name === 'Rahul')?.upi).toBe('rahul@ybl');
+    expect(krishna.s.people.find((p) => p.name === 'Rahul Verma')?.upi).toBe('rahul@ybl');
   });
 
   it('a UPI ID typed by hand is kept when the member never shared one', async () => {
