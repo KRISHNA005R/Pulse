@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>PULSE people</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    @font-face { font-family: 'Unbounded'; font-weight: 200 900; font-display: swap; src: url(/fonts/unbounded.woff2) format('woff2'); }
+    @font-face { font-family: 'Onest'; font-weight: 100 900; font-display: swap; src: url(/fonts/onest.woff2) format('woff2'); }
+    :root {
+      --bg: #F6F5F2; --surface: #FFFFFF; --sunk: #EDEBE6; --ink: #17140F; --ink2: #57524A; --ink3: #746F67; --line: #E4E1DA;
+      --accent: #EC5B2B; --accent-soft: #F5E1D8; --pos: #1F7A4D; --bar2: #C9C4BA;
+      --display: 'Unbounded', system-ui, sans-serif; --body: 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { color-scheme: dark; --bg: #12110F; --surface: #1C1A17; --sunk: #25221E; --ink: #F3F1EC; --ink2: #BDB8AE; --ink3: #948F86; --line: #2F2C27; --accent-soft: #3E2015; --pos: #4CC38A; --bar2: #4A453E; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 60px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .wm { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; font-size: 22px; }
+    .wm span { color: var(--accent); }
+    .muted { color: var(--ink3); font-size: 13px; }
+    h2 { font-family: var(--display); font-size: 15px; font-weight: 700; margin: 0 0 2px; letter-spacing: -0.01em; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+    .grid { display: grid; gap: 12px; }
+    .kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin-bottom: 12px; }
+    .two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 12px; }
+    .kpi .n { font-family: var(--display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1; margin-top: 6px; }
+    .kpi .l { font-size: 13px; color: var(--ink2); font-weight: 600; }
+    .chart { display: flex; align-items: flex-end; gap: 2px; height: 160px; margin-top: 14px; border-bottom: 1px solid var(--line); }
+    .chart .c { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; position: relative; min-width: 0; }
+    .chart .b { background: var(--accent); border-radius: 3px 3px 0 0; min-height: 1px; }
+    .chart .b.new { background: var(--bar2); border-radius: 0; }
+    .chart .c:hover .b { opacity: .8; }
+    .axis { display: flex; justify-content: space-between; color: var(--ink3); font-size: 11.5px; margin-top: 6px; }
+    .legend { display: flex; gap: 14px; font-size: 12.5px; color: var(--ink2); margin-top: 8px; flex-wrap: wrap; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    .rows { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .row .top { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .row .top b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .track { height: 8px; background: var(--sunk); border-radius: 99px; margin-top: 5px; overflow: hidden; }
+    .fill { height: 100%; background: var(--accent); border-radius: 99px; }
+    .fill.pos { background: var(--pos); }
+    .ret { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .ret > div { background: var(--sunk); border-radius: 14px; padding: 10px 11px; min-width: 0; }
+    .ret .muted { font-size: 12px; line-height: 1.3; }
+    .ret .n { font-family: var(--display); font-size: clamp(16px, 4.2vw, 20px); font-weight: 700; margin: 4px 0 2px; white-space: nowrap; }
+    .row .top span:first-child::first-letter { text-transform: uppercase; }
+    .tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 6px 9px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -110%); display: none; z-index: 5; }
+    form { max-width: 380px; margin: 14vh auto 0; display: flex; flex-direction: column; gap: 12px; }
+    input { font: inherit; padding: 13px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    button { font: inherit; font-weight: 700; border: 0; border-radius: 999px; padding: 13px 20px; background: var(--accent); color: #fff; cursor: pointer; }
+    .ghost { background: transparent; color: var(--ink2); padding: 8px 12px; font-weight: 600; font-size: 13px; border: 1px solid var(--line); }
+    select { font: inherit; font-size: 13px; padding: 7px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .err { color: #C2412D; font-size: 14px; }
+    .note { font-size: 12.5px; color: var(--ink3); margin-top: 10px; }
+    .fb { border-top: 1px solid var(--line); padding: 14px 0 12px; }
+    .fb:first-of-type { margin-top: 12px; }
+    .fbh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .tag { background: var(--sunk); border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; }
+    .fbm { margin: 8px 0 6px; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .dm { display: flex; gap: 12px; align-items: flex-start; border-top: 1px solid var(--line); padding: 11px 0; }
+    .dm:first-child { border-top: 0; }
+    .dm .when { flex: 0 0 74px; font-size: 13px; font-weight: 700; line-height: 1.35; }
+    .dm .when span { display: block; font-weight: 500; color: var(--ink3); }
+    .dm .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .dm .what b { display: block; font-size: 14.5px; }
+    .dm .what p { margin: 2px 0 6px; font-size: 13.5px; color: var(--ink2); }
+    .tag.mine { background: var(--accent-soft); color: var(--accent); }
+    .now { background: var(--sunk); border-radius: 14px; padding: 12px 14px; margin-top: 12px; overflow-wrap: anywhere; }
+    .write { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; max-width: 520px; }
+    .write label { font-size: 13px; font-weight: 600; color: var(--ink2); display: flex; flex-direction: column; gap: 5px; }
+    .write label span { font-weight: 500; color: var(--ink3); }
+    .write .lr { display: flex; justify-content: space-between; gap: 10px; }
+    .write input, .write textarea { font: inherit; width: 100%; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+    .write textarea { resize: vertical; min-height: 76px; }
+    .write .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+    .write .ghost { padding: 13px 18px; font-size: 14px; }
+    .mem { border-top: 1px solid var(--line); padding: 10px 0; font-size: 14px; }
+    .mem .l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .mem .l1 .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mem .l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; color: var(--ink3); font-size: 12.5px; }
+    .pill { border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 650; background: var(--sunk); color: var(--ink2); }
+    .pill.on { background: var(--accent-soft); color: var(--accent); }
+    .mem.gone { color: var(--ink3); }
+    .ret4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    @media (max-width: 560px) { .ret4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  </style>
+  <style>
+    .back { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 14px; text-decoration: none; color: var(--ink2); padding: 8px 12px 8px 8px; border: 1px solid var(--line); border-radius: 999px; }
+    #q { width: 100%; margin: 12px 0 4px; }
+  </style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+// Everyone with a PULSE account, newest first. Same shared password as /stats/.
+(function () {
+  var KEY = 'pulse-stats-key';
+  var app = document.getElementById('app');
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  function getKey() { try { return localStorage.getItem(KEY) || ''; } catch (e) { return ''; } }
+  function setKey(k) { try { k ? localStorage.setItem(KEY, k) : localStorage.removeItem(KEY); } catch (e) {} }
+  function login(msg) {
+    app.innerHTML = '<form id="f"><div class="wm">PULSE<span>.</span> people</div>' +
+      (msg ? '<p class="err">' + esc(msg) + '</p>' : '<p class="muted">Enter the stats password.</p>') +
+      '<input id="k" type="password" autocomplete="current-password" aria-label="Stats password" required>' +
+      '<button type="submit">Open</button></form>';
+    document.getElementById('f').onsubmit = function (e) { e.preventDefault(); setKey(document.getElementById('k').value.trim()); load(); };
+  }
+  var when = function (iso) { return new Date(iso).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); };
+  var todayIst = new Date(Date.now() + 5.5 * 3600000).toISOString().slice(0, 10);
+  var ago = function (day) {
+    var n = Math.round((new Date(todayIst + 'T00:00:00Z') - new Date(day + 'T00:00:00Z')) / 86400000);
+    return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+  };
+  function row(a) {
+    if (a.deleted) return '<div class="mem gone"><div class="l1"><b>#' + a.n + '</b><span>Account deleted</span></div></div>';
+    var name = a.name ? '<b>' + esc(a.name) + '</b> ' : '<span class="muted">No name yet</span> ';
+    return '<div class="mem"><div class="l1"><b>#' + a.n + '</b><span class="who">' + name + '<span class="muted">' + esc(a.email) + '</span></span></div>' +
+      '<div class="l2"><span>' + (a.google ? 'Google' : 'Email') + ' · joined ' + esc(when(a.at)) + '</span>' +
+      (a.seen ? '<span>Last opened ' + esc(ago(a.seen)) + '</span>' : '') +
+      '<span class="pill' + (a.devices ? ' on' : '') + '">' + (a.devices ? 'Signed in' + (a.devices > 1 ? ' · ' + a.devices + ' devices' : '') : 'Signed out') + '</span>' +
+      (a.setup ? '<span class="pill">Set up</span>' : '') + '</div></div>';
+  }
+  function draw(m, q) {
+    var rows = m.members || [];
+    var needle = q.trim().toLowerCase();
+    var shown = needle ? rows.filter(function (a) { return !a.deleted && ((a.name || '').toLowerCase().indexOf(needle) >= 0 || (a.email || '').toLowerCase().indexOf(needle) >= 0 || String(a.n) === needle.replace('#', '')); }) : rows;
+    document.getElementById('list').innerHTML = shown.length ? shown.map(row).join('') : '<p class="muted" style="margin-top:12px">Nobody matches.</p>';
+  }
+  function load() {
+    var key = getKey();
+    if (!key) return login();
+    app.innerHTML = '<p class="muted">Loading…</p>';
+    fetch('/api/auth?members=1', { headers: { 'x-stats-key': key }, cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 401) { setKey(''); login('That password is not right.'); return null; }
+        if (r.status === 429 || r.status === 503) return r.json().then(function (d) { setKey(''); login(d.error || 'Locked.'); return null; });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (m) {
+        if (!m) return;
+        var rows = m.members || [];
+        app.innerHTML = '<header><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><a class="back" href="/stats/">← Stats</a><div class="wm">PULSE<span>.</span> people</div></div></header>' +
+          '<div class="card"><h2>Everyone, newest first · ' + rows.filter(function (a) { return !a.deleted; }).length + '</h2>' +
+          '<input id="q" type="search" placeholder="Search name, email or #number" aria-label="Search people">' +
+          '<div id="list"></div>' +
+          '<p class="note">Email addresses are partly hidden on purpose: this page opens with one shared password.</p></div>';
+        draw(m, '');
+        document.getElementById('q').oninput = function (e) { draw(m, e.target.value); };
+      })
+      .catch(function (e) { app.innerHTML = '<p class="err">Could not load people (' + esc(e.message) + '). Try again in a minute.</p>'; });
+  }
+  load();
+})();
+</script>
+</body>
+</html>

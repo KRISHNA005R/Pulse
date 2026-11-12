@@ -193,15 +193,9 @@
       .then(function (m) {
         var el = document.getElementById('members');
         if (!el) return;
-        var draw = function () {
-          el.innerHTML = members(m);
-          var b = document.getElementById('memall');
-          if (b) b.onclick = function () { showAll = !showAll; draw(); };
-        };
-        draw();
+        el.innerHTML = members(m);
       });
   }
-  var showAll = false;
   function members(m) {
     if (!m) return '';
     var cell = function (label, n, sub) { return '<div><div class="muted">' + label + '</div><div class="n">' + fmt(n) + '</div>' + (sub ? '<div class="muted">' + sub + '</div>' : '') + '</div>'; };
@@ -219,7 +213,8 @@
       return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
     };
     var rows = m.members || [];
-    var shown = showAll ? rows : rows.slice(0, 25);
+    // The 5 newest here; everyone is on its own page (/stats/people/).
+    var shown = rows.slice(0, 5);
     var list = shown.map(function (a) {
       if (a.deleted) return '<div class="mem gone"><div class="l1"><b>#' + a.n + '</b><span>Account deleted</span></div></div>';
       var name = a.name ? '<b>' + esc(a.name) + '</b> ' : '<span class="muted">No name yet</span> ';
@@ -229,14 +224,14 @@
         '<span class="pill' + (a.devices ? ' on' : '') + '">' + (a.devices ? 'Signed in' + (a.devices > 1 ? ' · ' + a.devices + ' devices' : '') : 'Signed out') + '</span>' +
         (a.setup ? '<span class="pill">Set up</span>' : '') + '</div></div>';
     }).join('');
-    var more = rows.length > 25 ? '<button class="ghost" id="memall" style="margin-top:10px">' + (showAll ? 'Show fewer' : 'Show all ' + rows.length) + '</button>' : '';
+    var more = rows.length > 5 ? '<p style="margin:12px 0 0"><a href="/stats/people/" style="font-weight:700;font-size:14px;color:var(--accent)">See everyone (' + rows.length + ') →</a></p>' : '';
     var gone = m.highest - m.total;
     return '<div class="card" style="margin-bottom:12px"><h2>Accounts</h2><div class="muted">People who have signed in with Google or an email code</div><div class="ret ret4">' +
       cell('Registered', m.total, gone > 0 ? gone + ' deleted theirs' : (m.google + ' with Google')) +
       cell('Signed in now', m.signedIn, 'on at least one device') +
       cell('Finished setup', m.setup, 'own money, not demo') +
       cell('Opened this week', m.activeWeek, 'new today ' + fmt(m.today) + ' · this week ' + fmt(m.week)) + '</div>' +
-      (m.total ? chart + '<h2 style="margin-top:18px">Everyone, newest first</h2>' + list + more +
+      (m.total ? chart + '<h2 style="margin-top:18px">Newest 5</h2>' + list + more +
         '<p class="note">Names come from Google, or from setup for email sign-ins: “No name yet” means they signed in but haven’t finished setup on the updated app. “Last opened” and “Set up” fill in as people open the app from 14 Oct onwards. Email addresses are partly hidden on purpose: this page opens with one shared password.</p>'
         : '<p class="muted" style="margin-top:10px">Nobody has signed in yet. Accounts show up here the moment someone does.</p>') + '</div>';
   }
