@@ -226,7 +226,7 @@ export function GullakHero({ plan }: { plan: Plan }) {
 
       <div className="mt-5">
         {g.broken ? (
-          <p className="rounded-2xl bg-accent-soft p-3 text-center text-[14px] font-medium">Broken and banked. The money’s in this plan: take it out or start a new gullak.</p>
+          <p className="rounded-2xl bg-accent-soft p-3 text-center text-[14px] font-medium">Broken and banked. Start a new gullak any time.</p>
         ) : full ? (
           <button type="button" className="btn-accent w-full" onClick={smash} disabled={breaking}>
             Break the gullak 🔨

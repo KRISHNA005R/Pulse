@@ -376,7 +376,7 @@ export function NetWorthScreen() {
           <RollingNumber text={rupees(nw.total)} />
         </p>
         {h.length < 2 ? (
-          <p className="mt-2 text-[14px] text-ink2">Your trend line starts after your first full month. PULSE saves a snapshot each month.</p>
+          <p className="mt-2 text-[14px] text-ink2">Your trend starts after your first full month.</p>
         ) : (
           <p className={`mt-1 text-[14px] ${change >= 0 ? 'text-pos' : 'text-ink2'}`}>
             {change >= 0 ? '▲' : '▼'} {rupees(Math.abs(change))} since {monthName(h[0].month + '-01')}
@@ -472,7 +472,7 @@ export function IncomeScreen() {
             </li>
           ))}
         </ul>
-        {received.length > 0 && <p className="mt-1 px-1 text-[12.5px] text-ink3">Friend paid you back or a refund? Tap it and pick “Got it back”, so it isn’t counted as income.</p>}
+        {received.length > 0 && <p className="mt-1 px-1 text-[12.5px] text-ink3">Got paid back? Tap it and pick “Got it back”.</p>}
       </section>
     </div>
   );
@@ -496,7 +496,7 @@ export function CardsScreen() {
           </button>
         }
       />
-      {state.cards.length === 0 && <EmptyState icon="card" art="/illustrations/card.webp" title="No cards added." body="Add a credit card to track its balance, limit and due date. Only the last 4 digits, never the full number." action={{ label: 'Add a card', onClick: () => ui.openSheet({ type: 'card-form' }) }} />}
+      {state.cards.length === 0 && <EmptyState icon="card" art="/illustrations/card.webp" title="No cards added." body="Track a card's balance and due date. Last 4 digits only." action={{ label: 'Add a card', onClick: () => ui.openSheet({ type: 'card-form' }) }} />}
       <div className="flex flex-col gap-4">
         {state.cards.map((c) => {
           const util = c.limit > 0 ? c.balance / c.limit : 0;
@@ -765,7 +765,7 @@ export function AccountsScreen() {
           </li>
         ))}
       </ul>
-      <p className="mt-3 px-1 text-[13px] text-ink3">Tap a balance to correct it, or a name to edit the account. Safe-to-spend updates straight away.</p>
+      <p className="mt-3 px-1 text-[13px] text-ink3">Tap a balance to correct it.</p>
     </div>
   );
 }
@@ -809,10 +809,10 @@ export function CategoriesScreen() {
   };
   return (
     <div>
-      <TopNavigation title="Categories" onBack={ui.pop} sub="Tap one to rename it or change its emoji. Make your own for anything you spend on." />
+      <TopNavigation title="Categories" onBack={ui.pop} sub="Tap one to rename it or change its emoji." />
       <Section title="Money out" kind="expense" />
       <Section title="Money in" kind="income" />
-      <p className="mt-4 px-1 text-[13px] text-ink3">An orange dot marks the categories you made. Removing one moves its transactions to Other.</p>
+      <p className="mt-4 px-1 text-[13px] text-ink3">Removing one moves its spends to Other.</p>
     </div>
   );
 }
@@ -854,7 +854,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       <TopNavigation title={titles[section]} onBack={ui.pop} />
       {section === 'notifications' && (
         <div className="divide-y divide-line">
-          <Toggle label="Money moments" sub="A small win shown in the app after you log something. Never more than one a day." checked={s.notifications.moments} onChange={(v) => updateSettings({ notifications: { ...s.notifications, moments: v } })} />
+          <Toggle label="Money moments" sub="A small win after you log. One a day at most." checked={s.notifications.moments} onChange={(v) => updateSettings({ notifications: { ...s.notifications, moments: v } })} />
         </div>
       )}
       {section === 'security' && (
@@ -866,23 +866,23 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
         <div className="flex flex-col gap-4 text-[15px] text-ink2">
           {signedIn ? (
             <p>
-              PULSE never asks for bank passwords or card numbers. Your money data is saved on PULSE's server under your account, so it's there on any device you sign in on. It isn't sold or shown to anyone else. The details are in the{' '}
+              No bank passwords or card numbers, ever. Your data is saved to your account and never sold. See the{' '}
               <a href="/privacy/" className="font-semibold text-ink underline underline-offset-2">
                 Privacy Policy
               </a>
               .
             </p>
           ) : (
-            <p>PULSE never asks for bank passwords or card numbers. Your money data stays on your device. If you turn on sync, it's locked before upload so only your devices can open it.</p>
+            <p>No bank passwords or card numbers, ever. Your data stays on your device.</p>
           )}
-          <p>Shared budget cards only show the amount and line you type. Balances are never included.</p>
-          <p>What you split with friends on PULSE is shared with those friends only, and nothing else of yours is.</p>
+          <p>Shared cards never include balances.</p>
+          <p>Splits are shared only with those friends.</p>
           {state.mode === 'demo' ? (
             <>
               <button type="button" className="btn-accent self-start" onClick={store.hasStash ? store.backToMine : store.replayOnboarding}>
                 {store.hasStash ? 'Back to my money' : 'Start with my own money'}
               </button>
-              <button type="button" className="btn-quiet self-start" onClick={() => ui.openSheet({ type: 'confirm', title: 'Reset demo data?', body: 'This restores the original sample transactions, plans and groups. Anything you added will be removed.', confirm: 'Reset', run: store.resetDemo })}>
+              <button type="button" className="btn-quiet self-start" onClick={() => ui.openSheet({ type: 'confirm', title: 'Reset demo data?', body: 'Anything you added will be removed.', confirm: 'Reset', run: store.resetDemo })}>
                 <Icon name="reset" size={16} /> Reset demo data
               </button>
             </>
@@ -904,7 +904,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
           ) : (
             <div className="mt-4 border-t border-line pt-5">
               <p className="text-[15px] font-semibold text-ink">Erase all data</p>
-              <p className="mt-1 text-[14px]">Delete everything saved on this device and start again from the welcome screen.</p>
+              <p className="mt-1 text-[14px]">Delete everything on this device and start again.</p>
               <button type="button" className="btn mt-3 bg-neg/10 text-neg" onClick={() => ui.openSheet({ type: 'erase' })}>
                 <Icon name="trash" size={16} /> Erase all data
               </button>
@@ -937,7 +937,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       {section === 'currency' && <CurrencyPicker />}
       {section === 'budget-prefs' && (
         <div className="flex flex-col gap-4">
-          <Field label="Safety buffer" htmlFor="buffer" hint="Kept out of safe-to-spend for surprises like a cab home or a pharmacy run.">
+          <Field label="Safety buffer" htmlFor="buffer" hint="Kept out of safe-to-spend for surprises.">
             <div className="flex gap-2">
               <AmountInput id="buffer" inputMode="decimal" className="field num" value={buffer} onChange={(e) => setBuffer(e.target.value.replace(/[^\d]/g, ''))} />
               <button type="button" className="btn-primary shrink-0" onClick={() => { updateSettings({ buffer: Number(buffer) || 0 }); store.toast({ text: `Buffer set to ${rupees(Number(buffer) || 0)}. Safe to spend: ${rupees(safeToSpend({ ...state, settings: { ...s, buffer: Number(buffer) || 0 } }).safe)}.` }); }}>
@@ -963,7 +963,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
           </Field>
           <p className="text-[13.5px] text-ink3">Your first name is used in the greeting.</p>
           {state.mode === 'personal' && (
-            <Field label="Your UPI ID" htmlFor="profile-upi" hint="Friends connected on PULSE and people in your shared groups get it, so they can pay you in one tap from Settle up. Leave it empty to keep it to yourself.">
+            <Field label="Your UPI ID" htmlFor="profile-upi" hint="Friends on PULSE can pay you in one tap. Leave empty to keep it private.">
               <input
                 id="profile-upi"
                 className="field"
@@ -993,7 +993,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
           <BackupPanel />
           <hr className="my-4 border-line" />
           <p className="text-[13px] font-semibold text-ink2">Spreadsheet export</p>
-          <p className="text-[15px] text-ink2">Copy every transaction as CSV and paste it into Google Sheets or Excel.</p>
+          <p className="text-[15px] text-ink2">Copy all transactions for Sheets or Excel.</p>
           <pre className="max-h-[220px] overflow-auto rounded-xl bg-sunk p-3 text-[12px] leading-relaxed text-ink2">{csv().split('\n').slice(0, 8).join('\n')}{'\n'}…</pre>
           <button
             type="button"
@@ -1048,7 +1048,7 @@ export function InvestmentsScreen() {
       />
 
       {list.length === 0 && holdings.length === 0 ? (
-        <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF. PULSE records each debit on its date, keeps it aside before payday, and shows what it grows to." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
+        <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF. Kept aside before payday." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />
       ) : (
         <div className="flex flex-col gap-4">
           {/* 1. What it's worth, and how it's split */}
@@ -1126,7 +1126,7 @@ export function InvestmentsScreen() {
           )}
 
           {/* 3. Every investment */}
-          {list.length === 0 && <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF and PULSE records it on its date and shows what it could grow to." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />}
+          {list.length === 0 && <EmptyState icon="trend" art="/illustrations/plant.webp" title="No investments yet." body="Add a SIP, RD, FD or PPF." action={{ label: 'Add an investment', onClick: () => ui.openSheet({ type: 'investment-form' }) }} />}
           {list.length > 0 && (
             <section aria-labelledby="inv-list">
               <p id="inv-list" className="eyebrow mb-1 px-1">
@@ -1272,7 +1272,7 @@ export function InvestGrowth() {
           <span className="h-2 w-2 rounded-full bg-accent" /> Growth
         </span>
       </p>
-      <p className="mt-3 text-[12.5px] text-ink3">An estimate using the return you choose. Real returns go up and down and aren't guaranteed. PULSE isn't a financial advisor.</p>
+      <p className="mt-3 text-[12.5px] text-ink3">An estimate. Real returns aren't guaranteed.</p>
     </div>
   );
 }
@@ -1358,8 +1358,8 @@ function CurrencyPicker() {
   };
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[14px] text-ink2">Pick the currency you get paid and spend in. Amounts are shown in it, never converted.</p>
-      {demo && <p className="rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">The demo is a month in Bengaluru, so it stays in rupees. Your own data will use the currency you pick here.</p>}
+      <p className="text-[14px] text-ink2">Amounts are shown in it, never converted.</p>
+      {demo && <p className="rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">The demo stays in rupees.</p>}
       <label htmlFor="cur-q" className="sr-only">Search currencies</label>
       <input id="cur-q" className="field" placeholder="Search: dollar, AED, euro…" value={q} onChange={(e) => setQ(e.target.value)} />
       <div role="radiogroup" aria-label="Currency" className="flex flex-col gap-2">

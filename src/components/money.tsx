@@ -295,13 +295,8 @@ export function SafeBreakdown() {
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub={bufferNote(state)} />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
-      {sts.afterItems.length > 0 && (
-        <p className="mb-2 rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">
-          {sts.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')} {sts.fixedPayday ? 'comes from your next pay.' : `is due after these ${sts.daysLeft} days.`}
-        </p>
-      )}
       <p className="text-[13.5px] text-ink3">
-        That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
+        That's {rupees(sts.daily)} a day for {sts.daysLeft} days.
       </p>
       <p className="mt-2 text-[13px] text-ink3">Only counts what you've added. A missing bill makes this too high.</p>
     </div>

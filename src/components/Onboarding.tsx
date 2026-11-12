@@ -234,7 +234,7 @@ export function Onboarding() {
               )}
               {iosBrowser && !inviteGone && (
                 <p className="rounded-2xl bg-sunk p-3 text-[13px] leading-snug text-ink2">
-                  <b className="text-ink">Use PULSE from your Home Screen?</b> iPhone keeps that app separate from Safari. Copy the invite, open PULSE there, then Plans → Bhisi → I have an invite link.
+                  <b className="text-ink">Use PULSE from your Home Screen?</b> Copy the invite, open PULSE there, then Plans → Bhisi → I have an invite link.
                   <br />
                   <button
                     type="button"
@@ -280,7 +280,7 @@ export function Onboarding() {
             <div className="mt-auto flex flex-col gap-3 pt-8">
               {hasOwnData && (
                 <p className="rounded-2xl bg-warn/15 p-3 text-[14px] text-ink" role="alert">
-                  Setting up again replaces the money you've already entered on this device. Copy a backup first from You → Export data.
+                  This replaces the money already on this device.
                 </p>
               )}
               <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep('trust')} data-autofocus>
@@ -342,11 +342,11 @@ export function Onboarding() {
             <h1 id="ob-title" className="display text-[30px] leading-tight">
               Link this device
             </h1>
-            <p className="mt-3 text-[15.5px] text-ink2">On your other device, open You → Sync my devices and turn on sync. Then enter the code it shows. Everything comes across, and stays in sync.</p>
+            <p className="mt-3 text-[15.5px] text-ink2">On your other device: You → Sync my devices. Enter the code it shows.</p>
             <div className="mt-6 rounded-3xl border border-line bg-surface p-4">
               <JoinWithCode initial={linkCode ?? ''} />
             </div>
-            <p className="mt-4 text-[13px] text-ink3">Have a backup code instead? Start with your own money, then paste it in You → Backup code &amp; export.</p>
+            <p className="mt-4 text-[13px] text-ink3">Backup code? Paste it later in You → Backup code &amp; export.</p>
             <button type="button" className="btn-ghost mt-auto w-full" onClick={() => setStep('welcome')}>
               Back
             </button>
@@ -424,7 +424,7 @@ export function Onboarding() {
 
               {step === 'money' && (
                 <>
-                  <p className="-mt-2 mb-2 text-[15px] text-ink2">What's in your account and wallet today. This is the starting point for safe-to-spend.</p>
+                  <p className="-mt-2 mb-2 text-[15px] text-ink2">What's in your account and wallet today.</p>
                   {banks.map((b, i) => {
                     const set = (patch: Partial<{ name: string; balance: string }>) => setBanks(banks.map((x, j) => (j === i ? { ...x, ...patch } : x)));
                     return (
@@ -497,7 +497,7 @@ export function Onboarding() {
                         What your investments are worth today
                         <AmountInput id="ob-invested" inputMode="decimal" className="field num" placeholder={`${sym()}0`} value={invested} onChange={(e) => setInvested(e.target.value.replace(/[^\d.]/g, ''))} />
                       </label>
-                      <p className="mt-2 text-[12.5px] text-ink3">Your SIP is deducted automatically each month and kept aside before payday. Add more SIPs later in You → Investments.</p>
+                      <p className="mt-2 text-[12.5px] text-ink3">Kept aside before payday. Add more in You → Investments.</p>
                     </div>
                   ) : (
                     <button type="button" className="chip self-start" onClick={() => setShowInvest(true)}>
@@ -510,7 +510,7 @@ export function Onboarding() {
 
               {step === 'bills' && (
                 <>
-                  <p className="-mt-2 mb-2 text-[15px] text-ink2">PULSE keeps these aside before they're due, so your safe-to-spend is real. Rough amounts are fine.</p>
+                  <p className="-mt-2 mb-2 text-[15px] text-ink2">Kept aside before they're due. Rough amounts are fine.</p>
                   {!noBills && (
                     <div className="flex flex-wrap gap-2" role="group" aria-label="Pick what you pay">
                       {BILL_PICKS.map((p) => {
@@ -655,7 +655,6 @@ export function Onboarding() {
               <p className="mt-2 text-[14px] text-ink2">
                 {rupees(preview.daily)} a day {preview.fixedPayday ? `until payday, ${fmtDate(preview.payday)}` : `for the next ${preview.daysLeft} days`}.
               </p>
-              {preview.afterItems.length > 0 && <p className="mt-1.5 text-[12.5px] text-ink3">{preview.afterItems.map((b) => `${b.name} on ${fmtDate(b.date)}`).join(', ')} comes from your next pay.</p>}
               {!noBills && !fresh.subscriptions.some((x) => x.kind === 'bill') && (
                 <p className="mt-3 rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">
                   No rent or bills added yet. If you pay some, this number is too high.{' '}

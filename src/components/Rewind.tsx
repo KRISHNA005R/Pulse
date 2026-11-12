@@ -217,7 +217,7 @@ export function RewindStory({ month }: { month?: string }) {
         <p className="text-[44px]">📼</p>
         <p className="display mt-3 text-[22px]">Not enough for a Rewind yet</p>
         <p className="mx-auto mt-2 max-w-[300px] text-[14.5px] text-ink2">
-          Log a bit more and your next Rewind will be 🔥. A fresh one drops on {fmtDate(addMonths(r.month, 1))}.
+          Next one drops on {fmtDate(addMonths(r.month, 1))}.
         </p>
       </div>
     );

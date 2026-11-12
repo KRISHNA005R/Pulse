@@ -30,7 +30,7 @@ export function DemoGuideScreen() {
   const stops: Stop[] = [
     {
       emoji: '💸', title: 'Safe to spend', go: 'See the maths',
-      body: 'The big number on Home. It is what is really free until payday, after bills, SIPs and plan savings. Tap it to see every line.',
+      body: 'What’s really free until payday. Tap it to see every line.',
       run: () => { ui.resetTo('home'); ui.openSheet({ type: 'safe' }); },
     },
     {
@@ -40,27 +40,27 @@ export function DemoGuideScreen() {
     },
     {
       emoji: '🤔', title: 'Can I afford this?', go: `Check ${ex(5000)}`,
-      body: 'Before you buy, see what it does to your week, your daily limit and your plans. No lectures.',
+      body: 'See what a purchase does to your week. No lectures.',
       run: () => ui.openSheet({ type: 'afford', amount: inDemo ? 5000 : currentCurrency().big, what: 'dinner' }),
     },
     {
       emoji: '🏝️', title: 'Life plans', go: 'Open Goa 2026',
-      body: 'Goa 2026 is 62% saved. PULSE says if you are ahead or behind, and how much to put aside each payday.',
+      body: 'See if you’re ahead or behind, and what to put aside.',
       run: () => ui.resetTo('plans', { name: 'plan', id: 'goa' }),
     },
     {
       emoji: '👥', title: 'Split with friends', go: 'Open Goa Gang',
-      body: 'Split a bill equally, by amount, percentage or shares. See who owes whom and settle up in the same place.',
+      body: 'Split any way, see who owes whom, settle up.',
       run: () => { ui.setPlansSegment('splits'); ui.resetTo('plans', { name: 'group', id: 'g-goa' }); },
     },
     {
       emoji: '📈', title: 'SIPs on autopilot', go: 'See SIPs',
-      body: 'Two SIPs are set up. They come out on their date each month, and safe-to-spend already allows for them.',
+      body: 'SIPs come out on their date. Safe-to-spend allows for them.',
       run: () => ui.resetTo('you', { name: 'investments' }),
     },
     {
       emoji: '🔁', title: 'Bills & subscriptions', go: 'See bills',
-      body: 'Every renewal with its next date, plus a nudge when something was charged twice.',
+      body: 'Every renewal and its next date.',
       run: () => ui.resetTo('you', { name: 'subscriptions' }),
     },
     {
@@ -70,12 +70,12 @@ export function DemoGuideScreen() {
     },
     {
       emoji: '📅', title: 'Monthly recap', go: 'Play recap',
-      body: 'Your month as a few swipeable cards: wins, things to notice and one easy change.',
+      body: 'Your month in a few swipeable cards.',
       run: () => ui.openSheet({ type: 'recap' }),
     },
     {
       emoji: '📼', title: 'PULSE Rewind', go: 'Watch it',
-      body: 'Your month as 5 story slides: where it went, your habits, your biggest W. The last one is a card made for your story. No amounts, ever.',
+      body: 'Your month as 5 story slides. No amounts, ever.',
       run: () => ui.openSheet({ type: 'rewind' }),
     },
   ];
@@ -105,7 +105,7 @@ export function DemoGuideScreen() {
               <button
                 type="button"
                 className="btn min-h-[44px] bg-[#17140F]/10 px-4"
-                onClick={() => ui.openSheet({ type: 'confirm', title: 'Reset demo data?', body: 'This restores the original sample transactions, plans and groups. Anything you added in the demo will be removed.', confirm: 'Reset', run: store.resetDemo })}
+                onClick={() => ui.openSheet({ type: 'confirm', title: 'Reset demo data?', body: 'Anything you added in the demo will be removed.', confirm: 'Reset', run: store.resetDemo })}
               >
                 <Icon name="reset" size={16} /> Reset demo
               </button>
@@ -115,7 +115,7 @@ export function DemoGuideScreen() {
           <>
             <p className="eyebrow !text-current opacity-75">Try every feature</p>
             <p className="display mt-1 text-[22px] leading-tight">See PULSE with a full month of money.</p>
-            <p className="mt-1.5 text-[14px] opacity-85">Your own data is parked safely while you explore, and comes back with one tap.</p>
+            <p className="mt-1.5 text-[14px] opacity-85">Your data comes back with one tap.</p>
             <button type="button" className="btn mt-4 min-h-[44px] bg-[#17140F] px-5 text-[#FFFBF4]" onClick={() => { store.exploreDemo(); ui.resetTo('home'); }}>
               <Icon name="play" size={16} /> Open the demo
             </button>
@@ -184,7 +184,7 @@ export function InstallScreen() {
       { title: 'Open PULSE in Chrome', body: <>Go to <b>{SITE}</b> in Chrome. Samsung Internet and Edge work too.</> },
       { title: 'Tap Install', body: <>If an <b>Install</b> banner pops up, tap it. If not, tap the menu <Glyph>⋮</Glyph> at the top right.</> },
       { title: 'Tap Install app', body: <>Choose <b>Install app</b> (it may say <b>Add to Home screen</b>, then <b>Install</b>). In Samsung Internet: <Glyph>≡</Glyph> then <b>Add page to</b>, <b>Home screen</b>.</> },
-      { title: 'Open it like any app', body: <>PULSE shows up on your home screen and in your app drawer, full screen and offline.</> },
+      { title: 'Open it like any app', body: <>Full screen and offline, on your home screen.</> },
     ],
   };
 

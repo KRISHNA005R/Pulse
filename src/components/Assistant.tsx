@@ -303,7 +303,7 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
         return;
       case 'bill':
         store.saveSubscription({ name: a.name, amount: a.amount, cycle: a.cycle, nextDate: a.nextDate, category: a.category, status: 'active', kind: a.subKind, account: acct });
-        update({ status: 'done', note: `${a.name} added. It's now kept aside before it's due.` });
+        update({ status: 'done', note: `${a.name} added. It’s now kept aside before it's due.` });
         return;
       case 'sip': {
         const hold = state.accounts.find((x) => x.type === 'investment');
@@ -734,7 +734,7 @@ export function AIChat({ compact, initial }: { compact?: boolean; initial?: stri
       <div className="min-h-0 flex-1 overflow-y-auto">
         {ui.chat.length === 0 ? (
           <div className={compact ? 'pt-1' : 'pt-2'}>
-            <p className="text-[15px] text-ink2">Ask about your money. Answers come from your own transactions, plans and bills.</p>
+            <p className="text-[15px] text-ink2">Ask anything about your money.</p>
             <div className="mt-4 flex flex-col gap-2">
               {starterQuestions(state).slice(0, compact ? 5 : 8).map((s) => (
                 <button key={s} type="button" onClick={() => ask(s)} className="tap flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-left text-[14.5px] hover:border-ink3/40">

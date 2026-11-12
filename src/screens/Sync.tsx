@@ -175,7 +175,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
             {showQR && (
               <div className="mt-4 flex animate-toast flex-col items-center gap-2">
                 <QR text={syncLink(sync.code)} />
-                <p className="max-w-[30ch] text-center text-[12.5px] text-ink3">Scan with the other phone's camera to open PULSE with this code filled in.</p>
+                <p className="max-w-[30ch] text-center text-[12.5px] text-ink3">Scan with the other phone's camera.</p>
               </div>
             )}
             <button type="button" className="btn-ghost mt-3 w-full" disabled={sync.status === 'syncing'} onClick={() => void store.syncNow()}>
@@ -185,7 +185,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
 
           <section className="rounded-3xl bg-warn/10 p-4 text-[13.5px] leading-snug" aria-label="Keep your code safe">
             <p className="font-semibold">Save this code somewhere safe.</p>
-            <p className="mt-1 text-ink2">It's the only key to your synced data. PULSE can't show it again if you lose every device, and there's no reset, because we never see your data. Anyone with the code can see your money, so don't post it.</p>
+            <p className="mt-1 text-ink2">It can’t be reset or shown again. Don’t share it.</p>
           </section>
 
           <section className="rounded-3xl border border-line bg-surface p-5">
@@ -195,7 +195,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
               <li>
                 Go to <b>You → Sync my devices</b> there.
               </li>
-              <li>Type this code (or scan the QR). Done. Changes show up on both in a few seconds.</li>
+              <li>Type this code or scan the QR on the other device.</li>
             </ol>
           </section>
 
@@ -207,7 +207,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
                 ui.openSheet({
                   type: 'confirm',
                   title: 'Stop syncing this device?',
-                  body: 'Your data stays on this device and on your other devices. This one just stops getting updates.',
+                  body: 'Your data stays. This device just stops syncing.',
                   confirm: 'Stop syncing',
                   run: () => void store.disableSync(false).then(() => store.toast({ text: 'Sync is off on this device.' })),
                 })
@@ -246,7 +246,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
                 <Icon name="check" size={17} className="mt-0.5 shrink-0 text-pos" strokeWidth={2.6} /> Log on your phone, see it on your laptop in seconds.
               </li>
               <li className="flex gap-2.5">
-                <Icon name="lock" size={17} className="mt-0.5 shrink-0 text-pos" /> Locked on your device before upload. Nobody else can read it, not even PULSE.
+                <Icon name="lock" size={17} className="mt-0.5 shrink-0 text-pos" /> Locked before upload. Not even PULSE can read it.
               </li>
               <li className="flex gap-2.5">
                 <Icon name="user" size={17} className="mt-0.5 shrink-0 text-pos" /> No account, no email, no password. Just a code.

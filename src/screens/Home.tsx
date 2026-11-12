@@ -156,7 +156,7 @@ export function HomeScreen() {
       {!insight && state.transactions.length > 0 && state.transactions.length < 15 && (
         <section aria-labelledby="h-know">
           <SectionHeader id="h-know" title="One thing to know" />
-          <p className="rounded-2xl bg-accent-soft/70 p-4 text-[15px] font-medium">Keep logging for a week or two. Patterns and tips show up here once there's enough to compare.</p>
+          <p className="rounded-2xl bg-accent-soft/70 p-4 text-[15px] font-medium">Tips show up after a week or two of logging.</p>
         </section>
       )}
       {insight && (

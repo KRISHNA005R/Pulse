@@ -143,8 +143,7 @@ export function FeedbackScreen() {
           </span>
           <h2 className="display mt-5 text-[22px]">You're a real one.</h2>
           <p className="mt-2 max-w-[32ch] text-[15px] text-ink2">
-            That just landed with the person who builds PULSE. {wants.length ? 'Your votes are counted. ' : ''}
-            We'll hit you back if we need details.
+            Sent to the person who builds PULSE.
           </p>
           <button type="button" className="btn-primary mt-6" onClick={ui.pop}>
             Done

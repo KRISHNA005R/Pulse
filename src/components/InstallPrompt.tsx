@@ -176,7 +176,7 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
           </ol>
           {!accounts && (
             <div className="mt-3 rounded-xl border border-line bg-surface p-3">
-              <p className="text-[13px] leading-snug text-ink2">On iPhone the home-screen app starts empty. Your code moves everything you've entered here.</p>
+              <p className="text-[13px] leading-snug text-ink2">The home-screen app starts empty. Your code moves your data.</p>
               {code ? (
                 <>
                   <p className="num mt-2 select-all break-all rounded-lg bg-sunk px-2 py-2 text-center font-mono text-[14px] font-semibold tracking-wide">{code}</p>

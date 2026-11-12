@@ -201,7 +201,7 @@ function BudgetsView() {
   const states = state.budgets.map((b) => budgetState(state, b));
   const healthy = states.filter((s) => s.status === 'healthy').length;
   if (!state.budgets.length)
-    return <EmptyState icon="sliders" title="Budgets are optional." body="Set one for a category you want to keep an eye on. Safe-to-spend works without them." action={{ label: 'Create a budget', onClick: () => ui.openSheet({ type: 'budget-form' }) }} />;
+    return <EmptyState icon="sliders" title="Budgets are optional." body="Set one for a category you want to watch." action={{ label: 'Create a budget', onClick: () => ui.openSheet({ type: 'budget-form' }) }} />;
   return (
     <div>
       <p className="mb-4 px-1 text-[15px] text-ink2">
@@ -644,7 +644,7 @@ export function GroupDetail({ id }: { id: string }) {
                   })}
                 </ul>
               ) : (
-                <EmptyState icon="users" title="No expenses yet." body="Add the first one. Split it equally, by exact amounts, percentages or shares." />
+                <EmptyState icon="users" title="No expenses yet." body="Add the first one." />
               ))}
 
             {tab === 'balances' && (
@@ -805,7 +805,7 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
           </ul>
         </div>
       )}
-      <p className="mt-3 px-1 text-[12.5px] text-ink3">New people join with the group’s link, so everyone here is a real PULSE friend.</p>
+      <p className="mt-3 px-1 text-[12.5px] text-ink3">New people join with the group’s link.</p>
       <button type="button" className="btn-ghost mt-6 w-full text-neg" onClick={del}>
         <Icon name="trash" size={16} /> Delete group
       </button>

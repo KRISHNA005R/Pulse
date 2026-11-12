@@ -218,7 +218,7 @@ export function FriendConnect({ person }: { person: Person }) {
     return (
       <section className="mt-4 rounded-2xl border border-line bg-surface p-4" aria-label="Connect on PULSE">
         <p className="text-[15px] font-semibold">Connect with {person.short} on PULSE</p>
-        <p className="mt-1 text-[13.5px] text-ink3">What you split with {person.short} shows up in their app too, with a notification. When either of you settles up, both update.</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Your splits show up in both apps.</p>
         <button type="button" className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]" disabled={busy} onClick={() => void invite(person.id, person.name)}>
           <Icon name="share" size={16} /> {busy ? 'Making the invite…' : `Invite ${person.short}`}
         </button>
@@ -233,12 +233,12 @@ export function FriendConnect({ person }: { person: Person }) {
           <p className="text-[15px] font-semibold">Almost connected</p>
           <StatusPill status="close">Waiting</StatusPill>
         </div>
-        <p className="mt-1 text-[13.5px] text-ink3">You opened {person.short}'s PULSE link. You're connected as soon as {person.short} opens PULSE. You can already split with them; it reaches them then.</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Connected once {person.short} opens PULSE. You can split already.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-quiet min-h-[40px] px-4 text-[14px]" onClick={() => void syncFriends(host)}>
             Check now
           </button>
-          <button type="button" className="btn-ghost min-h-[40px] px-3 text-[14px] text-neg" onClick={() => disconnect('Cancel connecting?', `${person.short} won't be connected with you.`, 'Cancel')}>
+          <button type="button" className="btn-ghost min-h-[40px] px-3 text-[14px] text-neg" onClick={() => disconnect('Cancel connecting?', `${person.short} won’t be connected with you.`, 'Cancel')}>
             Cancel
           </button>
         </div>
@@ -252,7 +252,7 @@ export function FriendConnect({ person }: { person: Person }) {
           <p className="text-[15px] font-semibold">Invite sent</p>
           <StatusPill status="close">Waiting</StatusPill>
         </div>
-        <p className="mt-1 text-[13.5px] text-ink3">Once {person.short} opens the link in PULSE, you're connected. The link works for one person only.</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Connected once {person.short} opens it. One person only.</p>
         <p className="num mt-3 select-all break-all rounded-xl bg-sunk px-3 py-2 text-[12.5px] text-ink2">{inviteUrl(link, myName)}</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-primary min-h-[40px] px-4 text-[14px]" onClick={() => void again(link)}>
@@ -275,11 +275,11 @@ export function FriendConnect({ person }: { person: Person }) {
         <StatusPill status="good">Connected</StatusPill>
       </div>
       <p className="mt-1 text-[13.5px] text-ink3">
-        {link.theirName ?? person.short} sees what you split with them, and you see what they add. Each of you can only change your own entries.
+        You both see your splits. Each edits only their own.
       </p>
       <p className="mt-2 flex items-start gap-2 text-[12.5px] text-ink3">
         <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
-        <span>Only splits and settle-ups between you two are shared, locked so PULSE's server can't read them. The notification text passes through the server and isn't kept.</span>
+        <span>Only your splits together are shared, locked so PULSE can't read them.</span>
       </p>
       <button type="button" className="btn-ghost mt-2 min-h-[38px] px-0 text-[13.5px] text-neg" onClick={() => disconnect(`Disconnect from ${person.short}?`, 'Nothing more will be shared. What you already shared stays in both histories.', 'Disconnect')}>
         Disconnect
@@ -309,7 +309,7 @@ export function FriendInvite({ onDone }: { onDone: () => void }) {
     <div className="flex flex-col gap-4">
       <div>
         <p className="text-[15px] font-semibold">Your PULSE link</p>
-        <p className="mt-1 text-[13.5px] text-ink3">One link for everyone. Send it to a friend, a group chat, anywhere. Whoever opens it is connected with you, and what you split shows up in both apps.</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Whoever opens it is connected with you.</p>
       </div>
       <p className="num min-h-[40px] select-all break-all rounded-xl bg-sunk px-3 py-2 text-[12.5px] text-ink2" aria-label="Your PULSE link">
         {url || 'Making your link…'}
@@ -323,7 +323,7 @@ export function FriendInvite({ onDone }: { onDone: () => void }) {
         </button>
       </div>
       <p className="text-[12.5px] text-ink3">
-        People who don't have PULSE yet set it up first, then they're connected. Shared it somewhere you didn't mean to?{' '}
+        Shared it by mistake?{' '}
         <button
           type="button"
           className="font-semibold text-accent-ink underline-offset-2 hover:underline"
@@ -364,7 +364,7 @@ export function FriendInvite({ onDone }: { onDone: () => void }) {
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[12.5px] text-ink3">This makes a link just for them, so what you already split with them comes along.</p>
+          <p className="mt-2 text-[12.5px] text-ink3">Your past splits with them come along.</p>
         </div>
       )}
       <button type="button" className="btn-ghost w-full" onClick={() => ui.replaceSheet({ type: 'friend-join' })}>
@@ -400,7 +400,7 @@ export function FriendJoin({ code, onDone }: { code?: string; onDone: () => void
   if (state.mode !== 'personal')
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-[15px] text-ink2">Connecting with friends uses your own splits. Start with your own money first, then open the link again.</p>
+        <p className="text-[15px] text-ink2">Set up your own money first, then open the link again.</p>
         <button type="button" className="btn-primary w-full" onClick={onDone}>
           Okay
         </button>
@@ -412,7 +412,7 @@ export function FriendJoin({ code, onDone }: { code?: string; onDone: () => void
   if (bhisi) return <BhisiJoin invite={bhisi} onDone={close} />;
   if (inv?.kind === 'group') return <GroupJoin inv={inv} onDone={close} />;
 
-  const settled = myOwn ? 'This is your own PULSE link. Send it to your friends; they open it on their phones.' : mine ? (mine.link?.status === 'linked' ? `You're already connected with ${mine.short}.` : door ? `You've already opened ${mine.short}'s link. You're connected as soon as they open PULSE.` : 'This is your own invite. Send it to your friend, they open it on their phone.') : '';
+  const settled = myOwn ? 'This is your own link. Send it to your friends.' : mine ? (mine.link?.status === 'linked' ? `You’re already connected with ${mine.short}.` : door ? `Connected once ${mine.short} opens PULSE.` : 'This is your own invite. Send it to your friend.') : '';
 
   return (
     <div className="flex flex-col gap-4">
@@ -435,7 +435,7 @@ export function FriendJoin({ code, onDone }: { code?: string; onDone: () => void
       ) : (
         inv && (
           <>
-            <p className="text-[13.5px] text-ink3">What the two of you split shows up in both apps, and each gets a notification. Nothing else from your PULSE is shared.</p>
+            <p className="text-[13.5px] text-ink3">Your splits together show up in both apps. Nothing else is shared.</p>
             {state.people.some((p) => !p.link) && (
               <Field label={`Who is ${who} in your list?`} htmlFor="fr-as">
                 <select id="fr-as" className="field" value={target} onChange={(e) => setAs(e.target.value)}>
@@ -545,7 +545,7 @@ function GroupJoin({ inv, onDone }: { inv: Invite; onDone: () => void }) {
       <div className="flex flex-col gap-4">
         <div>
           <p className="text-[15px] font-semibold">Is one of these you?</p>
-          <p className="mt-1 text-[13.5px] text-ink3">These names were added to {name} by hand. If one is you, pick it and your share so far comes with you.</p>
+          <p className="mt-1 text-[13.5px] text-ink3">Pick yours and your share comes with you.</p>
         </div>
         <div className="flex flex-col gap-2" role="group" aria-label="Names in the group">
           {found.ghosts.map((g) => (
@@ -572,7 +572,7 @@ function GroupJoin({ inv, onDone }: { inv: Invite; onDone: () => void }) {
           You're invited to <span className="font-semibold">{name}</span> on PULSE.
         </p>
       </div>
-      <p className="text-[13.5px] text-ink3">Everyone in the group sees its expenses and who owes what, each in their own PULSE. Nothing else from your PULSE is shared.</p>
+      <p className="text-[13.5px] text-ink3">Everyone sees the group’s expenses. Nothing else is shared.</p>
       {error && (
         <p className="text-[13.5px] font-medium text-warn" role="alert">
           {error}
@@ -620,7 +620,7 @@ export function GroupShareCard({ group }: { group: Group }) {
     return (
       <section className="mt-4 rounded-2xl border border-line bg-surface p-4" aria-label="Invite to group">
         <p className="text-[15px] font-semibold">Invite people with a link</p>
-        <p className="mt-1 text-[13.5px] text-ink3">Send one link to your group chat. Everyone who opens it joins this group in their own PULSE: they appear here by themselves, see every expense, and can add their own.</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Share the link in your group chat. Whoever opens it joins.</p>
         <button
           type="button"
           className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]"
@@ -648,7 +648,7 @@ export function GroupShareCard({ group }: { group: Group }) {
         <p className="text-[15px] font-semibold">Shared group</p>
         <StatusPill status={joined.length ? 'good' : 'close'}>{joined.length ? `${joined.length + 1} on PULSE` : 'Waiting for people'}</StatusPill>
       </div>
-      <p className="mt-1 text-[13.5px] text-ink3">Share the link in your group chat. Everyone who opens it joins from their own PULSE and shows up here by themselves.{sh.closed ? ' New people can’t join right now.' : ''}</p>
+      <p className="mt-1 text-[13.5px] text-ink3">Whoever opens the link joins.{sh.closed ? ' New people can’t join right now.' : ''}</p>
       <button type="button" className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]" onClick={() => void send(group)}>
         <Icon name="share" size={16} /> Share link
       </button>
@@ -699,7 +699,7 @@ export function GroupShareCard({ group }: { group: Group }) {
       )}
       <p className="mt-2 flex items-start gap-2 text-[12.5px] text-ink3">
         <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
-        <span>Only this group is shared, locked so PULSE's server can't read it. Anyone with the link can join, so share it only with the group.</span>
+        <span>Locked so PULSE can't read it. Share the link only with the group.</span>
       </p>
     </section>
   );
@@ -715,7 +715,7 @@ export function PersonMerge({ personId, onDone }: { personId: string; onDone: ()
   const others = store.state.people.filter((x) => x.id !== p.id && !(x.link && p.link));
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[14.5px] text-ink2">Is {p.short} in your list twice? Pick the other name. Everything you split with them moves to {p.name}.</p>
+      <p className="text-[14.5px] text-ink2">Pick the other name. Splits move to {p.name}.</p>
       {others.length ? (
         <ul className="flex flex-col">
           {others.map((o) => (

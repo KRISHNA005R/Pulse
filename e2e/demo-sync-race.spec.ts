@@ -83,7 +83,7 @@ test('a phone already mixed up by the bug repairs itself: demo out, your entries
     localStorage.setItem('pulse-state-v1', JSON.stringify(mixed));
   });
   await page.reload();
-  await expect(page.getByText(/Fixed: demo data had got mixed/)).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText(/Fixed: demo data removed/)).toBeVisible({ timeout: 8000 });
   const s = await state(page);
   expect(s.user.name).toBe('Krishna');
   const ids: string[] = s.transactions.map((t: { id: string }) => t.id);

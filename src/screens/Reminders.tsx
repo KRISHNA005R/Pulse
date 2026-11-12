@@ -10,10 +10,10 @@ import { Toggle, TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
 const ROWS: { key: keyof Pick<ReminderPrefs, 'message' | 'daily' | 'payday' | 'bills' | 'streak' | 'weekly'>; label: string; sub: string }[] = [
-  { key: 'message', label: 'Daily message', sub: 'One short note around 10 am: a festival wish, a money tip, or what’s new in PULSE' },
+  { key: 'message', label: 'Daily message', sub: 'One short note around 10 am' },
   { key: 'daily', label: 'Log your day', sub: 'A nudge in the evening, only on days you haven’t logged anything' },
   { key: 'payday', label: 'Payday', sub: 'On salary day, so your month starts right' },
-  { key: 'bills', label: 'Due tomorrow', sub: 'Bills, subscriptions, card bills, EMIs and SIPs, the evening before' },
+  { key: 'bills', label: 'Due tomorrow', sub: 'Bills, EMIs and SIPs, the evening before' },
   { key: 'streak', label: 'Streak about to end', sub: 'When a streak of 2 days or more is at risk tonight' },
   { key: 'weekly', label: 'Sunday recap', sub: 'Sunday at 6 pm: where this week’s money went' },
 ];
@@ -53,7 +53,7 @@ export function RemindersScreen() {
       haptic(16);
       setOn(true);
       store.toast({ text: 'Reminders are on for this device.', tone: 'good', emoji: '🔔' });
-    } else if (res === 'denied') store.toast({ text: 'Notifications are blocked. Allow them for PULSE in your browser or phone settings, then try again.' });
+    } else if (res === 'denied') store.toast({ text: 'Notifications are blocked. Allow them in your settings.' });
     else store.toast({ text: "Couldn't turn reminders on. Check your connection and try again." });
   };
   const turnOff = async () => {
@@ -67,7 +67,7 @@ export function RemindersScreen() {
     setTesting(true);
     const ok = await runReminderTest(state);
     setTesting(false);
-    store.toast({ text: ok ? 'Test sent.' : "Couldn't send a test. Try again in a minute.", emoji: ok ? '🔔' : undefined });
+    store.toast({ text: ok ? 'Test sent.' : "Couldn’t send a test. Try again in a minute.", emoji: ok ? '🔔' : undefined });
   };
 
   return (
@@ -79,7 +79,7 @@ export function RemindersScreen() {
           {isIOS() && !isStandalone() ? (
             <>
               <h2 className="display text-[18px]">One step first on iPhone</h2>
-              <p className="mt-2 text-[14.5px] text-ink2">iPhone only allows reminders from apps on your Home Screen. Add PULSE there, open it from the Home Screen, then turn reminders on.</p>
+              <p className="mt-2 text-[14.5px] text-ink2">On iPhone, add PULSE to your Home Screen and open it from there.</p>
               <button type="button" className="btn-accent mt-4 w-full" onClick={() => ui.openSheet({ type: 'install' })}>
                 Show me how
               </button>
@@ -87,7 +87,7 @@ export function RemindersScreen() {
           ) : (
             <>
               <h2 className="display text-[18px]">Not available here</h2>
-              <p className="mt-2 text-[14.5px] text-ink2">This browser can’t show notifications from websites. Try Chrome, or update your phone’s software.</p>
+              <p className="mt-2 text-[14.5px] text-ink2">This browser can’t show notifications. Try Chrome.</p>
             </>
           )}
         </section>
@@ -103,9 +103,9 @@ export function RemindersScreen() {
             </div>
           </div>
           {blocked ? (
-            <p className="mt-4 rounded-2xl bg-warn/10 p-3 text-[14px] text-ink">Notifications are blocked for PULSE. Allow them in your browser or phone settings, then come back here.</p>
+            <p className="mt-4 rounded-2xl bg-warn/10 p-3 text-[14px] text-ink">Notifications are blocked. Allow them in your settings.</p>
           ) : demo ? (
-            <p className="mt-4 rounded-2xl bg-sunk p-3 text-[14px] text-ink2">Reminders use your own bills and payday. Start with your own money to turn them on.</p>
+            <p className="mt-4 rounded-2xl bg-sunk p-3 text-[14px] text-ink2">Set up your own money to turn reminders on.</p>
           ) : on ? (
             <>
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -156,7 +156,7 @@ export function RemindersScreen() {
         />
         <p className="mt-3 flex items-start gap-2 px-1 text-[12.5px] text-ink3">
           <Icon name="lock" size={14} className="mt-0.5 shrink-0" />
-          <span>To deliver a reminder, PULSE’s server keeps its time and its text for this device, and nothing more. With names and amounts off, the text never mentions them. The daily message is the same for everyone and uses none of your data.</span>
+          <span>The server keeps only each reminder’s time and text.</span>
         </p>
       </section>
     </div>

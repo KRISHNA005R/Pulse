@@ -477,15 +477,15 @@ function useStoreImpl() {
     if (f.restored) {
       writeStash(null);
       setHasStash(false);
-      toast({ text: 'Fixed: demo data had got mixed into your money. It’s removed and your own entries are back.', tone: 'good', emoji: '✅' });
-    } else toast({ text: 'Fixed: we removed demo data that got mixed into your money. If older entries are missing, open PULSE on your other phone: it may bring them back.', tone: 'heads-up' });
+      toast({ text: 'Fixed: demo data removed. Your entries are back.', tone: 'good', emoji: '✅' });
+    } else toast({ text: 'Fixed: demo data removed from your money.', tone: 'heads-up' });
   }, [state, toast]);
 
   // A save the phone refused would otherwise be lost silently at the next reload. Say so once, until saving works again.
   const saveFailed = useRef(false);
   useEffect(() => {
     const ok = save(state);
-    if (!ok && !saveFailed.current) toast({ text: 'Couldn’t save on this phone (storage may be full). Free up space so your changes aren’t lost.', tone: 'heads-up' });
+    if (!ok && !saveFailed.current) toast({ text: 'Couldn’t save. Phone storage may be full.', tone: 'heads-up' });
     saveFailed.current = !ok;
   }, [state, toast]);
   const dismissToast = useCallback((id: string) => setToasts((xs) => xs.filter((x) => x.id !== id)), []);

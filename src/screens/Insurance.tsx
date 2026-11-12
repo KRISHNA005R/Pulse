@@ -158,7 +158,7 @@ export function InsuranceScreen() {
             </section>
           )}
 
-          <p className="mt-8 px-1 text-[12.5px] text-ink3">PULSE only keeps track of your policies. It doesn't sell or recommend insurance.</p>
+          <p className="mt-8 px-1 text-[12.5px] text-ink3">PULSE only tracks your policies. It never sells insurance.</p>
         </>
       )}
     </div>

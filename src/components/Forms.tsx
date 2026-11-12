@@ -71,7 +71,7 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
   if (!tpl)
     return (
       <div>
-        <p className="mb-4 text-[15px] text-ink2">What are you saving for? Pick a starting point, you can change everything.</p>
+        <p className="mb-4 text-[15px] text-ink2">What are you saving for?</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {PLAN_TEMPLATES.map((x) => (
             <button key={x.key} type="button" onClick={() => pick(x.key)} className="tap flex min-h-[64px] items-center gap-2.5 rounded-2xl border border-line bg-surface px-3 text-left hover:border-ink3/40">
@@ -314,7 +314,7 @@ export function BudgetForm({ budgetId, category, onDone }: { budgetId?: string; 
       <div className="rounded-2xl bg-sunk/60">
         <MoneyInput value={amount} onChange={setAmount} label="Budget amount" size="md" id="budget-amount" />
       </div>
-      <p className="text-[13.5px] text-ink3">Budgets are optional guides. Going over never blocks anything, and PULSE keeps the language calm.</p>
+      <p className="text-[13.5px] text-ink3">Budgets are guides. Going over never blocks anything.</p>
       <button
         type="button"
         disabled={!(parseFloat(amount) > 0)}
@@ -466,7 +466,7 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
       </Field>
       <div>
         <p className="mb-1 text-[13px] font-semibold text-ink2">Who's in?</p>
-        <p className="mb-2 text-[12.5px] text-ink3">Pick friends on PULSE now, or skip this: after creating the group you can share one link and everyone who opens it joins by themselves.</p>
+        <p className="mb-2 text-[12.5px] text-ink3">Pick friends now, or share the group link later.</p>
         <PeoplePicker selected={members} onChange={setMembers} inputId="group-friend" />
       </div>
       <Field label="Link to a plan (optional)" htmlFor="group-plan" hint="Group expenses will count toward this plan automatically.">
@@ -815,7 +815,7 @@ export function CardForm({ cardId, onDone }: { cardId?: string; onDone: () => vo
         </Field>
       </div>
       <Segmented label="Payment status" size="sm" value={status} onChange={setStatus} options={[{ value: 'not-generated', label: 'No bill yet' }, { value: 'due', label: 'Due' }, { value: 'paid', label: 'Paid' }]} />
-      <p className="text-[12.5px] text-ink3">The balance (everything you owe on this card) comes off safe-to-spend. Bring it down when you pay the card.</p>
+      <p className="text-[12.5px] text-ink3">What you owe comes off safe-to-spend.</p>
       <button
         type="button"
         disabled={!name.trim() || !(num(limit) > 0)}
@@ -909,7 +909,7 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
           {dueToday && <span className="mt-1 block font-semibold text-ink">The EMI is due today, so it will be recorded when you save.</span>}
         </p>
       )}
-      <p className="text-[12.5px] text-ink3">An EMI due before payday is set aside in safe-to-spend. Change “Amount left” here any time to match your lender's statement.</p>
+      <p className="text-[12.5px] text-ink3">EMIs due before payday are set aside.</p>
       <button
         type="button"
         disabled={!name.trim() || !(num(remaining) > 0) || !(num(emi) > 0)}
@@ -974,7 +974,7 @@ export function BackupPanel() {
       await navigator.clipboard.writeText(code);
       track('backup');
       haptic(10);
-      store.toast({ text: 'Backup code copied. Paste it somewhere safe, like a note or a chat with yourself.', tone: 'good', emoji: '📋' });
+      store.toast({ text: 'Backup code copied. Keep it somewhere safe.', tone: 'good', emoji: '📋' });
     } catch {
       setPaste('');
       store.toast({ text: "Copy is blocked here. Use Share or Save as file instead." });
@@ -1023,7 +1023,7 @@ export function BackupPanel() {
               <Icon name="download" size={16} /> File
             </button>
           </div>
-          <p className="mt-2 text-[12px] text-ink3">Anyone with this code can open your data, so share it only with yourself.</p>
+          <p className="mt-2 text-[12px] text-ink3">Anyone with this code can open your data.</p>
         </div>
       ) : (
         <p className="rounded-2xl bg-sunk p-3 text-[14px] text-ink2">Nothing to back up yet. Start with your own money first.</p>
@@ -1439,7 +1439,7 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
               )}
             </>
           ) : (
-            <p className="text-[12.5px] text-ink3">Started earlier? Pick the real start date and PULSE adds what you've already put in.</p>
+            <p className="text-[12.5px] text-ink3">Started earlier? Pick the real start date.</p>
           )}
           {(ex || isPast) && (priorAmount > 0 || recorded > 0) && (
             <p className="rounded-xl bg-sunk p-3 text-[13.5px]">
@@ -1543,7 +1543,7 @@ export function EraseForm({ onDone }: { onDone: () => void }) {
   if (signedIn)
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-[15px] text-ink2">Your money is saved in your account. To clear just this phone, sign out. To remove everything for good, delete your account. Both are in Your account.</p>
+        <p className="text-[15px] text-ink2">To clear this phone, sign out. To remove everything, delete your account.</p>
         <button
           type="button"
           className="btn-primary w-full"

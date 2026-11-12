@@ -63,7 +63,7 @@ export function ReceiptScanner({ onClose }: { onClose: () => void }) {
             <Icon name="scan" size={26} />
           </span>
           <p className="display text-[18px]">Add a receipt photo</p>
-          <p className="mt-1 max-w-[30ch] text-[14px] text-ink2">We'll pull out the merchant, total, date and items. You check before anything is saved.</p>
+          <p className="mt-1 max-w-[30ch] text-[14px] text-ink2">We'll read the total and items. You check before saving.</p>
           <input ref={fileRef} type="file" accept="image/*,.pdf" className="sr-only" id="receipt-file" onChange={(e) => onFile(e.target.files?.[0])} />
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <label htmlFor="receipt-file" className="btn-primary cursor-pointer">
@@ -74,7 +74,7 @@ export function ReceiptScanner({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </div>
-        <p className="mt-3 text-[12.5px] text-ink3">Reading the photo isn't built yet, so this shows a sample bill. Your photo never leaves this page.</p>
+        <p className="mt-3 text-[12.5px] text-ink3">Reading photos isn't ready yet, so this is a sample bill.</p>
       </div>
     );
 

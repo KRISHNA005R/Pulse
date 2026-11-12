@@ -3,7 +3,7 @@ import { openDemo, setState, state } from './helpers';
 
 // Fixes from real testers' feedback (San, Vivek, Raicalendar, iansatiable).
 
-test('setup: one question fewer, bills ask how they are paid, amounts read 25,000, and the summary explains every line', async ({ page }) => {
+test('setup: one question fewer, bills ask how they are paid, amounts read 25,000, and the summary stays short', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Get started' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
@@ -47,7 +47,7 @@ test('setup: one question fewer, bills ask how they are paid, amounts read 25,00
   await expect(page.getByText(/You.re set, San/)).toBeVisible({ timeout: 15000 });
   // The summary says what the ₹1,800 is, names the bills, and doesn't claim rent is kept aside now.
   await expect(page.getByText('Safety buffer (3%)', { exact: true })).toBeVisible();
-  await expect(page.getByText(/Rent \/ PG on 5 \w+ comes from your next pay/)).toBeVisible();
+  await expect(page.getByText(/comes from your next pay/)).toHaveCount(0);
   await expect(page.getByText('Rent / PG, Electricity saved', { exact: true })).toBeVisible();
   await expect(page.getByText(/payments are kept aside before they’re due/)).toHaveCount(0);
 
@@ -113,7 +113,7 @@ test('safe-to-spend: shown as it is (no counting up through wrong amounts), and 
 
   await hero.click();
   const sheet = page.getByRole('dialog').last();
-  await expect(sheet.getByText(/Rent ₹12,000 on 5 \w+ comes from your next pay/)).toBeVisible();
+  await expect(sheet.getByText(/comes from your next pay/)).toHaveCount(0);
   await expect(sheet.getByText(/About 3% of your income, for surprises/)).toBeVisible();
   await expect(sheet.getByText(/A missing bill makes this too high/)).toBeVisible();
 });

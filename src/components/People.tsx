@@ -59,7 +59,7 @@ export function PeoplePicker({ selected, onChange, inputId, center }: { selected
     return (
       <div className={`rounded-2xl bg-sunk p-4 ${center ? 'mx-auto max-w-[340px] text-center' : ''}`}>
         <p className="text-[14px] font-semibold">No friends on PULSE yet</p>
-        <p className="mt-1 text-[13px] text-ink3">Send your PULSE link. Whoever opens it shows up here with their own name, ready to split with.</p>
+        <p className="mt-1 text-[13px] text-ink3">Send your PULSE link. Friends show up here.</p>
         <button type="button" className="btn-accent mt-3 w-full" onClick={invite}>
           <Icon name="user-plus" size={16} /> Add a friend
         </button>

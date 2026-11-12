@@ -273,7 +273,7 @@ export function AuthNudge({ onDone }: { onDone: () => void }) {
     <div className="flex flex-col gap-4">
       <div>
         <p className="eyebrow">One-time step</p>
-        <p className="mt-2 text-[15px] text-ink2">Abhi your money lives only on this phone. Sign in once and it's safe: new phone, browser or app, sab jagah same.</p>
+        <p className="mt-2 text-[15px] text-ink2">Sign in once and your money is safe on every phone.</p>
       </div>
       <YourNumbers />
       <LoginPanel />
@@ -309,7 +309,7 @@ function AuthWall({ onOffline }: { onOffline: () => void }) {
           <h1 id="wall-title" className="display text-[30px] leading-[1.08]">
             Sign in to keep going, {state.user.name}.
           </h1>
-          <p className="mt-3 text-[15.5px] text-ink2">Your money is still here on this phone, exactly as you left it. Sign in once and it's saved to your account for good.</p>
+          <p className="mt-3 text-[15.5px] text-ink2">Your money is still on this phone. Sign in to keep it safe.</p>
         </div>
         <div className="mt-6">
           <YourNumbers />
@@ -561,7 +561,7 @@ export function AccountScreen() {
           <Icon name="check" size={17} strokeWidth={2.4} className="mt-0.5 shrink-0 text-pos" /> {saved}
         </li>
         <li className="flex gap-3">
-          <Icon name="user" size={17} className="mt-0.5 shrink-0 text-pos" /> Sign in with the same email on any phone, browser or the app, and your money is there.
+          <Icon name="user" size={17} className="mt-0.5 shrink-0 text-pos" /> Same email on any phone, and your money is there.
         </li>
         <li className="flex gap-3">
           <Icon name="shield" size={17} className="mt-0.5 shrink-0 text-pos" />
@@ -584,7 +584,7 @@ export function AccountScreen() {
             ui.openSheet({
               type: 'confirm',
               title: 'Sign out?',
-              body: 'Your money stays safe in your account. This phone is cleared, and you can sign back in any time.',
+              body: 'Your money stays in your account. Sign back in any time.',
               confirm: 'Sign out',
               run: () => void act('out', auth.signOut),
             })
@@ -600,7 +600,7 @@ export function AccountScreen() {
             ui.openSheet({
               type: 'confirm',
               title: 'Delete your account?',
-              body: 'This deletes your account and all the money data saved with it, on PULSE’s server and on this phone. It can’t be undone. Want a copy first? Use You → Backup code & export.',
+              body: 'Your account and all its money data go, here and on PULSE’s server. This can’t be undone.',
               confirm: 'Delete account',
               run: () => void act('delete', auth.deleteAccount),
             })

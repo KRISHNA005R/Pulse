@@ -90,7 +90,7 @@ export function UpiPay({ person, amount, onOpened, note = 'Settle up via PULSE' 
       <div className="mt-4 flex w-full flex-col items-center rounded-2xl border border-line bg-surface p-4">
         <QR text={upiLink(pay)} size={184} label={`UPI QR code to pay ${person.short} ${rupees(amount)}`} />
         <p className="mt-3 text-[15px] font-semibold">Scan to pay {person.short} {rupees(amount)}</p>
-        <p className="mt-0.5 text-[13px] text-ink3">With GPay, PhonePe, Paytm or any UPI app on your phone. The amount is filled in.</p>
+        <p className="mt-0.5 text-[13px] text-ink3">Any UPI app. The amount is filled in.</p>
         <p className="mt-3 text-[12.5px] text-ink3">
           To {vpa} ·{' '}
           <button type="button" className="font-semibold text-accent-ink underline underline-offset-2" onClick={() => setEditing(true)}>
@@ -117,7 +117,7 @@ export function UpiPay({ person, amount, onOpened, note = 'Settle up via PULSE' 
       </div>
       {stuck && (
         <div className="mt-3 rounded-2xl bg-sunk p-3 text-left text-[13.5px] text-ink2" role="status">
-          <span className="font-semibold text-ink">Didn’t open?</span> That app may not be on this phone, or it blocked a filled-in payment. Pay from any UPI app with these:
+          <span className="font-semibold text-ink">Didn’t open?</span> Didn't open? Pay from any UPI app with these:
           <div className="mt-2 flex flex-wrap gap-2">
             <button type="button" className="chip" onClick={() => copy(vpa, 'UPI ID')}>
               Copy UPI ID

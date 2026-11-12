@@ -232,7 +232,7 @@ export function MoneyRecap({ onClose, month: initialMonth }: { onClose: () => vo
       <div>
         <p className="display text-[22px] opacity-80">Your</p>
         <p className="num-hero text-[clamp(34px,10vw,52px)] leading-[0.95] [overflow-wrap:anywhere] md:text-[64px]">{r.monthLabel}</p>
-        <p className="mt-4 max-w-[28ch] text-[16px] opacity-85">Nothing logged for this month yet. Add a few expenses and your recap fills itself in.</p>
+        <p className="mt-4 max-w-[28ch] text-[16px] opacity-85">Nothing logged this month yet.</p>
       </div>
       <div className="flex gap-2">
         {[prevMonth(state.today), state.today].map((m) => (

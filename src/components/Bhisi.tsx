@@ -68,7 +68,7 @@ export function BhisiList() {
       <section className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 pb-6 pt-4 text-center">
         <img src="/illustrations/bhisi.webp" alt="" aria-hidden="true" width={1000} height={558} decoding="async" data-testid="bhisi-art" className="-mx-2 mb-2 h-auto w-[calc(100%+16px)] max-w-none" />
         <h2 className="display mt-1 text-[23px] leading-tight">Bhisi, but make it digital</h2>
-        <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Your gang chips in every month. A lucky chit picks who takes the whole pot. Everyone wins once.</p>
+        <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Everyone chips in monthly. A lucky chit picks who takes the pot.</p>
         <ol className="mx-auto mt-5 flex max-w-[340px] flex-col gap-2 text-left">
           {[
             ['💸', 'Everyone puts in the same amount, monthly'],
@@ -89,7 +89,7 @@ export function BhisiList() {
         <button type="button" className="btn-ghost mt-1 w-full" onClick={() => ui.openSheet({ type: 'bhisi-join' })}>
           I have an invite link
         </button>
-        <p className="mt-3 text-[12px] text-ink3">PULSE keeps track and runs the draw. It never holds or moves your money.</p>
+        <p className="mt-3 text-[12px] text-ink3">PULSE runs the draw. It never holds your money.</p>
       </section>
     );
   return (
@@ -180,7 +180,7 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
       {real ? (
         <div className="rounded-2xl bg-sunk p-4">
           <p className="text-[13px] font-semibold text-ink2">Who’s in?</p>
-          <p className="mt-1 text-[13.5px] text-ink2">You, and everyone who joins with the invite link. Each person joins from their own PULSE, so every name is real. Joining closes at the first draw.</p>
+          <p className="mt-1 text-[13.5px] text-ink2">You, plus everyone who joins with the link.</p>
         </div>
       ) : (
         <div>
@@ -221,7 +221,7 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
               })}
             </div>
           )}
-          <p className="mt-2 text-[12.5px] text-ink3">After you start it, share the invite link. Friends join from their own PULSE and get a notification when they win.</p>
+          <p className="mt-2 text-[12.5px] text-ink3">Share the invite link after you start it.</p>
         </div>
       )}
 
@@ -310,7 +310,7 @@ export function BhisiDetail({ id }: { id: string }) {
         <section className="rounded-3xl border border-line bg-surface p-6 text-center" role="status">
           <img src="/illustrations/matka.webp" alt="" aria-hidden="true" width={600} height={593} decoding="async" className="mx-auto h-[96px] w-auto" />
           <p className="mt-2 text-[15px] font-semibold">Getting the details…</p>
-          <p className="mt-1 text-[13px] text-ink3">You’re in. The pot, the dates and who’s in show up here in a moment.</p>
+          <p className="mt-1 text-[13px] text-ink3">You’re in. Details show up in a moment.</p>
         </section>
       </div>
     );
@@ -395,7 +395,7 @@ export function BhisiDetail({ id }: { id: string }) {
           <button type="button" className="btn-primary mt-3 w-full" onClick={() => void shareLink(`Join my bhisi "${b.name}" on PULSE 🏺 ${rupees(b.amount)} a month, lucky chit every month:`, invite, store.toast)}>
             <Icon name="share" size={16} /> Send the invite link
           </button>
-          <p className="mt-2 text-[12px] text-ink3">Friends who open it join from their own PULSE, follow the draws and get notified when they win. Joining closes at the first draw.</p>
+          <p className="mt-2 text-[12px] text-ink3">Joining closes at the first draw.</p>
         </section>
       )}
 
@@ -508,7 +508,7 @@ export function BhisiDetail({ id }: { id: string }) {
           </ul>
           <div className="mt-3 rounded-2xl bg-accent-soft px-3.5 py-3 text-[13px] leading-snug">
             <p className="font-semibold">🍀 Pay early, boost your luck</p>
-            <p className="mt-0.5 text-ink2">Paid {EARLY_DAYS}+ days before the draw: 1.5× the chance. Paid before the draw: 1.25×. It’s still a lucky draw: anyone can come out, nobody’s guaranteed.</p>
+            <p className="mt-0.5 text-ink2">{EARLY_DAYS}+ days early: 1.5× the chance. Before the draw: 1.25×.</p>
           </div>
         </section>
       )}
@@ -681,7 +681,7 @@ function OrganiserUpi() {
       <label htmlFor="bh-my-upi" className="text-[14px] font-semibold">
         Your UPI ID
       </label>
-      <p className="mt-0.5 text-[12.5px] text-ink3">Everyone pays you here before the draw. PULSE opens their UPI app with it and the amount filled in.</p>
+      <p className="mt-0.5 text-[12.5px] text-ink3">Everyone pays you here before the draw.</p>
       <div className="mt-2.5 flex gap-2">
         <input id="bh-my-upi" className="field min-w-0 flex-1" inputMode="email" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="name@okaxis" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
         <button type="button" className="btn-primary shrink-0" disabled={!typed.trim()} onClick={save}>
@@ -761,7 +761,7 @@ export function BhisiJoin({ invite: given, onDone }: { invite?: BhisiInvite; onD
     try {
       const t = await navigator.clipboard.readText();
       setText(t);
-      if (!parseBhisiLink(t)) setErr('That isn’t a bhisi link. Copy the whole message or link and try again.');
+      if (!parseBhisiLink(t)) setErr('That isn’t a bhisi link.');
       else setErr('');
     } catch {
       setErr('Couldn’t read what you copied. Long-press the box and tap Paste.');
@@ -777,14 +777,14 @@ export function BhisiJoin({ invite: given, onDone }: { invite?: BhisiInvite; onD
   if (!invite)
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-[14px] text-ink2">Got a bhisi link from a friend? Paste it here to join.</p>
+        <p className="text-[14px] text-ink2">Paste a bhisi link to join.</p>
         <div className="flex gap-2">
           <input className="field min-w-0 flex-1" placeholder="Paste the link" value={text} onChange={(e) => { setText(e.target.value); setErr(''); }} aria-label="Bhisi invite link" autoCapitalize="off" autoCorrect="off" spellCheck={false} />
           <button type="button" className="btn-quiet min-h-[42px] shrink-0 px-4" onClick={() => void paste()}>
             Paste
           </button>
         </div>
-        {err ? <p className="text-[13px] text-ink2">{err}</p> : text.trim() ? <p className="text-[13px] text-ink2">That isn’t a bhisi link. Copy the whole message or link and try again.</p> : null}
+        {err ? <p className="text-[13px] text-ink2">{err}</p> : text.trim() ? <p className="text-[13px] text-ink2">That isn’t a bhisi link.</p> : null}
       </div>
     );
 
@@ -797,7 +797,7 @@ export function BhisiJoin({ invite: given, onDone }: { invite?: BhisiInvite; onD
           {[peek.org && `By ${peek.org}`, peek.amount && `${rupees(peek.amount)} a month`, peek.count > 0 && `${peek.count} in so far`].filter(Boolean).join(' · ')}
         </p>
       ) : null}
-      <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Your chit goes into the matka. Every month one chit comes out, picked by PULSE’s server: random and locked. You get a notification if it’s yours.</p>
+      <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">One chit comes out each month, at random. You’ll be told if it’s yours.</p>
       {err && <p className="mx-auto mt-3 max-w-[300px] rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">{err}</p>}
       {have ? (
         <button type="button" className="btn-accent mt-5 w-full" onClick={() => open(have.id)}>

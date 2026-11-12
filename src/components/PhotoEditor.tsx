@@ -207,7 +207,7 @@ export function PhotoEditor() {
       <PersonAvatar me size={76} />
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-semibold leading-tight">Your photo</p>
-        <p className="mt-0.5 text-[13px] leading-snug text-ink3">A photo or a GIF. Shown on your profile, and to friends you split with on PULSE.</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-ink3">A photo or GIF, shown to friends on PULSE.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" className="btn-primary min-h-[38px] px-4 text-[14px]" disabled={!!busy} onClick={() => input.current?.click()}>
             <Icon name="camera" size={15} /> {busy === 'reading' ? 'Opening…' : busy ? 'Adding…' : has ? 'Change photo or GIF' : 'Add photo or GIF'}
