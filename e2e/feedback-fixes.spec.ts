@@ -65,12 +65,18 @@ test('setup: one question fewer, bills ask how they are paid, amounts read 25,00
 
 test('the tour: tapping the lit-up + during "Add a spend" opens it (the tour no longer swallows the tap)', async ({ page }) => {
   await openDemo(page);
-  await setState(page, 's.settings.tourPending = true;');
+  // (Not setState: it presses Escape after reloading, which skips the tour.)
+  await page.evaluate(() => {
+    const s = JSON.parse(localStorage.getItem('pulse-state-v1') ?? '{}');
+    s.settings.tourPending = true;
+    localStorage.setItem('pulse-state-v1', JSON.stringify(s));
+  });
   await page.reload();
   const bubble = page.getByTestId('tour-bubble');
   await expect(bubble).toBeVisible({ timeout: 10000 });
   await bubble.getByRole('button', { name: /Next/ }).click();
   await expect(bubble.getByText('Add a spend')).toBeVisible();
+  await page.waitForTimeout(800); // the light slides over to + first
   const spot = await page.getByTestId('tour-spot').boundingBox();
   await page.mouse.click(spot!.x + spot!.width / 2, spot!.y + spot!.height / 2);
   await expect(page.getByTestId('tour')).toHaveCount(0);

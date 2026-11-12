@@ -102,18 +102,16 @@ test('a block never gets two entrance animations at once (Plans used to show, va
   await expect(page.locator('main .animate-toast').first()).toBeVisible();
 });
 
-test('a number further down waits and rolls when you scroll to it', async ({ page }) => {
+test('amounts are shown in place when a screen opens (no rolling up through made-up numbers), even further down', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 560 });
   await openDemo(page);
   await page.locator('nav').getByRole('button', { name: 'Plans' }).first().click();
   await page.waitForTimeout(300);
-  // The first rolling number that starts below the screen.
   const idx = await page.locator('main .roll').evaluateAll((els) => els.findIndex((e) => e.getBoundingClientRect().top > window.innerHeight));
   expect(idx, 'a rolling number should start below the screen for this test').toBeGreaterThanOrEqual(0);
   const roll = page.locator('main .roll').nth(idx);
-  await page.waitForTimeout(2500);
-  // Not rolled yet: it is waiting for you.
-  expect(await roll.getAttribute('data-done')).toBeNull();
+  // Already in place before you scroll to it: a meter only rolls when the amount changes.
+  expect(await roll.getAttribute('data-done')).not.toBeNull();
   await roll.scrollIntoViewIfNeeded();
-  await expect(roll).toHaveAttribute('data-done', '', { timeout: 4000 });
+  expect(await roll.getAttribute('data-done')).not.toBeNull();
 });

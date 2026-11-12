@@ -30,7 +30,8 @@ test('closed the loan: amount is filled in, and the loan shows as paid off', asy
   const sheet = page.getByRole('dialog').last();
   await sheet.getByRole('radio', { name: /Closed the loan/ }).click();
   const left0 = (await state(page)).debts[0].remaining;
-  await expect(sheet.getByLabel('Amount you paid')).toHaveValue(String(left0));
+  // Shown grouped while editing (₹1,86,400), saved as the plain number.
+  await expect(sheet.getByLabel('Amount you paid')).toHaveValue(Number(left0).toLocaleString('en-IN'));
   await sheet.getByRole('button', { name: /Record/ }).click();
   await expect(page.getByText('Paid off. Nothing left to pay.')).toBeVisible();
   expect((await state(page)).debts[0].remaining).toBe(0);
