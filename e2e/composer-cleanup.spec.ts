@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { log, openDemo, state } from './helpers';
+import { log, openDemo, state, setState } from './helpers';
 
 // The add screen, simplified:
 // 1. No "Plan" on a spend: a spend is never money put into a plan (that's Add money, or Moved → plan).
@@ -41,6 +41,8 @@ test('Moved → a plan still puts money into the plan', async ({ page }) => {
 
 test('a friend\'s name in the text does not split by itself; the hint does it on a tap', async ({ page }) => {
   await openDemo(page);
+  // A friend connected on PULSE (only they are offered for a split).
+  await setState(page, "s.people[0].link = { chan: 'c'.repeat(32), key: 'k', token: 't', status: 'linked', since: s.today }; s.people[0].uid = 'u-friend';");
   const friend = (await state(page)).people[0];
   await page.getByRole('button', { name: 'Add expense' }).click();
   await page.locator('#composer-amount').fill('600');

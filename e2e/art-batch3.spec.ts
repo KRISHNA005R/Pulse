@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openDemo, setState, state } from './helpers';
+import { openDemo, setState, state, phone, syncNow } from './helpers';
 
 // Third batch of illustrations: small objects (matka, chit, gullak, coins, chai, padlock, bell,
 // calendar, card, plant) and the "You're set" girl. Each shows in its moment and loads.
@@ -82,7 +82,8 @@ test('gullak broken: the card and the gullak page show the broken gullak with co
   await looksRight(page.getByTestId('gullak-broken-art'), 'gullak-broken');
 });
 
-test('bhisi: the matka on the round card, the matka full of chits in the draw, the chit flies out', async ({ page }) => {
+test('bhisi: the matka on the round card, the matka full of chits in the draw, the chit flies out', async ({ page, browser, baseURL }) => {
+  test.setTimeout(120_000);
   await openDemo(page);
   await tab(page, 'Plans');
   await page.getByRole('radio', { name: 'Bhisi' }).first().click();
@@ -90,10 +91,17 @@ test('bhisi: the matka on the round card, the matka full of chits in the draw, t
   const form = page.getByRole('dialog').last();
   await page.fill('#bh-name', 'Hostel gang');
   await form.locator('#bh-amount').fill('2000');
-  await form.getByRole('button', { name: /Rahul/ }).first().click();
+  // Nobody is picked: on a real account people join with the link.
   await form.getByRole('button', { name: 'Today', exact: true }).click();
   await form.getByRole('button', { name: /Start bhisi/ }).click();
-  await expect.poll(async () => (await state(page)).bhisis?.length ?? 0, { timeout: 15_000 }).toBe(1);
+  await expect.poll(async () => (await state(page)).bhisis?.[0]?.share?.bid, { timeout: 15_000 }).toBeTruthy();
+  // A friend joins with the link, so there's someone to draw against.
+  const invite = await page.evaluate(() => `${location.origin}/#b=${JSON.parse(localStorage.getItem('pulse-state-v1')!).bhisis[0].share.key}`);
+  const B = await phone(browser, baseURL!, 'Priya');
+  await B.goto(invite);
+  await B.getByRole('button', { name: /Join the bhisi/ }).click();
+  await expect.poll(async () => (await state(B)).bhisis?.length ?? 0, { timeout: 15_000 }).toBe(1);
+  await expect.poll(async () => { await syncNow(B); await syncNow(page); await page.waitForTimeout(1000); return (await state(page)).bhisis[0].members.length; }, { timeout: 40_000 }).toBe(2);
   await looksRight(page.getByTestId('matka-art'), 'matka');
   await page.getByRole('button', { name: /Draw the chitti/ }).click();
   const draw = page.getByRole('dialog').last();
