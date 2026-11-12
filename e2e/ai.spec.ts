@@ -14,7 +14,7 @@ test('PULSE AI knows what is new and adds up money got back', async ({ page }) =
 
   await page.getByRole('button', { name: 'Ask PULSE AI' }).click();
   await ask(page, "What's new in PULSE?");
-  await expect(page.getByText(/what.s new in PULSE/).first()).toBeAttached();
+  await expect(page.getByText(/^New in PULSE:/).first()).toBeAttached();
   await expect(page.getByText(/^🏺 Bhisi/).first()).toBeAttached();
   await expect(page.getByText(/^🪙 Gullak/).first()).toBeAttached();
 
