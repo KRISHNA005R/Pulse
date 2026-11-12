@@ -82,7 +82,7 @@ export function DemoGuideScreen() {
 
   return (
     <div>
-      <TopNavigation title="Explore the demo" sub="A month of sample money for Aarav, a 23-year-old in Bengaluru" onBack={ui.pop} />
+      <TopNavigation title="Explore the demo" sub="A sample month for Aarav, 23, Bengaluru" onBack={ui.pop} />
 
       <section className="mb-6 rounded-3xl bg-accent p-5 text-on-accent">
         {inDemo ? (

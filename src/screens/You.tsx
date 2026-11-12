@@ -67,7 +67,7 @@ export function YouScreen() {
       <section aria-labelledby="you-money" className="mb-8">
         <SectionHeader id="you-money" title="Money" />
         <NavRow icon="chart" label="Spending history" sub="Yearly report, month by month" onClick={() => go({ name: 'history' })} />
-        <NavRow icon="trend" label="Net worth" sub="Everything you own minus what you owe" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
+        <NavRow icon="trend" label="Net worth" sub="What you own minus what you owe" value={rupeesShort(nw.total)} onClick={() => go({ name: 'networth' })} />
         <NavRow icon="piggy" label="Investments" sub={(state.investments ?? []).length ? `${(state.investments ?? []).filter((i) => i.status === 'active').length} active · SIP, RD, FD and more` : 'SIP, RD, FD, PPF, NPS or gold'} value={investmentTotals(state).monthly ? `${rupees(investmentTotals(state).monthly)}/mo` : undefined} onClick={() => go({ name: 'investments' })} />
         {INSURANCE_ON && <NavRow icon="shield" label="Insurance" sub={ins.count ? `${ins.count} ${ins.count === 1 ? 'policy' : 'policies'}${ins.next ? ` · next due ${fmtDate(ins.next.nextDate)}` : ''}` : 'Health, term life, bike or car premiums'} value={ins.yearly ? `${rupeesShort(ins.yearly)}/yr` : undefined} onClick={() => go({ name: 'insurance' })} />}
         <NavRow icon="repeat" label="Subscriptions & bills" sub={`${rec.count} recurring payments`} value={`${rupees(rec.monthly)}/mo`} onClick={() => go({ name: 'subscriptions' })} />
@@ -116,11 +116,11 @@ export function YouScreen() {
         {account ? (
           <NavRow icon="user" label="Your account" sub={`${account.email} · member #${account.n}`} onClick={() => go({ name: 'account' })} />
         ) : auth.on && state.mode === 'personal' ? (
-          <NavRow icon="user" label="Sign in" sub="Save your money to an account, so it's on every device" onClick={() => ui.openSheet({ type: 'auth-nudge' })} />
+          <NavRow icon="user" label="Sign in" sub="Your money on every device" onClick={() => ui.openSheet({ type: 'auth-nudge' })} />
         ) : (
           <NavRow icon="reset" label="Sync my devices" sub={syncSummary(store.sync, state.mode)} onClick={() => go({ name: 'sync' })} />
         )}
-        <NavRow icon="download" label="Backup code & export" sub="Copy your data as a code, or as a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
+        <NavRow icon="download" label="Backup code & export" sub="As a code or a spreadsheet" onClick={() => go({ name: 'settings', section: 'export' })} />
         <NavRow icon="message" label="Send feedback" sub="Spill the tea: bugs, ideas, vibes" onClick={() => go({ name: 'feedback' })} />
         <a href="/about/" className="row-btn min-h-[56px]">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-sunk text-ink2" aria-hidden="true">
@@ -859,7 +859,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       )}
       {section === 'security' && (
         <div className="divide-y divide-line">
-          <Toggle label="Hide balances" sub="Blur the safe-to-spend number until you tap it" checked={s.hideBalances} onChange={(v) => updateSettings({ hideBalances: v })} />
+          <Toggle label="Hide balances" sub="Blur it until you tap" checked={s.hideBalances} onChange={(v) => updateSettings({ hideBalances: v })} />
         </div>
       )}
       {section === 'privacy' && (
@@ -930,7 +930,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
             if (on) playSfx('income', true);
           }}
           label="Sounds"
-          sub="A little sound when you log money out, money in or a move. Your phone's silent mode may mute it."
+          sub="A little sound when you log money."
         />
         </div>
       )}

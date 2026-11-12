@@ -495,8 +495,7 @@ function useStoreImpl() {
     (after: number) => {
       const made = takeAutoMade();
       if (!made.length) return 0;
-      const total = made.reduce((a, t) => a + t.amount, 0);
-      const text = made.length === 1 ? `${made[0].merchant} was due: ${rupees(made[0].amount)} is recorded.` : `${made.length} payments were due: ${rupees(total)} is recorded. See Activity.`;
+      const text = made.length === 1 ? `${made[0].merchant} ${rupees(made[0].amount)} recorded.` : `${made.length} payments recorded. See Activity.`;
       return window.setTimeout(() => toast({ text, emoji: '🧾' }), after);
     },
     [toast],

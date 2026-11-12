@@ -46,12 +46,12 @@ describe('the tester’s numbers', () => {
     expect(t.afterItems.map((b) => [b.name, b.amount, b.date])).toEqual([['Rent', 12000, '2026-12-05']]);
   });
 
-  it('the ₹1,800 is explained: about 3% of monthly income, and where to change it', () => {
+  it('the ₹1,800 is explained: about 3% of monthly income, or a cushion', () => {
     expect(bufferNote(tester())).toMatch(/3% of your income/);
     const custom = tester();
     custom.settings.buffer = 5000;
     expect(bufferNote(custom)).not.toMatch(/3%/);
-    expect(bufferNote(custom)).toMatch(/You → Budget preferences/);
+    expect(bufferNote(custom)).toBe('A cushion for surprises.');
   });
 
   it('a bill already paid this month (date moved to next month) is not counted again', () => {

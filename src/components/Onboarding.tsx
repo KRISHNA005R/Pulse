@@ -666,10 +666,10 @@ export function Onboarding() {
             </div>
             <ul className="mb-6 mt-4 flex flex-col gap-2.5">
               {[
-                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.map((x) => x.name).join(', ')} saved` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
-                ['target', fresh.plans.length ? 'An emergency fund plan is ready to top up' : 'Create a plan for something you’re saving for'],
-                ...(fresh.investments.length ? [['trend', `Your ${rupees(fresh.investments[0].amount)} SIP is deducted on the ${ordinal(Number(fresh.investments[0].nextDate.slice(8)))} of every month`]] : []),
-                ['users', 'Split costs with friends from the + button'],
+                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.map((x) => x.name).join(', ')} saved` : 'Add your bills any time'],
+                ['target', fresh.plans.length ? 'Emergency fund plan ready' : 'Start a savings plan'],
+                ...(fresh.investments.length ? [['trend', `${rupees(fresh.investments[0].amount)} SIP on the ${ordinal(Number(fresh.investments[0].nextDate.slice(8)))}`]] : []),
+                ['users', 'Split with friends from +'],
               ].map(([i, t]) => (
                 <li key={t} className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-3.5">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-ink">

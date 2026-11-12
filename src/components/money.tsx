@@ -279,7 +279,7 @@ export function SafeBreakdown() {
   return (
     <div>
       <p className="mb-2 text-[14.5px] text-ink2">
-        {sts.fixedPayday ? `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.` : `What's free for the next ${sts.daysLeft} days. No fixed payday, so PULSE plans 30 days ahead.`}
+        {sts.fixedPayday ? `Free until payday, ${fmtDate(sts.payday)}.` : `No fixed payday, so planned for ${sts.daysLeft} days.`}
       </p>
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join(', ')} />
       <Row label={sts.fixedPayday ? 'Bills before payday' : 'Bills in these days'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => `${b.name} ${rupees(b.amount)} · ${fmtDate(b.date)}`).join(', ') || 'Nothing due'} />
@@ -298,7 +298,7 @@ export function SafeBreakdown() {
       <p className="text-[13.5px] text-ink3">
         That's {rupees(sts.daily)} a day for {sts.daysLeft} days.
       </p>
-      <p className="mt-2 text-[13px] text-ink3">Only counts what you've added. A missing bill makes this too high.</p>
+      <p className="mt-2 text-[13px] text-ink3">A missing bill makes this too high.</p>
     </div>
   );
 }

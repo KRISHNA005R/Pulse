@@ -26,7 +26,7 @@ export function PlansScreen() {
     <div>
       <TopNavigation
         title="Plans"
-        sub="What you're saving for, who you split with, your bhisi and budgets."
+        sub="Savings, splits, bhisi and budgets."
         right={
           <button type="button" onClick={add} className="btn-primary min-h-[40px] px-4 text-[14px]">
             <Icon name="plus" size={16} /> {seg === 'plans' ? 'Plan' : seg === 'splits' ? 'Group' : seg === 'bhisi' ? 'Bhisi' : 'Budget'}

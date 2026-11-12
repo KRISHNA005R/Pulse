@@ -68,12 +68,12 @@ export function BhisiList() {
       <section className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 pb-6 pt-4 text-center">
         <img src="/illustrations/bhisi.webp" alt="" aria-hidden="true" width={1000} height={558} decoding="async" data-testid="bhisi-art" className="-mx-2 mb-2 h-auto w-[calc(100%+16px)] max-w-none" />
         <h2 className="display mt-1 text-[23px] leading-tight">Bhisi, but make it digital</h2>
-        <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">Everyone chips in monthly. A lucky chit picks who takes the pot.</p>
+        <p className="mx-auto mt-2 max-w-[300px] text-[14px] text-ink2">A lucky chit picks who takes the pot.</p>
         <ol className="mx-auto mt-5 flex max-w-[340px] flex-col gap-2 text-left">
           {[
-            ['💸', 'Everyone puts in the same amount, monthly'],
-            ['🏺', 'On draw day, anyone shakes the matka'],
-            ['🔒', 'PULSE picks the chit. Random, locked, no cheating'],
+            ['💸', 'Same amount, every month'],
+            ['🏺', 'Anyone shakes the matka'],
+            ['🔒', 'Random chit, no cheating'],
           ].map(([e, t], i) => (
             <li key={i} className="flex items-center gap-3 rounded-2xl bg-sunk px-3.5 py-2.5 text-[14px]">
               <span className="text-[18px]" aria-hidden="true">

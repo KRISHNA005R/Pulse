@@ -151,7 +151,7 @@ export function SyncScreen({ code: incoming }: { code?: string }) {
 
   return (
     <div>
-      <TopNavigation title="Sync my devices" onBack={ui.pop} sub="The same PULSE on your phone, laptop and home-screen app." />
+      <TopNavigation title="Sync my devices" onBack={ui.pop} sub="Same PULSE on every device." />
 
       {sync.enabled && sync.code ? (
         <div className="flex flex-col gap-4">

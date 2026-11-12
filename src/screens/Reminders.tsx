@@ -72,7 +72,7 @@ export function RemindersScreen() {
 
   return (
     <div>
-      <TopNavigation title="Reminders" onBack={ui.pop} sub="A nudge at the right moment. You choose which ones." />
+      <TopNavigation title="Reminders" onBack={ui.pop} sub="You choose which ones." />
 
       {!supported ? (
         <section className="rounded-3xl border border-line bg-surface p-5">
