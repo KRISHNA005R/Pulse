@@ -2,7 +2,7 @@
 // Survived payday, taking money out of a plan). Like the rest of PULSE AI, every answer is worked
 // out from the app's own data on the phone. Nothing is generated or sent anywhere.
 import type { Plan, State } from '../types';
-import { chances, currentRound, inBowl, isDone, myStanding, pot } from './bhisi';
+import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot } from './bhisi';
 import { gullakFull, gullakTarget, nextCoin } from './fun';
 import { categoryName, isBack, monthRange, prevMonth } from './finance';
 import { buildRewind, rewindPrompt } from './rewind';
@@ -13,6 +13,16 @@ const who = (s: State, id: string) => (id === 'me' ? 'You' : s.people.find((p) =
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 const asking = /\?|\b(how|what|when|kab|kitna|kitne|kya|kaise|which|who|show|my|status|tell|explain|mera|meri)\b/;
 
+const EXPLAIN = 'Everyone pays the same amount each month. One chit is drawn and that person takes the pot. Everyone wins once.';
+const RULES = [
+  { label: '💸 Money', value: '', sub: 'Everyone pays the organiser by UPI. They send the winner the pot.' },
+  { label: '🔗 Joining', value: '', sub: 'Friends join with the invite link, until the first draw.' },
+  { label: '🎲 Fair draw', value: '', sub: 'Drawn at random on PULSE’s server.' },
+  { label: '🍀 Pay early', value: '', sub: `${EARLY_DAYS}+ days early: 1.5× the chance. Before the draw: 1.25×.` },
+];
+
+const JOIN_ASK = /\b(add|invite|join|link|members?|people)\b/;
+const PAY_ASK = /\b(pay|paid|pot|send|bhej\w*|dena|kisko|owe|upi|money|paisa|paise)\b/;
 const BHISI_WORDS = /\b(bhisi|bisi|bhishi|bc|chit ?fund|committee|kameti|kitty|matka|chitt?i|lucky draw)\b/;
 const GULLAK_WORDS = /\b(gullak|gullaks|golak|piggy ?bank|coin a day)\b/;
 const BACK_ASK = /\b((get|got|getting) (it )?back|paid (me )?back|wapas|refunds?|cashback|reimburse\w*)\b/;
@@ -24,7 +34,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
     const last = /\blast month\b|pichle mahine/.test(q) || (!/\bso far\b|\bthis month\b/.test(q) && day <= 7);
     const r = buildRewind(s, last ? monthRange(prevMonth(s.today))[0] : s.today);
     if (!r.enough)
-      return { text: `Not enough logged in ${r.monthName} for a Rewind yet. Log a bit more and your next Rewind will be 🔥. It’s ready on the 1st of every month, and in the last days of the month you can see it so far.` };
+      return { text: `Not enough logged in ${r.monthName} for a Rewind yet. A new one drops on the 1st.` };
     return {
       text: `${r.title} Here’s your ${r.monthName}${r.partial ? ' so far' : ''}:`,
       blocks: [
@@ -43,22 +53,22 @@ export function askNew(s: State, q: string): AIAnswer | null {
   // --- What's new ---
   if (/\b(what['’]?s new|new features?|kya naya|naya kya|latest features?|what changed in pulse)\b/.test(q) && !/\b(spend|spent|month)\b/.test(q)) {
     return {
-      text: 'Here’s what’s new in PULSE:',
+      text: 'New in PULSE:',
       blocks: [
         {
           type: 'list',
           rows: [
-            { label: '🏺 Bhisi', value: '', sub: 'Save with friends. Everyone puts in the same amount each month, and one lucky chit wins the whole pot. Pay early for a little more luck.' },
-            { label: '🪙 Gullak', value: '', sub: 'A coin a day into a clay piggy bank. Fill it, then break it.' },
-            { label: '↩️ Got it back', value: '', sub: 'Friends paying you back, refunds and cashback aren’t income. They come off your spending instead.' },
-            { label: '🎯 Guess the bill', value: '', sub: 'Guess what you spent last week on one thing. See how close you get.' },
-            { label: '🏁 Survived payday', value: '', sub: 'Made it to payday with money left? PULSE cheers you on.' },
+            { label: '🏺 Bhisi', value: '', sub: 'Friends join with one link. Pay the organiser by UPI.' },
+            { label: '🤝 Real friends only', value: '', sub: 'Split only with friends on PULSE. No typed names.' },
+            { label: '📅 Pick dates', value: '', sub: 'Activity → Pick dates… for any range.' },
+            { label: '🪙 Gullak', value: '', sub: 'A coin a day. Fill it, then break it.' },
+            { label: '↩️ Got it back', value: '', sub: 'Paybacks and refunds come off your spending.' },
           ],
         },
         { type: 'link', label: 'Open Bhisi', to: { kind: 'route', tab: 'plans', segment: 'bhisi' } },
         { type: 'link', label: 'Start a gullak', to: { kind: 'sheet', sheet: { type: 'gullak-form' } } },
       ],
-      followups: ['How does bhisi work?', 'What is gullak?', 'How much did I get back this month?'],
+      followups: ['How does bhisi work?', 'How do I add a friend?', 'How much did I get back this month?'],
     };
   }
 
@@ -68,25 +78,41 @@ export function askNew(s: State, q: string): AIAnswer | null {
     const openList = { type: 'link' as const, label: list.length ? 'Open Bhisi' : 'Start a bhisi', to: list.length ? { kind: 'route' as const, tab: 'plans' as const, segment: 'bhisi' } : { kind: 'sheet' as const, sheet: { type: 'bhisi-form' } } };
     if (!list.length) {
       return {
-        text: 'A bhisi is saving together with friends. Everyone puts in the same amount every month. Once a month the chits go into a matka and one is drawn: that person gets the whole pot. Each person wins exactly once, so everyone gets back what they put in, just at different times. Winning early is like an interest-free loan; winning late is forced savings paid out in one go.',
-        blocks: [
-          { type: 'list', rows: [
-            { label: 'Fair draw', value: '', sub: 'PULSE’s server draws the chit with real randomness. Nobody can pick the winner, and everyone sees the same result.' },
-            { label: 'Early-bird luck', value: '', sub: 'Pay 3+ days before the draw: 6 tickets. Paid: 5. Not paid yet: 4. More tickets means a better chance, never a sure win.' },
-            { label: 'Draw day', value: '', sub: 'The matka stays locked until the draw date. Then anyone in the bhisi can draw.' },
-          ] },
-          openList,
-        ],
+        text: EXPLAIN,
+        blocks: [{ type: 'list', rows: RULES }, openList],
         followups: list.length ? ['When is my next bhisi draw?', 'What are my chances?'] : ['What is gullak?', "What's new in PULSE?"],
       };
     }
     const live = list.filter((b) => !isDone(b));
-    if (/\b(how does|how do|what is|kya hai|kaise|explain|rules?|fair|cheat|random)\b/.test(q)) {
+    if (/\b(how does|how do|what is|kya hai|kaise|explain|rules?|fair|cheat|random)\b/.test(q) && !JOIN_ASK.test(q) && !PAY_ASK.test(q)) {
       return {
-        text: 'Everyone puts in the same amount each month, and one chit is drawn from the matka on draw day. That person gets the whole pot and their chit leaves the matka. The draw happens on PULSE’s server with real randomness, so nobody can cheat. Paying early gives you a little more luck (6 tickets early, 5 paid, 4 not paid), but it’s never a sure win.',
-        blocks: [openList],
+        text: EXPLAIN,
+        blocks: [{ type: 'list', rows: RULES }, openList],
         followups: ['When is my next bhisi draw?', 'What are my chances?'],
       };
+    }
+    // Joining: the invite link (or pasting one).
+    if (JOIN_ASK.test(q) && !/\b(pay|paid|pot)\b/.test(q)) {
+      const b = live[0] ?? list[0];
+      return {
+        text: 'Share the invite link from the bhisi. Friends join from their own PULSE, until the first draw.',
+        blocks: [{ type: 'link', label: `Open ${b.name}`, to: { kind: 'route', tab: 'plans', route: { name: 'bhisi', id: b.id } } }, { type: 'link', label: 'I have an invite link', to: { kind: 'sheet', sheet: { type: 'bhisi-join' } } }],
+      };
+    }
+    // Money: members pay the organiser; the organiser sends the winner the pot.
+    if (PAY_ASK.test(q) && !/\b(chance|odds|luck)\b/.test(q)) {
+      const owner = list.find((b) => b.share?.owner && b.rounds.some((r) => r.winner && r.winner !== 'me' && !r.potSent));
+      if (owner) {
+        const k = owner.rounds.reduce((j, r, i) => (r.winner && r.winner !== 'me' && !r.potSent ? i : j), -1);
+        const to = who(s, owner.rounds[k].winner!);
+        return { text: `Send ${to} the pot, ${rupees(pot(owner))}.`, blocks: [{ type: 'link', label: `Send ${to} ${rupees(pot(owner))}`, to: { kind: 'sheet', sheet: { type: 'bhisi-pay', bhisiId: owner.id, round: k, kind: 'pot' } } }] };
+      }
+      const due = live.map((b) => ({ b, i: currentRound(b)! })).find(({ b, i }) => !b.rounds[i].paid.includes('me') && b.members.includes('me'));
+      if (!due) return { text: 'You’ve already paid this round ✓', blocks: [openList] };
+      const org = due.b.share?.org && !due.b.share.owner ? s.people.find((p) => p.id === due.b.share!.org) : undefined;
+      const date = fmtDate(due.b.rounds[due.i].date);
+      if (!org) return { text: `Your ${rupees(due.b.amount)} for ${due.b.name} is due before ${date}. Mark it paid in the bhisi.`, blocks: [{ type: 'link', label: `Open ${due.b.name}`, to: { kind: 'route', tab: 'plans', route: { name: 'bhisi', id: due.b.id } } }] };
+      return { text: `Pay ${org.short} ${rupees(due.b.amount)} before ${date}.`, blocks: [{ type: 'link', label: `Pay ${org.short} ${rupees(due.b.amount)}`, to: { kind: 'sheet', sheet: { type: 'bhisi-pay', bhisiId: due.b.id, round: due.i, kind: 'share' } } }] };
     }
     if (!live.length) return { text: `All your bhisis are done. ${plural(list.length, 'bhisi')}, every chit drawn. Start a new one any time.`, blocks: [{ type: 'link', label: 'Start a bhisi', to: { kind: 'sheet', sheet: { type: 'bhisi-form' } } }] };
     const rows = live.map((b) => {
@@ -113,7 +139,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
     if (/\b(chance|chances|odds|luck|win|jeet|kaun jeetega|who will)\b/.test(q)) {
       const pool = chances(first.b, currentRound(first.b)!);
       return {
-        text: first.mine ? `In ${first.b.name}, your chance this round is ${first.mine.pct}%. ${first.paid ? (first.mine.tickets >= 6 ? 'You paid early, so you hold the most tickets.' : 'Paying 3+ days before the draw would have given you one more ticket.') : `Pay your ${rupees(first.b.amount)} now: paying early gives you more tickets.`} It’s still a real lucky draw, never fixed.` : `Your chit has already come out in ${first.b.name}, so you’re not in this round’s draw. Keep paying your ${rupees(first.b.amount)} each month.`,
+        text: first.mine ? `In ${first.b.name}, your chance this round is ${first.mine.pct}%. ${first.paid ? (first.mine.tickets >= 6 ? 'You paid early ✓' : `Pay ${EARLY_DAYS}+ days early next time for more luck.`) : 'Pay early for more luck.'}` : `Your chit already came out in ${first.b.name}. Keep paying ${rupees(first.b.amount)} a month.`,
         blocks: [{ type: 'list', rows: pool.map((c) => ({ label: who(s, c.id), value: `${c.pct}%`, sub: `${plural(c.tickets, 'ticket')}` })) }, { type: 'link', label: `Open ${first.b.name}`, to: { kind: 'route', tab: 'plans', route: { name: 'bhisi', id: first.b.id } } }],
         followups: ['When is my next bhisi draw?'],
       };
@@ -124,7 +150,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
       return { text: 'Here’s who has won so far:', blocks: [{ type: 'list', rows: won.slice(-8).map((x) => ({ label: `${x.b.emoji} ${x.b.name} · round ${x.i + 1}`, value: who(s, x.r.winner!), sub: rupees(pot(x.b)) })) }, openList] };
     }
     return {
-      text: `${plural(live.length, 'bhisi')} running. Next draw: ${first.b.name}, ${relDay(first.r.date, s.today).toLowerCase()} (${fmtDate(first.r.date)}), for ${rupees(pot(first.b))}. ${inBowl(first.b).length} chits are still in the matka. ${first.paid ? 'You’ve paid this round.' : `Your ${rupees(first.b.amount)} for this round isn’t marked paid yet.`} ${first.line}`,
+      text: `Next draw: ${first.b.name}, ${fmtDate(first.r.date)}, for ${rupees(pot(first.b))}. ${inBowl(first.b).length} chits left. ${first.paid ? 'You’ve paid ✓' : `Your ${rupees(first.b.amount)} isn’t paid yet.`}`,
       blocks: [{ type: 'list', rows: rows.map((x) => x.row) }, openList],
       followups: ['What are my chances?', 'Who won the last draw?'],
     };
@@ -137,7 +163,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
     const start = { type: 'link' as const, label: 'Start a gullak', to: { kind: 'sheet' as const, sheet: { type: 'gullak-form' } } };
     if (!live.length || /\b(how does|how do|what is|kya hai|kaise|explain|work)\b/.test(q)) {
       return {
-        text: 'A gullak is a clay piggy bank challenge. Pick a coin (say ₹20) and a number of days. Drop a coin every day: it moves that money into the gullak plan. You can keep the same coin every day, or go rising (₹10, ₹20, ₹30…). When it’s full, you break it and the money is yours.',
+        text: 'A coin a day into a clay piggy bank. Same coin daily, or rising. When it’s full, break it.',
         blocks: [live.length ? { type: 'link', label: 'Open my gullak', to: { kind: 'route', tab: 'plans', route: { name: 'plan', id: live[0].id } } } : start],
         followups: ['How does bhisi work?', "What's new in PULSE?"],
       };
@@ -156,7 +182,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
     });
     const g0 = rows[0];
     return {
-      text: g0.full ? `${g0.p.name} is full! Break it open and enjoy the ${rupees(g0.p.saved)}.` : `${g0.p.name}: ${g0.p.gullak.drops.length} of ${g0.p.gullak.days} coins in, ${rupees(g0.p.saved)} saved. ${g0.today ? 'Today’s coin is already in. See you tomorrow.' : `Today’s coin is ${rupees(nextCoin(g0.p.gullak))}. Drop it to keep going.`}`,
+      text: g0.full ? `${g0.p.name} is full! Break it open: ${rupees(g0.p.saved)}.` : `${g0.p.name}: ${g0.p.gullak.drops.length} of ${g0.p.gullak.days} coins, ${rupees(g0.p.saved)} saved. ${g0.today ? 'Today’s coin is in ✓' : `Today’s coin: ${rupees(nextCoin(g0.p.gullak))}.`}`,
       blocks: [{ type: 'list', rows: rows.map((x) => x.row) }, { type: 'link', label: 'Open gullak', to: { kind: 'route', tab: 'plans', route: { name: 'plan', id: g0.p.id } } }],
       followups: ['Start another gullak', 'How does bhisi work?'],
     };
@@ -168,7 +194,7 @@ export function askNew(s: State, q: string): AIAnswer | null {
   if (BACK_ASK.test(q) && (!hasAmount || /\b(how much|kitna|total|this month|last month)\b/.test(q)) && asking.test(q)) {
     if (/\b(what is|what['’]?s|kya hai|explain|how does|is .* income|income\?)\b/.test(q) && !/\bhow much\b/.test(q)) {
       return {
-        text: 'Got it back is money that was already yours coming back: a friend paying their share of a bill, a refund, cashback, your office paying back travel. It isn’t income. PULSE takes it off your spending instead. So a ₹3,000 dinner with ₹2,500 paid back by friends counts as ₹500 spent, and your income stays what you really earned. When you log money in, pick the ↩️ Got it back category.',
+        text: 'Your own money coming back: paybacks, refunds, cashback. It isn’t income, so it comes off your spending.',
         blocks: [{ type: 'link', label: 'Log money I got back', to: { kind: 'sheet', sheet: { type: 'composer', preset: { type: 'income' } } } }],
         followups: ['How much did I get back this month?'],
       };
@@ -180,11 +206,11 @@ export function askNew(s: State, q: string): AIAnswer | null {
     const when = last ? 'last month' : 'this month';
     if (!list.length)
       return {
-        text: `Nothing logged as Got it back ${when}. When a friend pays you back or a refund lands, log it as money in with the ↩️ Got it back category, so it comes off your spending instead of counting as income.`,
+        text: `Nothing logged as Got it back ${when}. Log paybacks as money in → ↩️ Got it back.`,
         blocks: [{ type: 'link', label: 'Log money I got back', to: { kind: 'sheet', sheet: { type: 'composer', preset: { type: 'income' } } } }],
       };
     return {
-      text: `You got ${rupees(total)} back ${when}, across ${plural(list.length, 'payment')}. That’s already taken off your spending, and it isn’t counted as income.`,
+      text: `You got ${rupees(total)} back ${when}, across ${plural(list.length, 'payment')}. It’s off your spending.`,
       blocks: [{ type: 'list', rows: list.slice(0, 8).map((t) => ({ label: t.merchant, value: rupees(t.amount), sub: `${fmtDate(t.date)} · off ${categoryName(s, t.category).toLowerCase()}` })) }],
       followups: ['Show my monthly report', 'How much did I spend on food this month?'],
     };
@@ -192,13 +218,13 @@ export function askNew(s: State, q: string): AIAnswer | null {
 
   // --- Guess the bill / survived payday / taking money out of a plan ---
   if (/\bguess the bill\b/.test(q))
-    return { text: 'Guess the bill is a quick game on Home. PULSE picks one thing you spent on last week (like food) and you guess the total. Then it shows the real number. It’s a fun way to notice where money goes. It shows up when you’ve logged spends last week.', followups: ["What's new in PULSE?"] };
+    return { text: 'A quick game on Home: guess what you spent last week on one thing, then see the real number.', followups: ["What's new in PULSE?"] };
   if (/\bsurviv\w* payday\b/.test(q))
-    return { text: 'When your salary lands and you still had money left before it came, PULSE shows a “You survived payday” card on Home, with how much was left and how many paydays in a row you’ve made it.', followups: ['How much can I spend today?'] };
+    return { text: 'Reach payday with money left, and Home shows a “You survived payday” card 🏁', followups: ['How much can I spend today?'] };
   if (/\b(take|withdraw|nikal\w*|remove)\b.*\b(money|paise|out)\b.*\b(plan|goal|pot)\b|\bwithdraw\b.*\bplan\b/.test(q)) {
     const p = s.plans.find((x) => x.status === 'active' && x.saved > 0 && !x.gullak);
     return {
-      text: 'Open the plan and tap Take money out. The money goes back to your bank (or cash), the plan’s saved amount goes down, and PULSE works out the new monthly amount to still reach the goal on time.',
+      text: 'Open the plan and tap Take money out. It goes back to your bank, and the monthly amount updates.',
       blocks: p ? [{ type: 'link', label: `Open ${p.name}`, to: { kind: 'route', tab: 'plans', route: { name: 'plan', id: p.id } } }] : [{ type: 'link', label: 'Open Plans', to: { kind: 'route', tab: 'plans' } }],
     };
   }
@@ -209,7 +235,11 @@ export function askNew(s: State, q: string): AIAnswer | null {
 export function newQuickQuestions(s: State): string[] {
   const out: string[] = [];
   const b = (s.bhisis ?? []).find((x) => !isDone(x));
-  if (b) out.push('🏺 Bhisi draw kab hai?', '🍀 What are my chances?');
+  if (b) {
+    const i = currentRound(b)!;
+    if (b.share?.org && !b.share.owner && !b.rounds[i].paid.includes('me')) out.push('💳 Pay my bhisi');
+    out.push('🏺 Bhisi draw kab hai?', '🍀 What are my chances?');
+  }
   const g = s.plans.find((p) => p.gullak && !p.gullak.broken);
   if (g) out.push('🪙 Gullak kitna bhara?');
   const [ms] = monthRange(s.today);

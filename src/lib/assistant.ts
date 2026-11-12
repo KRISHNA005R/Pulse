@@ -5,7 +5,6 @@ import { canIAfford, parseAffordQuery, type AffordResult } from './afford';
 import {
   budgetState,
   categoryName,
-  investedBetween,
   investmentMonthly,
   insuranceTotals,
   PREMIUM_LABEL,
@@ -127,7 +126,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
   if (INSURANCE_ON && /\b(insurance|premiums?|polic(y|ies))\b/.test(q) && !/^(add|log|spent|paid|pay|got|record)\b/.test(q)) {
     const list = [...(s.insurance ?? [])].sort((a, b) => a.nextDate.localeCompare(b.nextDate));
     const link: AIBlock = { type: 'link', label: list.length ? 'Open insurance' : 'Add a policy', to: { kind: 'route', tab: 'you', route: { name: 'insurance' } } };
-    if (!list.length) return { text: "You haven't added any insurance yet. Add your health, term or vehicle policy and I'll keep the premium aside and show it in Up next before it's due.", blocks: [link] };
+    if (!list.length) return { text: "No insurance added yet. Add a policy and I'll keep its premium aside.", blocks: [link] };
     const t = insuranceTotals(s);
     const sts = safeToSpend(s);
     const n = list[0];
@@ -142,27 +141,34 @@ export function askPulse(s: State, asked: string): AIAnswer {
   const fresh = askNew(s, q);
   if (fresh) return fresh;
 
+  // --- Friends: only real ones, connected with a link ---
+  if (/\b(add|invite|connect|new)\b.*\b(friends?|dost|people|someone|members?)\b|\bfriends?\b.*\b(add|invite|connect)\b/.test(q) && !/\d/.test(q) && !/bhisi|bisi/.test(q)) {
+    if (/\bgroups?\b/.test(q))
+      return { text: 'Share the group’s link. Whoever opens it joins.', blocks: [{ type: 'link', label: 'Open Splits', to: { kind: 'route', tab: 'plans', segment: 'splits' } }] };
+    return { text: 'Send your PULSE link. Whoever opens it is connected with you.', blocks: [{ type: 'link', label: 'Share my PULSE link', to: { kind: 'sheet', sheet: { type: 'friend-invite' } } }] };
+  }
+
   // --- Monthly / yearly report ---
   if (/\b(report|recap|summary|review|wrapped|overview|breakdown)\b|how did i do|how was my (month|year)|spend(ing)? history|this year|yearly|annual|whole year/.test(q) && !/\bafford\b/.test(q)) {
     const yearMatch = q.match(/\b(20\d\d)\b/);
     if (/\byear(ly)?\b|\bannual\b|spend(ing)? history|\b20\d\d\b(?!.*\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))/.test(q)) {
       const year = yearMatch ? Number(yearMatch[1]) : Number(today.slice(0, 4));
       const y = yearSummary(s, year);
-      if (!y.spent && !y.income) return { text: `There's nothing recorded for ${year} yet. Once you log a few expenses, your year shows up here month by month.`, blocks: [{ type: 'link', label: 'Open spending history', to: { kind: 'route', tab: 'you', route: { name: 'history', year } } }] };
+      if (!y.spent && !y.income) return { text: `Nothing recorded for ${year} yet.`, blocks: [{ type: 'link', label: 'Open spending history', to: { kind: 'route', tab: 'you', route: { name: 'history', year } } }] };
       const top = y.categories[0];
       return {
-        text: `In ${year} so far you've spent ${rupees(y.spent)} across ${y.monthsSoFar} month${y.monthsSoFar === 1 ? '' : 's'}, about ${rupees(y.avgSpent)} a month. ${rupees(y.income)} came in and ${rupees(y.saved + y.invested)} went into plans and investments.${top ? ` Your biggest category is ${top.name.toLowerCase()} at ${rupees(top.amount)}.` : ''}${y.highest ? ` The most expensive month was ${monthName(y.highest.month)} (${rupees(y.highest.spent)}).` : ''}`,
+        text: `${year} so far: ${rupees(y.spent)} spent, about ${rupees(y.avgSpent)} a month.${top ? ` Biggest: ${top.name.toLowerCase()}, ${rupees(top.amount)}.` : ''}`,
         blocks: [{ type: 'year', year }, { type: 'link', label: 'Open full spending history', to: { kind: 'route', tab: 'you', route: { name: 'history', year } } }],
         followups: ['Show my monthly report', 'What changed from last month?'],
       };
     }
     const month = monthIn(q, today) ?? today.slice(0, 8) + '01';
     const r = buildRecap(s, month);
-    if (!r.spent && !r.income && !r.saved && !r.invested) return { text: `Nothing is recorded for ${r.monthLabel} yet, so there's no report to show.`, followups: ['Show my monthly report'] };
-    const vs = r.vsLast ? ` That's ${Math.abs(Math.round(r.vsLast * 100))}% ${r.vsLast > 0 ? 'more' : 'less'} than the month before.` : '';
+    if (!r.spent && !r.income && !r.saved && !r.invested) return { text: `Nothing recorded for ${r.monthLabel} yet.`, followups: ['Show my monthly report'] };
+    const vs = r.vsLast ? ` ${Math.abs(Math.round(r.vsLast * 100))}% ${r.vsLast > 0 ? 'more' : 'less'} than last month.` : '';
     const prevLabel = monthName(prevMonth(month));
     return {
-      text: `${r.monthLabel}${r.partial ? ` so far (through ${r.throughDate})` : ''}: you spent ${rupees(r.spent)}, ${rupees(r.income)} came in, and ${rupees(r.saved + r.invested)} went into plans and investments.${vs}`,
+      text: `${r.monthLabel}${r.partial ? ' so far' : ''}: ${rupees(r.spent)} spent, ${rupees(r.income)} in, ${rupees(r.saved + r.invested)} saved.${vs}`,
       blocks: [{ type: 'report', month }],
       followups: [`Report for ${prevLabel}`, 'How did I spend this year?', 'Why is this month more expensive?'],
     };
@@ -200,22 +206,25 @@ export function askPulse(s: State, asked: string): AIAnswer {
   // --- Do something: add an expense, income, bill, SIP, plan, budget or settle up ---
   const action = parseAction(s, actionFromHinglish(question));
   if (action) {
+    const strangers = action.kind === 'expense' ? action.strangers ?? [] : [];
     const text =
       action.kind === 'split'
-        ? `Splitting ${rupees(action.amount)} with ${action.names.join(', ')}. I'll open the split so you can check who owes what.`
+        ? `Splitting ${rupees(action.amount)} with ${action.names.join(', ')}. Check the shares and save.`
         : action.kind === 'settle'
           ? 'Got it. Check this and tap Save.'
-          : "Here's what I'll add. Tap Add to save it, or change anything first.";
-    return { text, blocks: [{ type: 'action', action }] };
+          : strangers.length
+            ? `${strangers.join(', ')} isn’t on PULSE with you, so this is your spend. Send your PULSE link to split.`
+            : "Here's what I'll add. Tap Add to save it.";
+    return { text, blocks: [{ type: 'action', action }, ...(strangers.length ? [{ type: 'link' as const, label: 'Share my PULSE link', to: { kind: 'sheet' as const, sheet: { type: 'friend-invite' } } }] : [])] };
   }
 
   // --- Can I afford ---
   const affordish = /afford/.test(q) || (/can i (spend|buy|get)|should i (buy|spend)|is it ok/.test(q) && /\d/.test(q));
   if (affordish && !/weekend/.test(q)) {
     const { amount, what } = parseAffordQuery(question);
-    if (!amount) return { text: `Tell me the amount and I'll check it against your week. For example: "Can I afford ${ex(3000)} on shoes?"`, followups: [`Can I afford ${ex(3000)}?`, `Can I afford ${ex(6000)} on shoes?`] };
+    if (!amount) return { text: `Tell me the amount, like "Can I afford ${ex(3000)} on shoes?"`, followups: [`Can I afford ${ex(3000)}?`, `Can I afford ${ex(6000)} on shoes?`] };
     const r = canIAfford(s, amount, what);
-    return { text: `${r.headline} ${r.explanation}${r.billsMissing ? " Heads-up: you haven't added rent or bills yet, so this may be too generous." : ''}`, blocks: [{ type: 'afford', result: r }], followups: ['How much can I spend this weekend?', ...(s.plans.some((p) => p.status === 'active') ? [`When will I reach my ${s.plans.find((p) => p.status === 'active')!.name} goal?`] : [])] };
+    return { text: `${r.headline}${r.billsMissing ? ' No bills added yet, so this may be too generous.' : ''}`, blocks: [{ type: 'afford', result: r }], followups: ['How much can I spend this weekend?', ...(s.plans.some((p) => p.status === 'active') ? [`When will I reach my ${s.plans.find((p) => p.status === 'active')!.name} goal?`] : [])] };
   }
 
   // --- Weekend ---
@@ -228,11 +237,11 @@ export function askPulse(s: State, asked: string): AIAnswer {
     const entLeft = ent ? budgetState(s, ent).left : null;
     const when = dow === 0 ? 'today' : dow === 6 ? 'this weekend' : 'this coming weekend';
     return {
-      text: `About ${rupees(weekendAllowance)} for ${when} keeps you on pace until payday.${entLeft != null ? ` Your going-out budget has ${rupees(Math.max(0, entLeft))} left this week.` : ''}`,
+      text: `About ${rupees(weekendAllowance)} for ${when} keeps you on pace.${entLeft != null ? ` Going-out budget: ${rupees(Math.max(0, entLeft))} left.` : ''}`,
       blocks: [{ type: 'list', rows: [
         { label: 'Daily allowance', value: `${rupees(sts.daily)}/day` },
         { label: 'Weekend days left', value: String(daysToWeekendEnd) },
-        { label: 'Safe to spend until payday', value: rupees(sts.safe) },
+        { label: sts.fixedPayday ? 'Safe until payday' : `Safe for ${sts.daysLeft} days`, value: rupees(sts.safe) },
       ] }],
       followups: [`Can I afford ${ex(1500)}?`, 'Make a weekend budget card'],
     };
@@ -244,17 +253,14 @@ export function askPulse(s: State, asked: string): AIAnswer {
     const all = (s.investments ?? []).filter((i) => i.status === 'active');
     const list = all.filter((i) => kindMeta(i.kind).recurring);
     const fds = all.filter((i) => i.kind === 'fd');
-    if (!all.length) return { text: "You haven't added any investments yet. Add a SIP, RD, FD or PPF in You → Investments and I'll record each debit and keep it aside before payday." };
+    if (!all.length) return { text: 'No investments yet. Add a SIP, RD, FD or PPF in You → Investments.' };
     const rate = list.length ? list.reduce((a, i) => a + i.expectedReturn * investmentMonthly(i), 0) / Math.max(1, t.monthly) : 7;
     const p10 = sipProjection(t.monthly, 10, rate, t.holdings);
-    const thisMonth = investedBetween(s, mStart, today);
     const kinds = [...new Set(list.map((i) => kindMeta(i.kind).short))];
-    const fdNext = fds.map((i) => ({ i, at: maturityDate(i) })).filter((x) => x.at && x.at > today).sort((a, b) => a.at!.localeCompare(b.at!))[0];
     const parts = [
-      list.length ? `You invest ${rupees(t.monthly)} a month across ${list.length} ${list.length === 1 ? kinds[0] : kinds.length === 1 ? `${kinds[0]}s` : `investments (${kinds.join(', ')})`}. ${rupees(thisMonth)} has gone in this month.` : '',
-      t.next ? `Next debit: ${rupees(t.next.amount)} for ${t.next.name} on ${fmtDate(t.next.nextDate)}.` : '',
-      fds.length ? `You also have ${fds.length} FD${fds.length > 1 ? 's' : ''} worth ${rupees(fds.reduce((a, i) => a + i.amount, 0))}${fdNext ? `; ${fdNext.i.name} matures on ${fmtDate(fdNext.at!, true)}` : ''}.` : '',
-      list.length ? `Keep it up for 10 years at about ${Math.round(rate * 10) / 10}% a year and it could be worth around ${rupees(p10.value)} (an estimate, not a promise).` : '',
+      list.length ? `You invest ${rupees(t.monthly)} a month across ${list.length} ${list.length === 1 ? kinds[0] : kinds.length === 1 ? `${kinds[0]}s` : 'investments'}.` : '',
+      fds.length && !list.length ? `${fds.length} FD${fds.length > 1 ? 's' : ''} worth ${rupees(fds.reduce((a, i) => a + i.amount, 0))}.` : '',
+      list.length ? `In 10 years: about ${rupees(p10.value)} (an estimate).` : '',
     ];
     return {
       text: parts.filter(Boolean).join(' '),
@@ -304,7 +310,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
   if (/subscri|recurring|renew|ott/.test(q)) {
     const subs = s.subscriptions.filter((x) => x.status !== 'cancelled' && (/biggest|largest|most|expensive/.test(q) ? true : x.kind === 'subscription'));
     const sorted = [...subs].sort((a, b) => b.amount - a.amount);
-    if (!sorted.length) return { text: "You haven't added any recurring payments yet. Add rent, your phone bill and subscriptions in You → Subscriptions & bills so they're set aside before payday." };
+    if (!sorted.length) return { text: 'No recurring payments yet. Add them in You → Subscriptions & bills.' };
     const tot = recurringTotals(s, /biggest|largest|most|expensive/.test(q) ? undefined : 'subscription');
     if (/biggest|largest|most|expensive/.test(q)) {
       const top = sorted.slice(0, 5);
@@ -325,7 +331,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
   const plan = s.plans.find((p) => q.includes(p.name.toLowerCase().split(' ')[0]) || (/emergency/.test(q) && p.id === 'ef'));
   if (plan || /\b(goal|plan|reach|save for)\b/.test(q)) {
     const target = plan ?? s.plans.filter((p) => p.status === 'active').sort((a, b) => a.targetDate.localeCompare(b.targetDate))[0];
-    if (!target) return { text: "You don't have a plan yet. Create one in the Plans tab and I can tell you when you'll get there." };
+    if (!target) return { text: 'No plan yet. Create one in Plans.' };
     if (target) {
       const m = planMetrics(s, target);
       const eta = m.projectedDate ? fmtDate(m.projectedDate, true) : 'not yet clear';
@@ -408,12 +414,12 @@ export function askPulse(s: State, asked: string): AIAnswer {
 
   // --- Budgets ---
   if (/budget/.test(q)) {
-    if (!s.budgets.length) return { text: "You haven't set any budgets. They're optional. Add one in Plans → Budgets if you want to keep an eye on a category." };
+    if (!s.budgets.length) return { text: 'No budgets set. They’re optional: Plans → Budgets.' };
     const rows = s.budgets.map((b) => {
       const st = budgetState(s, b);
       return { label: categoryName(s, b.category), value: st.label, sub: `${rupees(st.spent)} of ${rupees(b.amount)} ${b.period === 'weekly' ? 'this week' : 'this month'}` };
     });
-    return { text: `You have ${s.budgets.length} budgets. Here's where each one stands.`, blocks: [{ type: 'list', rows }] };
+    return { text: `Your ${s.budgets.length} budgets:`, blocks: [{ type: 'list', rows }] };
   }
 
   // --- Net worth ---
@@ -433,26 +439,33 @@ export function askPulse(s: State, asked: string): AIAnswer {
     const items = upcoming(s, addDays(today, week ? 7 : 14));
     if (!items.length) return { text: `Nothing is due in the next ${week ? 'week' : 'two weeks'}.`, followups: ['How much can I spend today?'] };
     return {
-      text: `${items.length} ${items.length === 1 ? 'payment is' : 'payments are'} due in the next ${week ? '7 days' : 'two weeks'}, ${rupees(items.reduce((a, i) => a + i.amount, 0))} in total. The ones before payday are already set aside.`,
+      text: `${items.length} ${items.length === 1 ? 'payment' : 'payments'} due in the next ${week ? '7 days' : 'two weeks'}, ${rupees(items.reduce((a, i) => a + i.amount, 0))} in all. Already kept aside.`,
       blocks: [{ type: 'list', rows: items.map((i) => ({ label: i.name, value: rupees(i.amount), sub: relDay(i.date, today) })) }],
     };
   }
 
   // --- Income / payday ---
   if (/income|salary|payday|get paid|paid next/.test(q)) {
+    const sts = safeToSpend(s);
+    const free = s.transactions.filter((t) => t.category === 'freelance' && t.type === 'income' && t.date >= mStart).reduce((a, t) => a + t.amount, 0);
+    const extra = free ? ` Freelance this month: ${rupees(free)}.` : '';
+    if (!sts.fixedPayday) return { text: `No fixed payday, so PULSE plans ${sts.daysLeft} days ahead.${extra}`, followups: ['How much can I spend today?'] };
     const pd = nextPayday(s);
-    return { text: `Your next salary is due ${relDay(pd, today).toLowerCase()} (${fmtDate(pd)}). Freelance income this month: ${rupees(s.transactions.filter((t) => t.category === 'freelance' && t.date >= mStart).reduce((a, t) => a + t.amount, 0))}.` };
+    return { text: `Payday is ${relDay(pd, today).replace(/^(In|Today|Tomorrow)\b/, (w) => w.toLowerCase())}.${extra}`, followups: ['How much can I spend today?'] };
   }
 
   // --- Safe to spend ---
   if (/(how much|what).*(spend|left|free)|safe|today/.test(q)) {
     const sts = safeToSpend(s);
     return {
-      text: `You can safely spend ${rupees(sts.safe)} until payday, about ${rupees(sts.daily)} a day for ${sts.daysLeft} days.`,
+      text: sts.fixedPayday
+        ? `You can safely spend ${rupees(sts.safe)} until payday, ${fmtDate(sts.payday)}. About ${rupees(sts.daily)} a day.`
+        : `You can safely spend ${rupees(sts.safe)} in the next ${sts.daysLeft} days. About ${rupees(sts.daily)} a day.`,
       blocks: [{ type: 'list', rows: [
         { label: 'Available now', value: rupees(sts.available) },
-        { label: 'Upcoming bills', value: `−${rupees(sts.bills)}` },
+        { label: sts.fixedPayday ? 'Bills before payday' : 'Bills in these days', value: `−${rupees(sts.bills)}` },
         { label: 'SIPs & investments', value: `−${rupees(sts.invest)}` },
+        ...(sts.setAside > 0 ? [{ label: 'Insurance kept aside', value: `−${rupees(sts.setAside)}` }] : []),
         ...(sts.cards > 0 ? [{ label: 'Owed on credit cards', value: `−${rupees(sts.cards)}` }] : []),
         { label: 'Plans', value: `−${rupees(sts.goals)}` },
         { label: 'Safety buffer', value: `−${rupees(sts.buffer)}` },
@@ -461,7 +474,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
   }
 
   return {
-    text: `I didn't get that one. Try asking like a friend, in English or Hinglish: "kitna bacha hai?", "paisa kab tak chalega?", "Zomato pe kitna uda diya?", or log something: "${ex(450)} dinner", "salary aa gayi ${ex(40000)}", "Netflix ${ex(199)} monthly". You can also tap the mic and just say it.`,
+    text: `Didn't get that. Try "kitna bacha hai?" or "${ex(450)} dinner".`,
     followups: starterDefaults().slice(0, 4),
   };
 }

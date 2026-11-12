@@ -144,6 +144,6 @@ describe('PULSE AI and the Rewind', () => {
     const s = createSeed();
     s.today = '2026-11-02';
     s.transactions = [];
-    expect(askPulse(s, 'show my rewind').text).toMatch(/log a bit more/i);
+    expect(askPulse(s, 'show my rewind').text).toMatch(/Not enough logged/);
   });
 });

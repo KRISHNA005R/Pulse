@@ -10,7 +10,7 @@ import { INV_META } from './invest';
 // "start a SIP of 2000 on the 5th") into one concrete change the person confirms with a tap.
 
 export type AIAction =
-  | { kind: 'expense' | 'income'; amount: number; merchant: string; category: CategoryId; date: ISODate; plan?: string; back?: boolean }
+  | { kind: 'expense' | 'income'; amount: number; merchant: string; category: CategoryId; date: ISODate; plan?: string; back?: boolean; strangers?: string[] }
   | { kind: 'split'; text: string; amount: number; names: string[] }
   | { kind: 'contribute'; planId: string; planName: string; amount: number }
   | { kind: 'plan'; name: string; icon: string; target: number; targetDate: ISODate }
@@ -228,16 +228,22 @@ export function parseAction(s: State, input: string): AIAction | null {
   const bare = raw.split(/\s+/).length <= 7; // "450 dinner with rahul" style entries
   if (!expenseWords.test(lower) && !bare) return null;
   const body = raw.replace(/^\s*(please\s+)?(add|log|record|note)\s+(an?\s+)?(expense\s+(of\s+)?)?/i, '').replace(/^\s*i\s+/i, '').replace(/^\s*(spent|paid|bought)\s+/i, '');
-  const p = parseEntry(body, { people: s.people, plans: s.plans, today, categories: s.categories, history: s.transactions });
-  if (p.people.length || p.newPeople.length) {
-    const names = [...p.people.map((id) => s.people.find((x) => x.id === id)?.short ?? ''), ...p.newPeople].filter(Boolean);
+  // Splits are with real friends only, like the + button: connected on PULSE (everyone in the demo).
+  const friends = s.mode === 'personal' ? s.people.filter((x) => x.link?.status === 'linked') : s.people;
+  const p = parseEntry(body, { people: friends, plans: s.plans, today, categories: s.categories, history: s.transactions });
+  if (p.people.length) {
+    const names = p.people.map((id) => s.people.find((x) => x.id === id)?.short ?? '').filter(Boolean);
     return { kind: 'split', text: body, amount, names };
   }
+  // Names that aren't friends on PULSE: typed after "with", or people saved here who never connected.
+  const lowerBody = body.toLowerCase();
+  const unlinked = s.people.filter((x) => !friends.includes(x) && [x.short, x.name.split(' ')[0]].some((w) => w.length > 1 && new RegExp(`\\b${w.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lowerBody)));
+  const strangers = [...new Set([...unlinked.map((x) => x.short), ...p.newPeople.map((w) => w.charAt(0).toUpperCase() + w.slice(1))])];
   let label = cleanName(p.label || p.merchant || '', [/\b(on|for|at|to)\b(?=\s*$)/gi]);
   if (p.merchant) label = cap(label.replace(new RegExp(`\\s*\\b(on|at|from|via|in)\\s+${p.merchant}\\b`, 'i'), '').trim());
   const category = p.category ?? 'other';
   const catName = s.categories.find((c) => c.id === category)?.name ?? 'Expense';
   const merchant = p.merchant && label && !label.toLowerCase().includes(p.merchant.toLowerCase()) ? `${p.merchant} · ${label}` : label || p.merchant || catName;
   // Never tagged with a plan: that read like money went into it. "Add 4180 to Goa" does that.
-  return { kind: 'expense', amount, merchant, category, date: p.date ?? today };
+  return { kind: 'expense', amount, merchant, category, date: p.date ?? today, ...(strangers.length ? { strangers } : {}) };
 }

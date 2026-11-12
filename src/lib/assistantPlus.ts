@@ -111,6 +111,25 @@ function monthEnd(q: string, today: ISODate): ISODate | null {
   return addDays(addMonths(start, 1), -1);
 }
 
+/** "from 1 nov to 15 nov", "between 3 and 10 march": the two dates, in order (this year, or last year if still ahead). */
+function dateRange(q: string, today: ISODate): [ISODate, ISODate] | null {
+  const MON = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
+  const m = q.match(new RegExp(`\\b(?:from|between)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:${MON})?\\s+(?:to|and|till|until|by|-)\\s+(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:${MON})?`));
+  if (!m) return null;
+  const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+  const m2 = m[4] ?? m[2];
+  const m1 = m[2] ?? m2;
+  if (!m1) return null;
+  const y = Number(today.slice(0, 4));
+  const at = (d: string, mo: string, yr: number) => `${yr}-${String(MONTHS.indexOf(mo) + 1).padStart(2, '0')}-${d.padStart(2, '0')}`;
+  let a = at(m[1], m1, y);
+  let b = at(m[3], m2, y);
+  if (a > today) { a = at(m[1], m1, y - 1); if (b > today) b = at(m[3], m2, y - 1); }
+  if (b < a) [a, b] = [b, a];
+  if (Number.isNaN(parseDate(a).getTime()) || Number.isNaN(parseDate(b).getTime())) return null;
+  return [a, b];
+}
+
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 // ---------------------------------------------------------------------------------------------
@@ -168,21 +187,22 @@ export function askMore(s: State, q: string): AIAnswer | null {
     const from = addDays(today, -13);
     const spent = s.transactions.filter((t) => everyday(t) && t.date >= from && t.date <= today).reduce((a, t) => a + myCost(s, t), 0);
     const pace = spent / 14;
-    if (pace < 1) return { text: `You haven’t logged everyday spending in the last 2 weeks, so there’s no pace to go by yet. Your safe to spend is ${rupees(sts.safe)} until payday on ${fmtDate(sts.payday)}.`, followups: ['How much can I spend today?'] };
+    const end = sts.fixedPayday ? `payday, ${fmtDate(sts.payday)}` : fmtDate(sts.payday);
+    if (pace < 1) return { text: `No everyday spends in the last 2 weeks to go by. Safe to spend: ${rupees(sts.safe)} until ${end}.`, followups: ['How much can I spend today?'] };
     const days = Math.floor(sts.safe / pace);
     const until = addDays(today, days);
     const before = daysBetween(until, sts.payday);
     const text =
       days >= sts.daysLeft
-        ? `At your pace of about ${rupees(Math.round(pace))} a day, your money lasts past payday on ${fmtDate(sts.payday)}. You’re fine, with about ${rupees(Math.max(0, Math.round(sts.safe - pace * sts.daysLeft)))} to spare.`
-        : `At your pace of about ${rupees(Math.round(pace))} a day, your safe-to-spend lasts till ${fmtDate(until)}, ${plural(before, 'day')} before payday. Keeping to ${rupees(sts.daily)} a day gets you there.`;
+        ? `At your pace of about ${rupees(Math.round(pace))} a day, your money lasts past ${end}. You’re fine.`
+        : `At your pace of about ${rupees(Math.round(pace))} a day, it lasts till ${fmtDate(until)}, ${plural(before, 'day')} short. Keep to ${rupees(sts.daily)} a day.`;
     return {
       text,
       blocks: [{ type: 'list', rows: [
         { label: 'Your pace (last 14 days)', value: `${rupees(Math.round(pace))}/day` },
         { label: 'Safe to spend', value: rupees(sts.safe) },
         { label: 'Lasts till', value: days >= sts.daysLeft ? `Past ${fmtDate(sts.payday)}` : fmtDate(until) },
-        { label: 'To reach payday', value: `${rupees(sts.daily)}/day` },
+        { label: sts.fixedPayday ? 'To reach payday' : `For ${sts.daysLeft} days`, value: `${rupees(sts.daily)}/day` },
       ] }],
       followups: ['Where did my money go?', 'Biggest expenses this month?'],
     };
@@ -285,6 +305,20 @@ export function askMore(s: State, q: string): AIAnswer | null {
       text: `${label.charAt(0).toUpperCase()}${label.slice(1)} you’ve spent ${rupees(Math.round(total))}. Most of it went to ${categoryName(s, cats[0][0]).toLowerCase()} (${Math.round((cats[0][1] / total) * 100)}%)${cats[1] ? ` and ${categoryName(s, cats[1][0]).toLowerCase()} (${Math.round((cats[1][1] / total) * 100)}%)` : ''}.`,
       blocks: [{ type: 'compare', rows: cats.map(([c, v]) => ({ label: categoryName(s, c), value: Math.round(v) })) }],
       followups: ['Biggest expenses this month?', 'How long will my money last?'],
+    };
+  }
+
+  // --- Spending between two dates you pick ("from 1 nov to 15 nov"), like Activity → Pick dates ---
+  const range = dateRange(q, today);
+  if (range && /\b(spen[dt]|spending|kharch)/.test(q)) {
+    const [a, b] = range;
+    const t = target(s, q.replace(/\b(from|between)\b.*$/, ''));
+    const total = s.transactions.filter((x) => x.type === 'expense' && x.date >= a && x.date <= b && (!t || t.match(x))).reduce((n, x) => n + myCost(s, x), 0);
+    const span = `from ${fmtDate(a)} to ${fmtDate(b)}`;
+    return {
+      text: total ? `You spent ${rupees(Math.round(total))}${t ? ` on ${t.label}` : ''} ${span}.` : `Nothing spent${t ? ` on ${t.label}` : ''} ${span}.`,
+      blocks: [{ type: 'link', label: 'Open Activity', to: { kind: 'route', tab: 'activity' } }],
+      followups: ['Where did my money go?'],
     };
   }
 

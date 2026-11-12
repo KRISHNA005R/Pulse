@@ -18,7 +18,7 @@ describe('PULSE AI: Hinglish', () => {
   it.each([
     ['Kitna bacha hai?', /safely spend/],
     ['kitne paise bache hain', /safely spend/],
-    ['salary kab aayegi', /next salary/],
+    ['salary kab aayegi', /^Payday is/],
     ['zomato pe kitna uda diya?', /on Zomato this month/],
     ['3000 ke shoes le sakta hu?', /./],
     ['mujhe kisko dena hai', /owe/],

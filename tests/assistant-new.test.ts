@@ -32,7 +32,7 @@ describe('PULSE AI knows the new features', () => {
   });
 
   it('explains bhisi to someone without one', () => {
-    expect(askPulse(createSeed(), 'how does bhisi work?').text).toMatch(/whole pot/);
+    expect(askPulse(createSeed(), 'how does bhisi work?').text).toMatch(/takes the pot/);
   });
 
   it('tells me my next draw and my chance', () => {
