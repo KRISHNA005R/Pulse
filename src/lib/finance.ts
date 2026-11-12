@@ -122,10 +122,17 @@ export function mainIncome(s: State): IncomeSource | undefined {
   return fixed.find((i) => i.main === true) ?? [...fixed].sort((a, b) => Number(a.main === false) - Number(b.main === false) || b.expected - a.expected)[0];
 }
 
-/** Next main payday after today. Safe-to-spend lasts until then. */
+/** How far ahead PULSE plans when there's no fixed payday (freelance, irregular income). */
+export const NO_PAYDAY_DAYS = 30;
+
+/**
+ * Next main payday after today. Safe-to-spend lasts until then. With no fixed payday (freelance,
+ * irregular income) it plans 30 days ahead: the end of the month would spread the money over just a
+ * few days late in the month, which makes "per day" far too generous.
+ */
 export function nextPayday(s: State): ISODate {
   const m = mainIncome(s);
-  if (!m?.nextDate) return addDays(endOfMonth(s.today), 1);
+  if (!m?.nextDate) return addDays(s.today, NO_PAYDAY_DAYS);
   let d = m.nextDate;
   let guard = 0;
   while (d <= s.today && guard++ < 24) d = addMonths(d, 1);
@@ -353,6 +360,11 @@ export interface SafeToSpend {
   daily: number;
   daysLeft: number;
   payday: ISODate;
+  /** A real payday (a monthly income with a date). False: no fixed payday, planned 30 days ahead. */
+  fixedPayday: boolean;
+  /** Bills due in the 10 days after payday: not counted now (that pay covers them), but named so
+   *  rent on the 5th doesn't look forgotten when payday is the 1st. */
+  afterItems: UpcomingItem[];
 }
 
 export function safeToSpend(s: State): SafeToSpend {
@@ -373,7 +385,19 @@ export function safeToSpend(s: State): SafeToSpend {
   const buffer = s.settings.buffer;
   const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
   const daysLeft = Math.max(1, daysBetween(s.today, payday));
-  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday };
+  const fixedPayday = !!mainIncome(s)?.nextDate;
+  const afterItems = upcoming(s, addDays(payday, 10)).filter((u) => u.date >= payday && u.kind !== 'card' && u.kind !== 'income');
+  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday, fixedPayday, afterItems };
+}
+
+/**
+ * Where the safety buffer comes from, in words. Setup starts it at about 3% of monthly income
+ * (₹500 to ₹3,000); once changed by hand it's just "your cushion".
+ */
+export function bufferNote(s: State): string {
+  const income = mainIncome(s)?.expected ?? s.incomes.reduce((a, i) => a + (i.expected ?? 0), 0);
+  const auto = income > 0 && Math.abs(s.settings.buffer - Math.min(3000, Math.max(500, Math.round((income * 0.03) / 100) * 100))) < 1;
+  return `${auto ? 'About 3% of your monthly income, ' : 'A cushion '}kept for surprises like a cab home or a pharmacy run. Change it in You → Budget preferences.`;
 }
 
 // ------------------------------------------------------------------

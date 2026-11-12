@@ -2,8 +2,8 @@ import { useLayoutEffect, useRef } from 'react';
 import { gsap, reducedMotion, rollTarget, rollTokens } from '../../lib/motion';
 
 /**
- * An amount that rolls into place like a meter: every digit is a little wheel that spins to its
- * number, the ones digit first and the big digits last. One further down the page waits until you scroll to it. The wheels and fixed characters are drawn
+ * An amount that rolls like a meter when it changes: every digit is a little wheel that spins to its
+ * new number, the ones digit first and the big digits last. When it first appears it's simply shown. One further down the page waits until you scroll to it. The wheels and fixed characters are drawn
  * with CSS (not text), so the element's text is exactly the amount, for screen readers and copying.
  * With "reduce motion" it's just the number.
  */
@@ -37,7 +37,9 @@ export function RollingNumber({ text, className = '', testId }: { text: string; 
       const to = rollTarget(d);
       strip.dataset.at = String(to);
       gsap.killTweensOf(strip);
-      if (fromRaw >= 0 && fromRaw % 10 === d) {
+      // First time on screen: shown in place, not rolled up from 0 (that showed made-up amounts for a
+      // moment). Only a change rolls.
+      if (fromRaw < 0 || fromRaw % 10 === d) {
         gsap.set(strip, { '--p': to });
         return;
       }

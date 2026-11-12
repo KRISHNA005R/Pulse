@@ -4,17 +4,17 @@ import { CURRENCIES, detectCurrency, setCurrency, sym, type CurrencyCode } from 
 import { useStore } from '../store/store';
 import { useBackSteps } from '../store/ui';
 import { createFresh, nextFirstOfMonth } from '../data/seed';
-import { safeToSpend } from '../lib/finance';
+import { bufferNote, safeToSpend } from '../lib/finance';
 import { addDays, fmtDate, ordinal, realToday, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
-import { MoneyInput } from './ui/bits';
+import { MoneyInput, AmountInput } from './ui/bits';
 import { JoinWithCode } from '../screens/Sync';
 import { takeSyncLink } from '../lib/sync';
 import { useAuth } from '../store/auth';
 import { LoginLegal, LoginPanel } from './Auth';
+import { justSetUp } from './InstallPrompt';
 import { bhisiLink, clearBhisiLink, markBhisiAutoJoin, peekBhisi, pendingBhisiLink, type BhisiPeek } from '../lib/bhisiShare';
 
-const REASONS = ['Track spending', 'Save more', 'Control subscriptions', 'Plan a goal', 'Manage shared expenses', 'All of these'];
 const PAY = ['Salary', 'Freelance', 'Allowance', 'Multiple sources', 'Other'];
 // Monthly payments people forget to mention. Picked during setup, they're kept aside before they're due.
 type BillPick = { key: string; name: string; emoji: string; category: string; kind: 'bill' | 'subscription'; day: number };
@@ -31,7 +31,8 @@ const BILL_PICKS: BillPick[] = [
 const PRIORITIES = ['Save for something', 'Reduce unnecessary spending', 'Build emergency savings', 'Understand spending', 'Manage social expenses'];
 
 type Step = 'invite' | 'welcome' | 'trust' | 'join' | 'name' | 'reasons' | 'pay' | 'money' | 'bills' | 'priorities' | 'building' | 'done';
-const FLOW: Step[] = ['name', 'reasons', 'pay', 'money', 'bills', 'priorities'];
+// "What are you here for?" was asked here too, and again as priorities at the end: one question now.
+const FLOW: Step[] = ['name', 'pay', 'money', 'bills', 'priorities'];
 
 // Screen 1: what PULSE gives you, before any questions.
 const VALUE: { icon: 'wallet' | 'target' | 'users'; title: string; sub: string; accent?: boolean }[] = [
@@ -83,10 +84,9 @@ export function Onboarding() {
     moved.current = true;
     const known = auth.session.account.name;
     if (known && !name.trim()) setName(known);
-    setStep(known || name.trim() ? 'reasons' : 'name');
+    setStep(known || name.trim() ? 'pay' : 'name');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.outcome, auth.session, step]);
-  const [reasons, setReasons] = useState<string[]>([]);
   const [pay, setPay] = useState('');
   const [income, setIncome] = useState('');
   const today = realToday();
@@ -99,7 +99,7 @@ export function Onboarding() {
   const [sip, setSip] = useState('');
   const [sipDate, setSipDate] = useState(nextFirstOfMonth(today).slice(0, 8) + '05');
   const [showInvest, setShowInvest] = useState(false);
-  const [bills, setBills] = useState<(BillPick & { amount: string })[]>([]);
+  const [bills, setBills] = useState<(BillPick & { amount: string; auto?: boolean })[]>([]);
   const [noBills, setNoBills] = useState(false);
   const [otherSeq, setOtherSeq] = useState(0);
   const [currency, setCur] = useState<CurrencyCode>(() => detectCurrency());
@@ -132,7 +132,7 @@ export function Onboarding() {
     () =>
       createFresh({
         name,
-        reasons,
+        reasons: [],
         payType: pay,
         income: parseFloat(income) || 0,
         payday: pay === 'Freelance' ? null : payday,
@@ -143,10 +143,10 @@ export function Onboarding() {
         sipAmount: parseFloat(sip) || 0,
         sipDate,
         currency,
-        bills: noBills ? [] : bills.map((b) => ({ name: b.name, amount: parseFloat(b.amount) || 0, day: b.day, kind: b.kind, category: b.category })),
+        bills: noBills ? [] : bills.map((b) => ({ name: b.name, amount: parseFloat(b.amount) || 0, day: b.day, kind: b.kind, category: b.category, auto: b.auto ?? b.kind === 'subscription' })),
         skipped: noBills ? ['bills'] : [],
       }),
-    [name, reasons, pay, income, payday, banks, cash, prio, invested, sip, sipDate, currency, bills, noBills],
+    [name, pay, income, payday, banks, cash, prio, invested, sip, sipDate, currency, bills, noBills],
   );
   const preview = useMemo(() => safeToSpend(fresh), [fresh]);
 
@@ -172,7 +172,7 @@ export function Onboarding() {
     pay: 'How do you usually get paid?',
     money: 'How much do you have right now?',
     bills: 'What do you pay every month?',
-    priorities: 'Pick up to 3 priorities',
+    priorities: 'What should PULSE help with first?',
   };
   // Every question can be skipped ("You can skip anything" on screen 2). Setup fills sensible
   // defaults for anything left empty (a name becomes "Friend", and so on).
@@ -186,7 +186,6 @@ export function Onboarding() {
   };
   const empty: Record<string, boolean> = {
     name: !name.trim(),
-    reasons: reasons.length === 0,
     pay: !pay && !income,
     money: banks.every((b) => !b.balance) && !cash && !sip && !invested,
     bills: !noBills && bills.length === 0,
@@ -229,7 +228,7 @@ export function Onboarding() {
               ) : needLogin ? (
                 <LoginPanel />
               ) : (
-                <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
+                <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'pay' : 'name')} data-autofocus>
                   Join the bhisi 🏺
                 </button>
               )}
@@ -323,7 +322,7 @@ export function Onboarding() {
                 <LoginPanel />
               ) : (
                 <>
-                  <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'reasons' : 'name')} data-autofocus>
+                  <button type="button" className="btn-accent w-full text-[16px]" onClick={() => setStep(auth.session?.account.name && name.trim() ? 'pay' : 'name')} data-autofocus>
                     Continue
                   </button>
                 </>
@@ -385,20 +384,6 @@ export function Onboarding() {
                 </>
               )}
 
-              {step === 'reasons' && (
-                <div role="group" aria-labelledby="ob-title" className="flex flex-col gap-2.5">
-                  {REASONS.map((r) => (
-                    <Choice
-                      key={r}
-                      multi
-                      label={r}
-                      on={reasons.includes(r) || (r !== 'All of these' && reasons.includes('All of these'))}
-                      onClick={() => setReasons(r === 'All of these' ? (reasons.includes(r) ? [] : [r]) : reasons.includes(r) ? reasons.filter((x) => x !== r) : [...reasons.filter((x) => x !== 'All of these'), r])}
-                    />
-                  ))}
-                </div>
-              )}
-
               {step === 'pay' && (
                 <>
                   <div role="radiogroup" aria-labelledby="ob-title" className="flex flex-col gap-2.5">
@@ -454,12 +439,17 @@ export function Onboarding() {
                           <input
                             id={`ob-bank-name-${i}`}
                             className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold placeholder:font-medium placeholder:text-ink3 focus:outline-none"
-                            placeholder={i === 0 ? 'Main bank (e.g. HDFC)' : 'Bank name'}
+                            placeholder={i === 0 ? 'Type or pick your bank' : 'Type or pick a bank'}
                             value={b.name}
                             onFocus={() => setBankPicker(i)}
                             onChange={(e) => set({ name: e.target.value })}
                             autoComplete="off"
                           />
+                          {b.name && (
+                            <button type="button" onClick={() => { set({ name: '' }); setBankPicker(i); document.getElementById(`ob-bank-name-${i}`)?.focus(); }} className="tap shrink-0 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold text-ink3 hover:bg-sunk" aria-label={`Change bank ${i + 1}`}>
+                              Change
+                            </button>
+                          )}
                           {banks.length > 1 && (
                             <button type="button" onClick={() => { setBanks(banks.filter((_, j) => j !== i)); setBankPicker(null); }} className="tap grid h-9 w-9 shrink-0 place-items-center rounded-full text-ink3 hover:bg-sunk" aria-label={`Remove ${b.name || `bank ${i + 1}`}`}>
                               <Icon name="x" size={16} />
@@ -467,8 +457,9 @@ export function Onboarding() {
                           )}
                         </div>
                         {bankPicker === i && !BANKS.includes(b.name) && (
-                          <div className="no-scrollbar -mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4" role="group" aria-label="Pick your bank">
-                            {BANKS.filter((n) => !banks.some((x, j) => j !== i && x.name === n)).filter((n) => !b.name || n.toLowerCase().includes(b.name.toLowerCase())).map((n) => (
+                          <div className="mt-3 flex flex-wrap gap-1.5" role="group" aria-label="Pick your bank">
+                            {/* The most common ones; typing above finds the rest. Rows, not a strip to scroll sideways. */}
+                            {BANKS.filter((n) => !banks.some((x, j) => j !== i && x.name === n)).filter((n) => !b.name || n.toLowerCase().includes(b.name.toLowerCase())).slice(0, b.name ? 12 : 8).map((n) => (
                               <button key={n} type="button" className="chip shrink-0 text-[13px]" onClick={() => { set({ name: n }); setBankPicker(null); }}>
                                 {n}
                               </button>
@@ -495,7 +486,7 @@ export function Onboarding() {
                       <div className="mt-3 grid grid-cols-2 gap-3">
                         <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
                           Monthly SIP
-                          <input id="ob-sip" inputMode="decimal" className="field num" placeholder={sym().trim()} value={sip} onChange={(e) => setSip(e.target.value.replace(/[^\d.]/g, ''))} />
+                          <AmountInput id="ob-sip" inputMode="decimal" className="field num" placeholder={sym().trim()} value={sip} onChange={(e) => setSip(e.target.value.replace(/[^\d.]/g, ''))} />
                         </label>
                         <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
                           SIP date
@@ -504,7 +495,7 @@ export function Onboarding() {
                       </div>
                       <label className="mt-3 flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
                         What your investments are worth today
-                        <input id="ob-invested" inputMode="decimal" className="field num" placeholder={`${sym()}0`} value={invested} onChange={(e) => setInvested(e.target.value.replace(/[^\d.]/g, ''))} />
+                        <AmountInput id="ob-invested" inputMode="decimal" className="field num" placeholder={`${sym()}0`} value={invested} onChange={(e) => setInvested(e.target.value.replace(/[^\d.]/g, ''))} />
                       </label>
                       <p className="mt-2 text-[12.5px] text-ink3">Your SIP is deducted automatically each month and kept aside before payday. Add more SIPs later in You → Investments.</p>
                     </div>
@@ -537,7 +528,7 @@ export function Onboarding() {
                   )}
                   {!noBills &&
                     bills.map((b) => {
-                      const set = (patch: Partial<BillPick & { amount: string }>) => setBills(bills.map((x) => (x.key === b.key ? { ...x, ...patch } : x)));
+                      const set = (patch: Partial<BillPick & { amount: string; auto?: boolean }>) => setBills(bills.map((x) => (x.key === b.key ? { ...x, ...patch } : x)));
                       const custom = b.key.startsWith('other-');
                       return (
                         <div key={b.key} className="animate-rise rounded-3xl border border-line bg-surface p-4">
@@ -557,7 +548,7 @@ export function Onboarding() {
                           <div className="mt-3 grid grid-cols-2 gap-3">
                             <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
                               A month
-                              <input inputMode="decimal" className="field num" placeholder={sym().trim()} value={b.amount} autoFocus={!custom && !b.amount} onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, '') })} />
+                              <AmountInput inputMode="decimal" className="field num" placeholder={sym().trim()} value={b.amount} autoFocus={!custom && !b.amount} onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, '') })} />
                             </label>
                             <label className="flex flex-col gap-1.5 text-[13px] font-semibold text-ink2">
                               Due on
@@ -569,6 +560,20 @@ export function Onboarding() {
                                 ))}
                               </select>
                             </label>
+                          </div>
+                          {/* How it's paid: auto-debit is never assumed for rent and bills. */}
+                          <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-sunk p-1" role="radiogroup" aria-label={`How do you pay ${b.name || 'this'}?`}>
+                            {[
+                              { v: false, label: 'I pay it' },
+                              { v: true, label: 'Auto-debit' },
+                            ].map((o) => {
+                              const on = (b.auto ?? b.kind === 'subscription') === o.v;
+                              return (
+                                <button key={o.label} type="button" role="radio" aria-checked={on} onClick={() => set({ auto: o.v })} className={`tap min-h-[38px] rounded-xl text-[13.5px] font-semibold ${on ? 'bg-surface text-ink shadow-sm' : 'text-ink3'}`}>
+                                  {o.label}
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
                       );
@@ -585,6 +590,7 @@ export function Onboarding() {
 
               {step === 'priorities' && (
                 <div role="group" aria-labelledby="ob-title" className="flex flex-col gap-2.5">
+                  <p className="-mt-2 mb-1 text-[15px] text-ink2">Pick up to 3. They shape the plans and budgets you start with.</p>
                   {PRIORITIES.map((p) => (
                     <Choice key={p} multi label={p} on={prio.includes(p)} onClick={() => setPrio(prio.includes(p) ? prio.filter((x) => x !== p) : prio.length >= 3 ? prio : [...prio, p])} />
                   ))}
@@ -623,16 +629,22 @@ export function Onboarding() {
             <h1 id="ob-title" className="display text-[30px] leading-tight">
               You're set, {fresh.user.name}.
             </h1>
+            {/* A new account's member number, here instead of on a screen of its own after this one. */}
+            {auth.fresh && auth.session?.account && (
+              <p className="mt-2 text-[15px] text-ink2">
+                🎉 You're PULSE member <b className="text-ink">#{auth.session.account.n}</b>. Your member card is in You → Account.
+              </p>
+            )}
             <div className="mt-6 rounded-3xl border border-line bg-surface p-5">
               <p className="num-hero text-[39px] leading-none">{rupees(preview.safe)}</p>
               <p className="eyebrow mt-2 text-ink2">Safe to spend</p>
               <dl className="mt-4 border-t border-line pt-3 text-[14px]">
                 {[
                   ['In your accounts', rupees(preview.available)],
-                  ...(preview.bills > 0 ? [[`Bills before ${fmtDate(preview.payday)}`, `−${rupees(preview.bills)}`]] : []),
+                  ...(preview.bills > 0 ? [[`${preview.billItems.map((b) => b.name).join(', ')} (before ${fmtDate(preview.payday)})`, `−${rupees(preview.bills)}`]] : []),
                   ...(preview.invest > 0 ? [['SIPs before payday', `−${rupees(preview.invest)}`]] : []),
                   ...(preview.goals > 0 ? [['Plans', `−${rupees(preview.goals)}`]] : []),
-                  ['Kept aside for surprises', `−${rupees(preview.buffer)}`],
+                  ['Safety buffer', `−${rupees(preview.buffer)}`],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between gap-3 py-1">
                     <dt className="text-ink2">{k}</dt>
@@ -641,8 +653,15 @@ export function Onboarding() {
                 ))}
               </dl>
               <p className="mt-2 text-[14px] text-ink2">
-                That's {rupees(preview.daily)} a day for {preview.daysLeft} {preview.daysLeft === 1 ? 'day' : 'days'}, until {fmtDate(preview.payday)}.
+                That's {rupees(preview.daily)} a day for {preview.daysLeft} {preview.daysLeft === 1 ? 'day' : 'days'}
+                {preview.fixedPayday ? `, until payday on ${fmtDate(preview.payday)}.` : ' (no fixed payday, so PULSE plans 30 days ahead).'}
               </p>
+              <p className="mt-2 text-[12.5px] text-ink3">Safety buffer: {bufferNote(fresh).replace(/^About/, 'about').replace(/^A cushion/, 'a cushion')}</p>
+              {preview.afterItems.length > 0 && (
+                <p className="mt-2 text-[12.5px] text-ink3">
+                  Not counted yet: {preview.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')}. {preview.fixedPayday ? 'Due after payday, so it comes from that pay.' : `Due after these ${preview.daysLeft} days.`}
+                </p>
+              )}
               {!noBills && !fresh.subscriptions.some((x) => x.kind === 'bill') && (
                 <p className="mt-3 rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">
                   No rent or bills added yet. If you pay some, this number is too high.{' '}
@@ -654,7 +673,7 @@ export function Onboarding() {
             </div>
             <ul className="mb-6 mt-4 flex flex-col gap-2.5">
               {[
-                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.length} monthly ${fresh.subscriptions.length === 1 ? 'payment is' : 'payments are'} kept aside before ${fresh.subscriptions.length === 1 ? 'it’s' : 'they’re'} due` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
+                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.map((x) => x.name).join(', ')} saved. Each is kept aside whenever it falls before payday.` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
                 ['target', fresh.plans.length ? 'An emergency fund plan is ready to top up' : 'Create a plan for something you’re saving for'],
                 ...(fresh.investments.length ? [['trend', `Your ${rupees(fresh.investments[0].amount)} SIP is deducted on the ${ordinal(Number(fresh.investments[0].nextDate.slice(8)))} of every month`]] : []),
                 ['users', 'Split costs with friends from the + button'],
@@ -672,6 +691,10 @@ export function Onboarding() {
               className="btn-accent mt-auto w-full"
               onClick={() => {
                 auth.rename(fresh.user.fullName || fresh.user.name);
+                // Straight to Home: no "You're in" screen and no install sheet right after setup. The
+                // short tour is the one thing that shows.
+                if (auth.fresh) auth.seenWelcome();
+                justSetUp();
                 startPersonal(fresh);
               }}
             >

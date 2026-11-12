@@ -14,7 +14,7 @@ import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closi
 import { Icon } from './ui/Icon';
 import { INV_KIND_ORDER, INV_META, kindMeta, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { PeoplePicker } from './People';
-import { Field, MoneyInput, PersonAvatar, Segmented, Toggle } from './ui/bits';
+import { Field, MoneyInput, PersonAvatar, Segmented, Toggle, AmountInput } from './ui/bits';
 
 export const PLAN_TEMPLATES: { key: string; name: string; icon: string; target: number; months: number; kind: Plan['kind']; categories: CategoryId[] }[] = [
   { key: 'trip', name: 'Goa trip', icon: '🏝️', target: 20000, months: 4, kind: 'plan', categories: ['travel'] },
@@ -142,7 +142,7 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Already saved" htmlFor="plan-saved">
-          <input id="plan-saved" inputMode="decimal" className="field num" value={saved} onChange={(e) => setSaved(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`${sym()}0`} />
+          <AmountInput id="plan-saved" inputMode="decimal" className="field num" value={saved} onChange={(e) => setSaved(e.target.value.replace(/[^\d.]/g, ''))} placeholder={`${sym()}0`} />
         </Field>
         <Field label="Target date" htmlFor="plan-date">
           <input id="plan-date" type="date" className="field" value={date} min={state.today} onChange={(e) => setDate(e.target.value)} />
@@ -157,7 +157,7 @@ export function PlanForm({ planId, template, onDone }: { planId?: string; templa
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Keep aside every payday" htmlFor="plan-reserve" hint="Held back from safe-to-spend each payday.">
-          <input id="plan-reserve" inputMode="decimal" className="field num" value={reserve} onChange={(e) => setReserve(e.target.value.replace(/[^\d.]/g, ''))} placeholder={monthly ? `${sym()}${monthly}` : `${sym()}0`} />
+          <AmountInput id="plan-reserve" inputMode="decimal" className="field num" value={reserve} onChange={(e) => setReserve(e.target.value.replace(/[^\d.]/g, ''))} placeholder={monthly ? `${sym()}${monthly}` : `${sym()}0`} />
         </Field>
         <Field label="Shared with a group" htmlFor="plan-group">
           <select id="plan-group" className="field" value={group} onChange={(e) => setGroup(e.target.value)}>
@@ -377,7 +377,7 @@ export function SubscriptionForm({ subId, preset, kind: kind0, onDone }: { subId
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Amount" htmlFor="sub-amount">
-          <input id="sub-amount" inputMode="decimal" className="field num" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="sub-amount" inputMode="decimal" className="field num" value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         <Field label="Repeats" htmlFor="sub-cycle">
           <select id="sub-cycle" className="field" value={cycle} onChange={(e) => setCycle(e.target.value as Subscription['cycle'])}>
@@ -599,7 +599,7 @@ export function IncomeForm({ incomeId, onDone }: { incomeId?: string; onDone: ()
       <Segmented label="Pattern" size="sm" value={cycle} onChange={setCycle} options={[{ value: 'monthly', label: 'Fixed date' }, { value: 'irregular', label: 'Irregular' }]} />
       <div className="grid grid-cols-2 gap-2.5">
         <Field label={cycle === 'monthly' ? 'Amount' : 'Typical month'} htmlFor="inc-exp">
-          <input id="inc-exp" inputMode="decimal" className="field num" value={expected} onChange={(e) => setExpected(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="inc-exp" inputMode="decimal" className="field num" value={expected} onChange={(e) => setExpected(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         {cycle === 'monthly' ? (
           <Field label="Next payday" htmlFor="inc-next">
@@ -727,7 +727,7 @@ export function AccountForm({ accountId, holding, onDone }: { accountId?: string
         </Field>
         )}
         <Field label={holding ? 'Current value' : 'Balance'} htmlFor="acct-bal">
-          <input id="acct-bal" inputMode="decimal" className="field num" value={balance} onChange={(e) => setBalance(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="acct-bal" inputMode="decimal" className="field num" value={balance} onChange={(e) => setBalance(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
       </div>
       <Field label="Bank or app (optional)" htmlFor="acct-inst">
@@ -797,10 +797,10 @@ export function CardForm({ cardId, onDone }: { cardId?: string; onDone: () => vo
           <input id="card-last4" inputMode="numeric" maxLength={4} className="field num" value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="1234" />
         </Field>
         <Field label="Limit" htmlFor="card-limit">
-          <input id="card-limit" inputMode="decimal" className="field num" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="card-limit" inputMode="decimal" className="field num" value={limit} onChange={(e) => setLimit(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         <Field label="Balance" htmlFor="card-bal">
-          <input id="card-bal" inputMode="decimal" className="field num" value={balance} onChange={(e) => setBalance(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="card-bal" inputMode="decimal" className="field num" value={balance} onChange={(e) => setBalance(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -811,7 +811,7 @@ export function CardForm({ cardId, onDone }: { cardId?: string; onDone: () => vo
           <input id="card-due" type="date" className="field px-2" value={due} onChange={(e) => setDue(e.target.value)} />
         </Field>
         <Field label="Minimum due" htmlFor="card-min">
-          <input id="card-min" inputMode="decimal" className="field num" value={minDue} onChange={(e) => setMinDue(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="card-min" inputMode="decimal" className="field num" value={minDue} onChange={(e) => setMinDue(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
       </div>
       <Segmented label="Payment status" size="sm" value={status} onChange={setStatus} options={[{ value: 'not-generated', label: 'No bill yet' }, { value: 'due', label: 'Due' }, { value: 'paid', label: 'Paid' }]} />
@@ -877,10 +877,10 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Amount left" htmlFor="debt-rem">
-          <input id="debt-rem" inputMode="decimal" className="field num" value={remaining} onChange={(e) => setRemaining(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="debt-rem" inputMode="decimal" className="field num" value={remaining} onChange={(e) => setRemaining(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         <Field label="EMI / minimum" htmlFor="debt-emi">
-          <input id="debt-emi" inputMode="decimal" className="field num" value={emi} onChange={(e) => setEmi(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="debt-emi" inputMode="decimal" className="field num" value={emi} onChange={(e) => setEmi(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         <Field label="Due day of month" htmlFor="debt-day">
           <input id="debt-day" inputMode="numeric" className="field num" value={dueDay} onChange={(e) => setDueDay(e.target.value.replace(/\D/g, '').slice(0, 2))} />
@@ -1406,7 +1406,7 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
           {isPast ? (
             <>
               <Field label="Put in before PULSE" htmlFor="inv-prior">
-                <input
+                <AmountInput
                   id="inv-prior"
                   inputMode="decimal"
                   className="field num"
@@ -1434,7 +1434,7 @@ export function InvestmentForm({ investmentId, onDone }: { investmentId?: string
               </p>
               {!ex && to === '__new' && (
                 <Field label="Current value in your app (optional)" htmlFor="inv-value">
-                  <input id="inv-value" inputMode="decimal" className="field num" value={value} placeholder={priorAmount ? rupees(priorAmount) : `${sym()}0`} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ''))} />
+                  <AmountInput id="inv-value" inputMode="decimal" className="field num" value={value} placeholder={priorAmount ? rupees(priorAmount) : `${sym()}0`} onChange={(e) => setValue(e.target.value.replace(/[^\d.]/g, ''))} />
                 </Field>
               )}
             </>

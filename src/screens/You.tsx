@@ -12,7 +12,7 @@ import { useStore } from '../store/store';
 import { useUI, type Route } from '../store/ui';
 import { debtDue, isEarned, detections, emiParts, holdingAccounts, incomeThisMonth, insuranceTotals, investedTotal, investmentMonthly, investmentTotals, netWorth, payoffInterest, payoffMonths, recurringTotals, safeToSpend, sipProjection } from '../lib/finance';
 import { addMonths, daysBetween, endOfMonth, fmtDate, incomeLabel, ordinal, monthName, parseDate, relDay, rupees, rupeesShort, startOfMonth } from '../lib/format';
-import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field } from '../components/ui/bits';
+import { NavRow, SectionHeader, Segmented, StatusPill, Toggle, TopNavigation, EmptyState, PersonAvatar, CategoryMark, ProgressBar, Field, AmountInput } from '../components/ui/bits';
 import { SubscriptionRow, TransactionList } from '../components/money';
 import { BackupPanel } from '../components/Forms';
 import { Icon } from '../components/ui/Icon';
@@ -755,7 +755,7 @@ export function AccountsScreen() {
                 <label htmlFor={`bal-${a.id}`} className="sr-only">
                   Balance for {a.name}
                 </label>
-                <input id={`bal-${a.id}`} autoFocus inputMode="decimal" className="field num w-[110px] py-1.5 text-right" value={val} onChange={(e) => setVal(e.target.value.replace(/[^\d.]/g, ''))} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
+                <AmountInput id={`bal-${a.id}`} autoFocus inputMode="decimal" className="field num w-[110px] py-1.5 text-right" value={val} onChange={(e) => setVal(e.target.value.replace(/[^\d.]/g, ''))} onBlur={(e) => e.currentTarget.form?.requestSubmit()} />
               </form>
             ) : (
               <button type="button" className="num tap rounded-lg px-2 py-1 text-[15.5px] font-semibold hover:bg-sunk" onClick={() => { setEditing(a.id); setVal(String(a.balance)); }} aria-label={`${a.name} balance ${rupees(a.balance)}. Edit`}>
@@ -939,7 +939,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
         <div className="flex flex-col gap-4">
           <Field label="Safety buffer" htmlFor="buffer" hint="Kept out of safe-to-spend for surprises like a cab home or a pharmacy run.">
             <div className="flex gap-2">
-              <input id="buffer" inputMode="decimal" className="field num" value={buffer} onChange={(e) => setBuffer(e.target.value.replace(/[^\d]/g, ''))} />
+              <AmountInput id="buffer" inputMode="decimal" className="field num" value={buffer} onChange={(e) => setBuffer(e.target.value.replace(/[^\d]/g, ''))} />
               <button type="button" className="btn-primary shrink-0" onClick={() => { updateSettings({ buffer: Number(buffer) || 0 }); store.toast({ text: `Buffer set to ${rupees(Number(buffer) || 0)}. Safe to spend: ${rupees(safeToSpend({ ...state, settings: { ...s, buffer: Number(buffer) || 0 } }).safe)}.` }); }}>
                 Save
               </button>

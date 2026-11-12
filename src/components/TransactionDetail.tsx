@@ -6,7 +6,7 @@ import { BACK_WORDS, isBack, myCost } from '../lib/finance';
 import { categoryFor } from '../lib/lexicon';
 import { fmtDate, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
-import { CategoryMark, PersonAvatar, Toggle } from './ui/bits';
+import { CategoryMark, PersonAvatar, Toggle, AmountInput } from './ui/bits';
 
 export function TransactionDetail({ id, onClose, inline }: { id: string; onClose: () => void; inline?: boolean }) {
   const store = useStore();
@@ -61,7 +61,7 @@ export function TransactionDetail({ id, onClose, inline }: { id: string; onClose
           </button>
         )}
         {editing === 'amount' ? (
-          <input autoFocus aria-label="Amount" inputMode="decimal" className="field num-hero mt-2 w-[200px] text-center text-[28px]" value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^\d.]/g, ''))} onBlur={commitEdit} onKeyDown={(e) => e.key === 'Enter' && commitEdit()} />
+          <AmountInput autoFocus aria-label="Amount" inputMode="decimal" className="field num-hero mt-2 w-[200px] text-center text-[28px]" value={draft} onChange={(e) => setDraft(e.target.value.replace(/[^\d.]/g, ''))} onBlur={commitEdit} onKeyDown={(e) => e.key === 'Enter' && commitEdit()} />
         ) : (
           <button type="button" onClick={() => startEdit('amount')} className={`tap num-hero mt-1 rounded-xl px-2 text-[36px] leading-tight hover:bg-sunk ${back ? '' : isIn ? 'text-pos' : ''}`} aria-label={`Amount ${rupees(tx.amount)}. Edit`}>
             {isIn ? '+' : '−'}

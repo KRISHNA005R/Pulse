@@ -80,8 +80,11 @@ export type PlansSegment = 'plans' | 'splits' | 'bhisi' | 'budgets';
 export interface ActivityFilter {
   chip: string; // 'all' | category | 'plans' | 'people'
   query: string;
-  range: 'this-month' | 'last-month' | '7d' | '30d' | 'all';
+  range: 'this-month' | 'last-month' | '7d' | '30d' | 'all' | 'custom';
   account: string; // 'all' | account id
+  /** With range 'custom': from and to (either may be left open). */
+  from?: string;
+  to?: string;
 }
 
 export interface ChatMsg {

@@ -96,9 +96,37 @@ function Screen() {
   }
 }
 
-/** Desktop contextual panel: the selected transaction, otherwise PULSE AI. */
+const AI_HIDDEN = 'pulse-ai-panel-hidden';
+const readHidden = () => {
+  try {
+    return localStorage.getItem(AI_HIDDEN) === '1';
+  } catch {
+    return false;
+  }
+};
+
+/** Desktop contextual panel: the selected transaction, otherwise PULSE AI. PULSE AI can be folded
+ *  away to give the main view the width (remembered on this browser); a transaction still opens here. */
 function ContextPanel() {
   const ui = useUI();
+  const [hidden, setHiddenState] = useState(readHidden);
+  const setHidden = (v: boolean) => {
+    setHiddenState(v);
+    try {
+      if (v) localStorage.setItem(AI_HIDDEN, '1');
+      else localStorage.removeItem(AI_HIDDEN);
+    } catch {
+      /* remembered for this visit only */
+    }
+  };
+  if (hidden && !ui.selectedTx)
+    return (
+      <aside aria-label="Context" className="sticky top-0 hidden h-screen w-14 shrink-0 flex-col items-center border-l border-line bg-surface/60 py-6 xl:flex">
+        <button type="button" className="tap grid h-10 w-10 place-items-center rounded-full bg-accent text-on-accent" aria-label="Show PULSE AI" title="Show PULSE AI" onClick={() => setHidden(false)}>
+          <Icon name="spark" size={17} />
+        </button>
+      </aside>
+    );
   return (
     <aside aria-label="Context" className="sticky top-0 hidden h-screen w-[380px] shrink-0 flex-col border-l border-line bg-surface/60 px-5 py-6 xl:flex">
       {ui.selectedTx ? (
@@ -125,6 +153,9 @@ function ContextPanel() {
                 Clear
               </button>
             )}
+            <button type="button" className="tap grid h-9 w-9 place-items-center rounded-full text-ink3 hover:bg-sunk hover:text-ink" aria-label="Hide PULSE AI" title="Hide PULSE AI" onClick={() => setHidden(true)}>
+              <Icon name="chevron" size={18} />
+            </button>
           </div>
           <div className="min-h-0 flex-1">
             <AIChat compact />

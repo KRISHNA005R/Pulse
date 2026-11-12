@@ -117,8 +117,18 @@ function TourSteps({ onEnd }: { onEnd: () => void }) {
 
   return (
     <div className="fixed inset-0 z-[80]" data-testid="tour">
-      {/* Catches taps so nothing behind the tour is pressed by accident. */}
-      <div className="absolute inset-0" aria-hidden="true" />
+      {/* Catches taps so nothing behind the tour is pressed by accident, except the lit-up thing
+          itself: tapping + during "Add a spend" ends the tour and opens it, as you'd expect. */}
+      <div
+        className="absolute inset-0"
+        aria-hidden="true"
+        onClick={(e) => {
+          if (e.clientX < box.left || e.clientX > box.left + box.width || e.clientY < box.top || e.clientY > box.top + box.height) return;
+          const el = findTarget(step.key);
+          onEnd();
+          if (el) window.setTimeout(() => (el.matches('button, a, [role="button"]') ? el : el.querySelector<HTMLElement>('button, a, [role="button"]'))?.click(), 0);
+        }}
+      />
       <div
         aria-hidden="true"
         data-testid="tour-spot"

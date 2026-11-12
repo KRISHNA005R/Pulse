@@ -48,13 +48,30 @@ function eligible(canPrompt: boolean) {
 }
 
 /** Opens the install sheet once, shortly after the dashboard first appears. Call from the app shell. */
+/** Setup just finished in this visit: the install sheet waits for another day (the Home banner stays). */
+const FRESH = 'pulse-just-set-up';
+export function justSetUp() {
+  try {
+    sessionStorage.setItem(FRESH, '1');
+  } catch {
+    /* it may show once; no harm */
+  }
+}
+const setUpNow = () => {
+  try {
+    return sessionStorage.getItem(FRESH) === '1';
+  } catch {
+    return false;
+  }
+};
+
 export function useInstallNudge() {
   const { state } = useStore();
   const ui = useUI();
   const inst = useInstall();
   const ready = state.onboarding.done && state.mode === 'personal';
   useEffect(() => {
-    if (!ready || read().first || !eligible(inst.canPrompt)) return;
+    if (!ready || read().first || !eligible(inst.canPrompt) || setUpNow()) return;
     const t = window.setTimeout(() => {
       if (read().first || isStandalone()) return;
       write({ ...read(), first: state.today });
@@ -65,9 +82,12 @@ export function useInstallNudge() {
   }, [ready, inst.canPrompt]);
 }
 
-const REASONS: [string, string, string][] = [
+/** Why install. The data line says what's true: signed in, the account keeps a copy anyway. */
+const reasons = (signedIn: boolean): [string, string, string][] => [
   ['⚡', 'Opens in one tap', 'Full screen, like any other app. Works offline too.'],
-  ['🔒', 'Keeps your data safer', 'Browsers can clear a website’s saved data. An installed app keeps it.'],
+  signedIn
+    ? ['🔒', 'Keeps you signed in', 'Your money is saved to your account either way. A browser can clear a website’s data and sign you out; an installed app keeps you in.']
+    : ['🔒', 'Keeps your data safer', 'Without an account your money lives only on this device, and a browser can clear a website’s data. An installed app keeps it.'],
   ['🔔', 'Lets PULSE remind you', 'Bills due, payday and a nudge to log your day.'],
 ];
 
@@ -92,7 +112,8 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
   const [making, setMaking] = useState(false);
   const code = store.sync.enabled ? store.sync.code : null;
   // With accounts, the data follows the person: they just sign in on the home-screen app. No code to carry.
-  const accounts = useAuth().on;
+  const authNow = useAuth();
+  const accounts = authNow.on;
 
   const install = async () => {
     setBusy(true);
@@ -118,7 +139,7 @@ export function InstallPrompt({ onDone }: { onDone: () => void }) {
       </div>
 
       <ul className="flex flex-col gap-3">
-        {REASONS.map(([emoji, title, body]) => (
+        {reasons(!!authNow.session).map(([emoji, title, body]) => (
           <li key={title} className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sunk text-[19px]" aria-hidden="true">
               {emoji}

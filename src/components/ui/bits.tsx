@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { sym } from '../../lib/currency';
+import { useEffect, useLayoutEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { caretAfterDigits, groupTyped, sym } from '../../lib/currency';
 import type { Person, State } from '../../types';
 import { Icon } from './Icon';
 import { RollingNumber } from './RollingNumber';
@@ -195,12 +195,48 @@ export function Ring({ value, size = 56, stroke = 6, children, label }: { value:
 }
 
 // ---------- Money input ----------
-export function MoneyInput({ value, onChange, label, size = 'lg', autoFocus, id }: { value: string; onChange: (v: string) => void; label: string; size?: 'lg' | 'md'; autoFocus?: boolean; id?: string }) {
+/**
+ * Grouped digits while typing (₹25000 shows as 25,000; rupees in lakhs, 1,00,000). The value in and
+ * out stays plain digits ("25000"), so saving and maths are unchanged; the caret stays next to the
+ * digit just typed.
+ */
+function useGrouped(raw: string) {
   const ref = useRef<HTMLInputElement>(null);
+  const caret = useRef<number | null>(null);
+  const shown = groupTyped(String(raw ?? '').replace(/[^\d.]/g, ''));
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (caret.current === null || !el || document.activeElement !== el) return;
+    const p = caretAfterDigits(shown, caret.current);
+    caret.current = null;
+    try {
+      el.setSelectionRange(p, p);
+    } catch {
+      /* some input types can't place the caret */
+    }
+  });
+  /** The plain digits typed, and where the caret was among them. */
+  const read = (el: HTMLInputElement) => {
+    const pos = el.selectionStart ?? el.value.length;
+    caret.current = el.value.slice(0, pos).replace(/[^\d.]/g, '').length;
+    return el.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+  };
+  return { ref, shown, read };
+}
+
+/** A plain amount box (forms): same look as before, digits grouped while typing. `onChange` gets the plain digits as e.target.value. */
+export function AmountInput({ value, onChange, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'> & { value: string | number; onChange: (e: { target: { value: string } }) => void }) {
+  const g = useGrouped(String(value ?? ''));
+  return <input {...rest} ref={g.ref} inputMode="decimal" autoComplete="off" value={g.shown} onChange={(e) => onChange({ target: { value: g.read(e.target) } })} />;
+}
+
+export function MoneyInput({ value, onChange, label, size = 'lg', autoFocus, id }: { value: string; onChange: (v: string) => void; label: string; size?: 'lg' | 'md'; autoFocus?: boolean; id?: string }) {
+  const g = useGrouped(value);
+  const ref = g.ref;
   useEffect(() => {
     if (autoFocus) window.setTimeout(() => ref.current?.focus(), 60);
-  }, [autoFocus]);
-  const width = Math.max(1, value.length || 1);
+  }, [autoFocus, ref]);
+  const width = Math.max(1, g.shown.length || 1);
   return (
     <label className={`flex cursor-text items-baseline justify-center gap-1 ${size === 'lg' ? 'py-3' : 'py-1'}`} onClick={() => ref.current?.focus()}>
       <span className="sr-only">{label}</span>
@@ -213,12 +249,9 @@ export function MoneyInput({ value, onChange, label, size = 'lg', autoFocus, id 
         data-autofocus={autoFocus ? '' : undefined}
         inputMode="decimal"
         autoComplete="off"
-        value={value}
+        value={g.shown}
         placeholder="0"
-        onChange={(e) => {
-          const v = e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
-          onChange(v);
-        }}
+        onChange={(e) => onChange(g.read(e.target))}
         onKeyDown={(e) => {
           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
             e.preventDefault();

@@ -156,3 +156,31 @@ export function detectCurrency(): CurrencyCode {
   if (lang.endsWith('-GB')) return 'GBP';
   return 'INR';
 }
+
+/**
+ * What's typed in an amount box, grouped for reading (₹25000 → 25,000; rupees in lakhs, 1,00,000).
+ * Takes the raw digits ("25000.5") and returns the shown text; the decimals are left as typed.
+ */
+export function groupTyped(raw: string): string {
+  if (!raw) return '';
+  const [int, dec] = raw.split('.');
+  const digits = int.replace(/^0+(?=\d)/, '');
+  let out: string;
+  if (current.code === 'INR' && digits.length > 3) {
+    const last3 = digits.slice(-3);
+    const rest = digits.slice(0, -3).replace(/\B(?=(\d{2})+(?!\d))/g, ',');
+    out = `${rest},${last3}`;
+  } else out = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return raw.includes('.') ? `${out || '0'}.${dec ?? ''}` : out;
+}
+
+/** Where the caret goes in grouped text so that `digits` digits (and the dot) are before it. */
+export function caretAfterDigits(shown: string, digits: number): number {
+  if (digits <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < shown.length; i++) {
+    if (shown[i] !== ',') seen++;
+    if (seen === digits) return i + 1;
+  }
+  return shown.length;
+}

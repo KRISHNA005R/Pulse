@@ -7,7 +7,7 @@ import { stamp } from '../lib/motion';
 import { addDays, haptic, rupees } from '../lib/format';
 import { playSfx } from '../lib/sfx';
 import { gullakFull, gullakTarget, nextCoin } from '../lib/fun';
-import { Segmented } from './ui/bits';
+import { Segmented, AmountInput } from './ui/bits';
 import { Icon } from './ui/Icon';
 
 const INK = '#17140F';
@@ -103,7 +103,7 @@ export function GullakForm({ onDone }: { onDone: () => void }) {
         <span className="text-[14.5px] font-semibold">{mode === 'rising' ? 'Start with' : 'Every day'}</span>
         <span className="flex items-center gap-1">
           <span className="text-ink3">₹</span>
-          <input inputMode="decimal" className="num w-20 bg-transparent text-right text-[20px] font-bold outline-none" value={step} onChange={(e) => setStep(e.target.value.replace(/[^\d.]/g, ''))} aria-label="Coin amount" />
+          <AmountInput inputMode="decimal" className="num w-20 bg-transparent text-right text-[20px] font-bold outline-none" value={step} onChange={(e) => setStep(e.target.value.replace(/[^\d.]/g, ''))} aria-label="Coin amount" />
         </span>
       </label>
       <div>

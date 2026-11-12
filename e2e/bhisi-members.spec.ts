@@ -93,7 +93,7 @@ test('a new person opens the invite: set up, then they land in the bhisi, alread
   const N = await ctx.newPage();
   await N.goto(invite);
   await N.getByRole('button', { name: /Join the bhisi/ }).click();
-  for (let i = 0; i < 5; i++) await N.getByRole('button', { name: 'Skip for now' }).click();
+  for (let i = 0; i < 4; i++) await N.getByRole('button', { name: 'Skip for now' }).click();
   await N.getByRole('button', { name: 'Build my dashboard' }).click();
   await N.getByRole('button', { name: /Open PULSE|Let’s go|Go to/ }).first().click({ timeout: 15_000 }).catch(() => {});
   // No second "Join?" question: it's joined and open.

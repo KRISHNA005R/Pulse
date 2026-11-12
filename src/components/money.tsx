@@ -3,20 +3,22 @@ import { INSURANCE_ON } from '../lib/features';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
-import { budgetState, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
+import { budgetState, bufferNote, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { burstFrom } from '../lib/celebrate';
 import { RollingNumber } from './ui/RollingNumber';
 import { streak } from '../lib/streak';
-import { AvatarStack, CategoryMark, ProgressBar, Ring, StatusPill } from './ui/bits';
+import { AvatarStack, CategoryMark, ProgressBar, Ring, StatusPill, AmountInput } from './ui/bits';
 
 // ------------------------------------------------------------------
 // SafeToSpendCard — the hero
 // ------------------------------------------------------------------
 /** Counts a number smoothly to its new value (and up from a little below on first show). */
 function useRolling(value: number, ms = 800) {
-  const [shown, setShown] = useState(() => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? value : Math.round(value * 0.55)));
+  // Shown as it is when the screen opens (counting up from a smaller number looked like wrong amounts
+  // for a moment); it only moves when the amount changes, e.g. after logging a spend.
+  const [shown, setShown] = useState(value);
   const from = useRef(shown);
   const raf = useRef(0);
   useEffect(() => {
@@ -109,7 +111,7 @@ export function PaydayCard() {
               <label htmlFor="payday-amt" className="sr-only">
                 Amount that came in
               </label>
-              <input id="payday-amt" inputMode="decimal" autoFocus className="num min-w-0 flex-1 rounded-full bg-white/90 px-4 text-[16px] font-semibold text-ink placeholder:text-ink3 focus:outline-none" placeholder={rupees(i.expected)} value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} />
+              <AmountInput id="payday-amt" inputMode="decimal" autoFocus className="num min-w-0 flex-1 rounded-full bg-white/90 px-4 text-[16px] font-semibold text-ink placeholder:text-ink3 focus:outline-none" placeholder={rupees(i.expected)} value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d.]/g, ''))} />
               <button type="submit" disabled={!(parseFloat(amt) > 0)} className="tap min-h-[46px] shrink-0 rounded-full bg-ink px-5 text-[14.5px] font-semibold text-bg disabled:opacity-50">
                 Add
               </button>
@@ -180,7 +182,8 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
       </div>
 
       {/* 2. The number, sized to always fit on one line */}
-      <div className="relative mt-3" data-tour="safe">
+      {/* Tapping the number shows how it's worked out (the same as "How it works" below). */}
+      <div className="relative mt-3 cursor-pointer" data-tour="safe" onClick={() => ui.openSheet({ type: 'safe' })}>
         <p
           key={`n${delta?.id ?? 0}`}
           className={`hero-amt num-hero ${delta ? 'animate-squash' : ''} ${hide ? 'blur-md select-none' : ''}`}
@@ -214,11 +217,11 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
           <dd className="mt-0.5 truncate text-[12px] text-ink3">{soon ? 'until payday' : `for ${sts.daysLeft} days`}</dd>
         </div>
         <div className="min-w-0 rounded-2xl bg-accent-soft px-3.5 py-3">
-          <dt className="text-[12px] font-medium text-accent-ink/80">Payday</dt>
+          <dt className="text-[12px] font-medium text-accent-ink/80">{sts.fixedPayday ? 'Payday' : 'Planned until'}</dt>
           <dd className="stat-amt num mt-0.5 truncate font-semibold text-accent-ink" style={{ ['--len' as string]: 7 }}>
             {fmtDate(sts.payday)}
           </dd>
-          <dd className="mt-0.5 truncate text-[12px] text-accent-ink/80">{extra ? `+${rupees(extra.income.expected)} on ${fmtDate(extra.date)}` : paydayIn}</dd>
+          <dd className="mt-0.5 truncate text-[12px] text-accent-ink/80">{extra ? `+${rupees(extra.income.expected)} on ${fmtDate(extra.date)}` : sts.fixedPayday ? paydayIn : 'No fixed payday'}</dd>
         </div>
       </dl>
 
@@ -275,9 +278,11 @@ export function SafeBreakdown() {
   );
   return (
     <div>
-      <p className="mb-2 text-[14.5px] text-ink2">What's actually free until payday on {fmtDate(sts.payday)}, after everything already spoken for.</p>
+      <p className="mb-2 text-[14.5px] text-ink2">
+        {sts.fixedPayday ? `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.` : `What's actually free for the next ${sts.daysLeft} days (until ${fmtDate(sts.payday)}), after everything already spoken for. With no fixed payday, PULSE plans 30 days ahead and counts freelance money only once it lands.`}
+      </p>
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
-      <Row label="Upcoming bills" value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => b.name).join(', ') || 'Nothing before payday'} />
+      <Row label={sts.fixedPayday ? 'Bills before payday' : 'Bills in these days'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => `${b.name} ${rupees(b.amount)} · ${fmtDate(b.date)}`).join(', ') || 'Nothing due'} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
         <Row
@@ -288,11 +293,17 @@ export function SafeBreakdown() {
       )}
       {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={sts.cardItems.map((c) => `${c.name} ${rupees(c.balance)}`).join(' · ') || 'Nothing owed'} />}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
-      <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub="A cushion for surprises. Change it in You → Budget preferences." />
+      <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub={bufferNote(state)} />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
+      {sts.afterItems.length > 0 && (
+        <p className="mb-2 rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">
+          <b className="font-semibold text-ink">Not counted yet:</b> {sts.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')}. {sts.fixedPayday ? `${sts.afterItems.length === 1 ? 'It’s' : 'They’re'} due after payday, so ${sts.afterItems.length === 1 ? 'it comes' : 'they come'} from that pay.` : `${sts.afterItems.length === 1 ? 'It’s' : 'They’re'} due after these ${sts.daysLeft} days.`}
+        </p>
+      )}
       <p className="text-[13.5px] text-ink3">
         That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
       </p>
+      <p className="mt-2 text-[13px] text-ink3">PULSE never connects to your bank, so this only knows what you've added. A bill or spend that's missing makes this number too high.</p>
     </div>
   );
 }

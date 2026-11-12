@@ -13,7 +13,7 @@ import { Icon } from './ui/Icon';
 import { HScroll } from './ui/HScroll';
 import { PeoplePicker } from './People';
 import { SwipeToConfirm } from './ui/SwipeToConfirm';
-import { CategoryMark, MoneyInput, PersonAvatar, Segmented } from './ui/bits';
+import { CategoryMark, MoneyInput, PersonAvatar, Segmented, AmountInput } from './ui/bits';
 
 export interface ComposerPreset {
   amount?: number;
@@ -543,7 +543,7 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
                       <label htmlFor={`split-${i}`} className="sr-only">
                         {name} {mode === 'exact' ? 'amount' : mode === 'percent' ? 'percent' : 'shares'}
                       </label>
-                      <input id={`split-${i}`} inputMode="decimal" className="field num w-[84px] py-1.5 text-right" placeholder={mode === 'percent' ? '%' : mode === 'shares' ? '1' : sym().trim()} value={values[id] ?? ''} onChange={(e) => setValues({ ...values, [id]: e.target.value.replace(/[^\d.]/g, '') })} />
+                      <AmountInput id={`split-${i}`} inputMode="decimal" className="field num w-[84px] py-1.5 text-right" placeholder={mode === 'percent' ? '%' : mode === 'shares' ? '1' : sym().trim()} value={values[id] ?? ''} onChange={(e) => setValues({ ...values, [id]: e.target.value.replace(/[^\d.]/g, '') })} />
                     </>
                   )}
                   <span className="num w-[72px] text-right text-[14.5px] font-semibold">{rupees(shares[i]?.amount ?? 0)}</span>

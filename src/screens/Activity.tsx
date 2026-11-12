@@ -26,6 +26,7 @@ const RANGES: { key: ActivityFilter['range']; label: string }[] = [
   { key: 'last-month', label: 'Last month' },
   { key: '7d', label: 'Last 7 days' },
   { key: '30d', label: 'Last 30 days' },
+  { key: 'custom', label: 'Pick dates…' },
 ];
 
 export function ActivityScreen() {
@@ -42,6 +43,8 @@ export function ActivityScreen() {
     if (f.range === 'last-month') [start, end] = monthRange(prevMonth(state.today));
     if (f.range === '7d') [start, end] = [addDays(state.today, -6), state.today];
     if (f.range === '30d') [start, end] = [addDays(state.today, -29), state.today];
+    // Your own dates (either end may be open; picked the wrong way round, they're swapped).
+    if (f.range === 'custom') [start, end] = [f.from || '0000-00-00', f.to || '9999-99-99'].sort() as [string, string];
     return state.transactions.filter((t) => {
       if (t.date < start || t.date > end) return false;
       if (f.account !== 'all' && t.account !== f.account) return false;
@@ -84,7 +87,7 @@ export function ActivityScreen() {
         <div className="mt-3 grid animate-rise grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-ink3">
             Date
-            <select className="field py-2.5" value={f.range} onChange={(e) => set({ range: e.target.value as ActivityFilter['range'] })}>
+            <select className="field py-2.5" value={f.range} onChange={(e) => set({ range: e.target.value as ActivityFilter['range'], ...(e.target.value === 'custom' && !f.from && !f.to ? { from: addDays(state.today, -29), to: state.today } : {}) })}>
               {RANGES.map((r) => (
                 <option key={r.key} value={r.key}>
                   {r.label}
@@ -108,6 +111,18 @@ export function ActivityScreen() {
               ))}
             </select>
           </label>
+          {f.range === 'custom' && (
+            <>
+              <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-ink3">
+                From
+                <input type="date" className="field py-2" value={f.from ?? ''} max={f.to || state.today} onChange={(e) => set({ from: e.target.value })} />
+              </label>
+              <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-ink3">
+                To
+                <input type="date" className="field py-2" value={f.to ?? ''} min={f.from || undefined} onChange={(e) => set({ to: e.target.value })} />
+              </label>
+            </>
+          )}
         </div>
       )}
 

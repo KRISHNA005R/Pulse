@@ -5,7 +5,7 @@ import { useUI } from '../store/ui';
 import { defaultAccount, insuranceTotals, PREMIUM_LABEL, PREMIUM_MONTHS, premiumSetAside, safeToSpend } from '../lib/finance';
 import { roundMoney, sym } from '../lib/currency';
 import { addMonths, daysBetween, fmtDate, relDay, rupees, rupeesShort } from '../lib/format';
-import { EmptyState, Field, ProgressBar, SectionHeader, TopNavigation, CategoryMark } from '../components/ui/bits';
+import { EmptyState, Field, ProgressBar, SectionHeader, TopNavigation, CategoryMark, AmountInput } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
 
 export const INSURANCE_KINDS: { id: InsuranceKind; label: string; emoji: string; hint: string }[] = [
@@ -239,7 +239,7 @@ export function InsuranceForm({ insuranceId, onDone }: { insuranceId?: string; o
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Premium" htmlFor="ins-amt">
-          <input id="ins-amt" inputMode="decimal" className="field num" value={premium} onChange={(e) => setPremium(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
+          <AmountInput id="ins-amt" inputMode="decimal" className="field num" value={premium} onChange={(e) => setPremium(e.target.value.replace(/[^\d.]/g, ''))} placeholder={sym().trim()} />
         </Field>
         <Field label="Paid" htmlFor="ins-cycle">
           <select id="ins-cycle" className="field px-2.5" value={cycle} onChange={(e) => setCycle(e.target.value as PremiumCycle)}>
@@ -274,7 +274,7 @@ export function InsuranceForm({ insuranceId, onDone }: { insuranceId?: string; o
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Cover (optional)" htmlFor="ins-cover">
-          <input id="ins-cover" inputMode="decimal" className="field num" value={cover} onChange={(e) => setCover(e.target.value.replace(/[^\d.]/g, ''))} placeholder="500000" />
+          <AmountInput id="ins-cover" inputMode="decimal" className="field num" value={cover} onChange={(e) => setCover(e.target.value.replace(/[^\d.]/g, ''))} placeholder="500000" />
         </Field>
         <Field label="Who's covered (optional)" htmlFor="ins-who">
           <input id="ins-who" className="field" value={covers} onChange={(e) => setCovers(e.target.value)} placeholder="Me, parents…" maxLength={30} />

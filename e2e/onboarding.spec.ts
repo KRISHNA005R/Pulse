@@ -55,7 +55,8 @@ test('"you can skip anything" is true: every question can be skipped, and the ap
   await page.goto('/');
   await page.getByRole('button', { name: 'Get started' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  for (let i = 0; i < 5; i++) {
+  // Name, pay, money, bills ("What are you here for?" is gone: priorities at the end asks it once).
+  for (let i = 0; i < 4; i++) {
     const skip = page.getByRole('button', { name: 'Skip for now' });
     await expect(skip).toBeEnabled();
     await skip.click();

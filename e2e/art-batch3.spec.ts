@@ -21,7 +21,7 @@ test('setup finished: "You\'re set" stays without a picture', async ({ page }) =
   await page.goto('/');
   await page.getByRole('button', { name: 'Get started' }).click();
   await page.getByRole('button', { name: 'Continue' }).click();
-  for (let i = 0; i < 5; i++) await page.getByRole('button', { name: 'Skip for now' }).click();
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Skip for now' }).click();
   await page.getByRole('button', { name: 'Build my dashboard' }).click();
   await expect(page.getByText(/You.re set/)).toBeVisible({ timeout: 15000 });
   await expect(page.getByTestId('done-art')).toHaveCount(0);

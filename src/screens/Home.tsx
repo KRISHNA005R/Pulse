@@ -28,6 +28,8 @@ export function HomeScreen() {
     const soon = addDays(state.today, 3);
     return all.filter((u) => u.date <= soon || u.kind === 'income' || u.kind === 'investment' || u.kind === 'insurance' || u.amount >= scaled(5000)).slice(0, 5);
   }, [state]);
+  // Bills already saved but not due soon: say when the next one is, instead of asking to add them.
+  const laterBill = useMemo(() => [...state.subscriptions].filter((x) => x.status === 'active' || x.status === 'unknown').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0], [state.subscriptions]);
   const plans = state.plans.filter((p) => p.status === 'active' && !p.gullak).slice(0, 3);
   const recent = useMemo(() => [...state.transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4), [state.transactions]);
   // A different suggestion every day; urgent ones (over budget, a bill due today or tomorrow) first.
@@ -62,7 +64,21 @@ export function HomeScreen() {
               </button>
             </li>
           ))}
-          {next.length === 0 && !owe && (
+          {next.length === 0 && !owe && laterBill && (
+            <li>
+              <button type="button" className="row-btn" onClick={() => ui.push({ name: 'subscriptions' }, 'you')}>
+                <CategoryMark state={state} category={laterBill.kind === 'subscription' ? 'subscriptions' : 'bills'} size={40} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold">Nothing due in the next 10 days</span>
+                  <span className="block truncate text-[13px] text-ink3">
+                    Next: {laterBill.name} on {fmtDate(laterBill.nextDate)}
+                  </span>
+                </span>
+                <span className="num text-[15.5px] font-semibold">{rupees(laterBill.amount)}</span>
+              </button>
+            </li>
+          )}
+          {next.length === 0 && !owe && !laterBill && (
             <li>
               <button type="button" className="row-btn" onClick={() => ui.openSheet({ type: 'sub-form' })}>
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[14px] border border-dashed border-line text-ink3" aria-hidden="true">

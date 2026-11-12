@@ -31,6 +31,8 @@ export interface AffordResult {
  */
 export function canIAfford(s: State, amount: number, what = ''): AffordResult {
   const sts = safeToSpend(s);
+  // With no fixed payday PULSE plans 30 days ahead: say that, not "until payday".
+  const until = sts.fixedPayday ? 'until payday' : `for the next ${sts.daysLeft} days`;
   const category = guessCategory(what, undefined, 'expense');
   const label = what.trim();
   const safeAfter = Math.max(0, sts.safe - amount);
@@ -69,7 +71,7 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
   if (amount <= sts.safe && pctOfSafe <= 0.35) {
     verdict = 'comfortable';
     headline = 'Yes, comfortably.';
-    explanation = `You'd still have ${rupees(safeAfter)} free until payday, about ${rupees(dailyAfter)} a day.`;
+    explanation = `You'd still have ${rupees(safeAfter)} free ${until}, about ${rupees(dailyAfter)} a day.`;
   } else if (amount <= sts.safe) {
     verdict = 'yes';
     headline = 'Yes.';
@@ -77,7 +79,7 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
   } else if (fromBuffer === 0 && shortBy === 0) {
     verdict = 'affects-plans';
     headline = 'Yes, but it affects your plans.';
-    explanation = `This purchase is possible, but it uses all of your free money until payday and ${rupees(fromPlans)} you'd planned to save this cycle.`;
+    explanation = `This purchase is possible, but it uses all of your free money ${until} and ${rupees(fromPlans)} you'd planned to save this cycle.`;
   } else if (shortBy === 0) {
     verdict = 'buffer';
     headline = 'Possible, but it uses your safety buffer.';

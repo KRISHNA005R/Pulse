@@ -374,7 +374,8 @@ export interface FreshInput {
   /** Currency to track in; defaults to rupees. */
   currency?: import('../lib/currency').CurrencyCode;
   /** Monthly bills and subscriptions picked during setup: amount and day of the month. */
-  bills?: { name: string; amount: number; day: number; kind: 'bill' | 'subscription'; category: string }[];
+  /** auto: paid by auto-debit (recorded by PULSE on the date). Not said: subscriptions yes, bills no. */
+  bills?: { name: string; amount: number; day: number; kind: 'bill' | 'subscription'; category: string; auto?: boolean }[];
   /** "Finish setup" items already answered with "I don't have this". */
   skipped?: string[];
 }
@@ -469,7 +470,7 @@ export function createFresh(input: FreshInput): State {
     plans,
     subscriptions: (input.bills ?? [])
       .filter((b) => b.amount > 0 && b.name.trim())
-      .map((b, i): Subscription => ({ id: `sub-setup-${i + 1}`, name: b.name.trim(), amount: Math.round(b.amount), cycle: 'monthly', nextDate: nextOnDay(today, b.day), category: b.category, status: 'active', kind: b.kind, account: 'main' })),
+      .map((b, i): Subscription => ({ id: `sub-setup-${i + 1}`, name: b.name.trim(), amount: Math.round(b.amount), cycle: 'monthly', nextDate: nextOnDay(today, b.day), category: b.category, status: 'active', kind: b.kind, account: 'main', autoDebit: b.auto ?? b.kind === 'subscription' })),
     investments,
     incomes,
     people: [],
