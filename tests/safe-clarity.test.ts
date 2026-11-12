@@ -47,7 +47,7 @@ describe('the tester’s numbers', () => {
   });
 
   it('the ₹1,800 is explained: about 3% of monthly income, and where to change it', () => {
-    expect(bufferNote(tester())).toMatch(/3% of your monthly income/);
+    expect(bufferNote(tester())).toMatch(/3% of your income/);
     const custom = tester();
     custom.settings.buffer = 5000;
     expect(bufferNote(custom)).not.toMatch(/3%/);

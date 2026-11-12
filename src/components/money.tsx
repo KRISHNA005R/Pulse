@@ -279,9 +279,9 @@ export function SafeBreakdown() {
   return (
     <div>
       <p className="mb-2 text-[14.5px] text-ink2">
-        {sts.fixedPayday ? `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.` : `What's actually free for the next ${sts.daysLeft} days (until ${fmtDate(sts.payday)}), after everything already spoken for. With no fixed payday, PULSE plans 30 days ahead and counts freelance money only once it lands.`}
+        {sts.fixedPayday ? `What's actually free until payday on ${fmtDate(sts.payday)}, after everything already spoken for.` : `What's free for the next ${sts.daysLeft} days. No fixed payday, so PULSE plans 30 days ahead.`}
       </p>
-      <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join()} />
+      <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join(', ')} />
       <Row label={sts.fixedPayday ? 'Bills before payday' : 'Bills in these days'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => `${b.name} ${rupees(b.amount)} · ${fmtDate(b.date)}`).join(', ') || 'Nothing due'} />
       <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
@@ -297,13 +297,13 @@ export function SafeBreakdown() {
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       {sts.afterItems.length > 0 && (
         <p className="mb-2 rounded-2xl bg-sunk px-3.5 py-2.5 text-[13.5px] text-ink2">
-          <b className="font-semibold text-ink">Not counted yet:</b> {sts.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')}. {sts.fixedPayday ? `${sts.afterItems.length === 1 ? 'It’s' : 'They’re'} due after payday, so ${sts.afterItems.length === 1 ? 'it comes' : 'they come'} from that pay.` : `${sts.afterItems.length === 1 ? 'It’s' : 'They’re'} due after these ${sts.daysLeft} days.`}
+          {sts.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')} {sts.fixedPayday ? 'comes from your next pay.' : `is due after these ${sts.daysLeft} days.`}
         </p>
       )}
       <p className="text-[13.5px] text-ink3">
         That's {rupees(sts.daily)} a day for {sts.daysLeft} days. Card spending counts straight away, because that money is already spent.
       </p>
-      <p className="mt-2 text-[13px] text-ink3">PULSE never connects to your bank, so this only knows what you've added. A bill or spend that's missing makes this number too high.</p>
+      <p className="mt-2 text-[13px] text-ink3">Only counts what you've added. A missing bill makes this too high.</p>
     </div>
   );
 }

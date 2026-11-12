@@ -397,7 +397,7 @@ export function safeToSpend(s: State): SafeToSpend {
 export function bufferNote(s: State): string {
   const income = mainIncome(s)?.expected ?? s.incomes.reduce((a, i) => a + (i.expected ?? 0), 0);
   const auto = income > 0 && Math.abs(s.settings.buffer - Math.min(3000, Math.max(500, Math.round((income * 0.03) / 100) * 100))) < 1;
-  return `${auto ? 'About 3% of your monthly income, ' : 'A cushion '}kept for surprises like a cab home or a pharmacy run. Change it in You → Budget preferences.`;
+  return `${auto ? 'About 3% of your income, for surprises.' : 'A cushion for surprises.'} Change it in You → Budget preferences.`;
 }
 
 // ------------------------------------------------------------------

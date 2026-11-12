@@ -641,10 +641,10 @@ export function Onboarding() {
               <dl className="mt-4 border-t border-line pt-3 text-[14px]">
                 {[
                   ['In your accounts', rupees(preview.available)],
-                  ...(preview.bills > 0 ? [[`${preview.billItems.map((b) => b.name).join(', ')} (before ${fmtDate(preview.payday)})`, `−${rupees(preview.bills)}`]] : []),
+                  ...(preview.bills > 0 ? [[preview.billItems.map((b) => b.name).join(', '), `−${rupees(preview.bills)}`]] : []),
                   ...(preview.invest > 0 ? [['SIPs before payday', `−${rupees(preview.invest)}`]] : []),
                   ...(preview.goals > 0 ? [['Plans', `−${rupees(preview.goals)}`]] : []),
-                  ['Safety buffer', `−${rupees(preview.buffer)}`],
+                  [/^About 3%/.test(bufferNote(fresh)) ? 'Safety buffer (3%)' : 'Safety buffer', `−${rupees(preview.buffer)}`],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-baseline justify-between gap-3 py-1">
                     <dt className="text-ink2">{k}</dt>
@@ -653,15 +653,9 @@ export function Onboarding() {
                 ))}
               </dl>
               <p className="mt-2 text-[14px] text-ink2">
-                That's {rupees(preview.daily)} a day for {preview.daysLeft} {preview.daysLeft === 1 ? 'day' : 'days'}
-                {preview.fixedPayday ? `, until payday on ${fmtDate(preview.payday)}.` : ' (no fixed payday, so PULSE plans 30 days ahead).'}
+                {rupees(preview.daily)} a day {preview.fixedPayday ? `until payday, ${fmtDate(preview.payday)}` : `for the next ${preview.daysLeft} days`}.
               </p>
-              <p className="mt-2 text-[12.5px] text-ink3">Safety buffer: {bufferNote(fresh).replace(/^About/, 'about').replace(/^A cushion/, 'a cushion')}</p>
-              {preview.afterItems.length > 0 && (
-                <p className="mt-2 text-[12.5px] text-ink3">
-                  Not counted yet: {preview.afterItems.map((b) => `${b.name} ${rupees(b.amount)} on ${fmtDate(b.date)}`).join(', ')}. {preview.fixedPayday ? 'Due after payday, so it comes from that pay.' : `Due after these ${preview.daysLeft} days.`}
-                </p>
-              )}
+              {preview.afterItems.length > 0 && <p className="mt-1.5 text-[12.5px] text-ink3">{preview.afterItems.map((b) => `${b.name} on ${fmtDate(b.date)}`).join(', ')} comes from your next pay.</p>}
               {!noBills && !fresh.subscriptions.some((x) => x.kind === 'bill') && (
                 <p className="mt-3 rounded-2xl bg-sunk p-3 text-[13.5px] text-ink2">
                   No rent or bills added yet. If you pay some, this number is too high.{' '}
@@ -673,7 +667,7 @@ export function Onboarding() {
             </div>
             <ul className="mb-6 mt-4 flex flex-col gap-2.5">
               {[
-                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.map((x) => x.name).join(', ')} saved. Each is kept aside whenever it falls before payday.` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
+                ['receipt', fresh.subscriptions.length ? `${fresh.subscriptions.map((x) => x.name).join(', ')} saved` : 'Add rent, phone and subscriptions so they’re set aside before payday'],
                 ['target', fresh.plans.length ? 'An emergency fund plan is ready to top up' : 'Create a plan for something you’re saving for'],
                 ...(fresh.investments.length ? [['trend', `Your ${rupees(fresh.investments[0].amount)} SIP is deducted on the ${ordinal(Number(fresh.investments[0].nextDate.slice(8)))} of every month`]] : []),
                 ['users', 'Split costs with friends from the + button'],

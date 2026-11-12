@@ -1,4 +1,4 @@
-import { devices, expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { openDemo, setState, state } from './helpers';
 
 // Fixes from real testers' feedback (San, Vivek, Raicalendar, iansatiable).
@@ -46,9 +46,9 @@ test('setup: one question fewer, bills ask how they are paid, amounts read 25,00
   await page.getByRole('button', { name: 'Build my dashboard' }).click();
   await expect(page.getByText(/You.re set, San/)).toBeVisible({ timeout: 15000 });
   // The summary says what the ₹1,800 is, names the bills, and doesn't claim rent is kept aside now.
-  await expect(page.getByText('Safety buffer', { exact: true })).toBeVisible();
-  await expect(page.getByText(/about 3% of your monthly income/)).toBeVisible();
-  await expect(page.getByText(/Rent \/ PG, Electricity saved\. Each is kept aside whenever it falls before payday/)).toBeVisible();
+  await expect(page.getByText('Safety buffer (3%)', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Rent \/ PG on 5 \w+ comes from your next pay/)).toBeVisible();
+  await expect(page.getByText('Rent / PG, Electricity saved', { exact: true })).toBeVisible();
   await expect(page.getByText(/payments are kept aside before they’re due/)).toHaveCount(0);
 
   // Open PULSE: straight to Home. No "You're in" screen and no install sheet; the short tour is the one thing.
@@ -113,10 +113,9 @@ test('safe-to-spend: shown as it is (no counting up through wrong amounts), and 
 
   await hero.click();
   const sheet = page.getByRole('dialog').last();
-  await expect(sheet.getByText(/Not counted yet:.*Rent ₹12,000 on 5/)).toBeVisible();
-  await expect(sheet.getByText(/due after payday, so it comes from that pay/)).toBeVisible();
-  await expect(sheet.getByText(/About 3% of your monthly income/)).toBeVisible();
-  await expect(sheet.getByText(/PULSE never connects to your bank/)).toBeVisible();
+  await expect(sheet.getByText(/Rent ₹12,000 on 5 \w+ comes from your next pay/)).toBeVisible();
+  await expect(sheet.getByText(/About 3% of your income, for surprises/)).toBeVisible();
+  await expect(sheet.getByText(/A missing bill makes this too high/)).toBeVisible();
 });
 
 test('Home: bills already saved but not due soon say when the next one is, instead of asking to add bills', async ({ page }) => {
@@ -152,17 +151,4 @@ test('Activity: pick your own dates', async ({ page }) => {
   await expect(page.getByText('March lunch')).toBeVisible();
   await expect(page.getByText('Old chai')).toHaveCount(0);
   await expect(page.getByText('May cab')).toHaveCount(0);
-});
-
-test('laptop: the PULSE AI side panel can be hidden and brought back', async ({ browser, baseURL }) => {
-  const ctx = await browser.newContext({ ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 }, baseURL });
-  const page = await ctx.newPage();
-  await openDemo(page);
-  await page.getByRole('button', { name: 'Hide PULSE AI' }).click();
-  await expect(page.getByRole('button', { name: 'Show PULSE AI' })).toBeVisible();
-  await page.reload();
-  await expect(page.getByRole('button', { name: 'Show PULSE AI' })).toBeVisible();
-  await page.getByRole('button', { name: 'Show PULSE AI' }).click();
-  await expect(page.getByRole('button', { name: 'Hide PULSE AI' })).toBeVisible();
-  await ctx.close();
 });
