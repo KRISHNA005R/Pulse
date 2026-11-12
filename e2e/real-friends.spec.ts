@@ -57,5 +57,5 @@ test('groups: no "add someone by name" box; people join with the group link', as
   await page.getByRole('button', { name: /New group|Create a group|group/i }).first().click();
   const form = page.getByRole('dialog').last();
   await expect(form.getByPlaceholder(/add a friend|by name/i)).toHaveCount(0);
-  await expect(form.getByText(/Pick friends on PULSE now/)).toBeVisible();
+  await expect(form.getByText(/Pick friends now, or share the group link/)).toBeVisible();
 });
