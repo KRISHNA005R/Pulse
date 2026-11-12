@@ -65,6 +65,11 @@ export default defineConfig(({ mode }) => {
                 theme_color: '#F6F5F2',
                 categories: ['finance', 'productivity', 'lifestyle'],
                 prefer_related_applications: false,
+                // Invite links (friend, group, bhisi) open in the installed app when there is one,
+                // reusing its window; otherwise in the browser. (Android opens links in its scope in
+                // the installed app; desktop Chrome and Edge read these two. iPhone can't.)
+                handle_links: 'preferred',
+                launch_handler: { client_mode: ['navigate-existing', 'auto'] },
                 icons: [
                   { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
                   { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
