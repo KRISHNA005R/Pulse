@@ -152,3 +152,11 @@ test('Activity: pick your own dates', async ({ page }) => {
   await expect(page.getByText('Old chai')).toHaveCount(0);
   await expect(page.getByText('May cab')).toHaveCount(0);
 });
+
+test('safe-to-spend breakdown: each line is one short list of names, no amounts and dates', async ({ page }) => {
+  await openDemo(page);
+  await page.locator('[data-tour="safe"] .hero-amt').first().click();
+  const sheet = page.getByRole('dialog').last();
+  await expect(sheet.getByText(/^[^,]+, [^,]+ \+\d+ more$/).first()).toBeVisible();
+  await expect(sheet.getByText(/₹[\d,]+ · \d+ \w{3}/)).toHaveCount(0);
+});

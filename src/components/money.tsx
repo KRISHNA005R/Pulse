@@ -264,6 +264,9 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   );
 }
 
+/** One short line: up to two names, then “+N more”. */
+const brief = (names: string[]): string => (names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2} more` : names.join(', '));
+
 export function SafeBreakdown() {
   const { state } = useStore();
   const sts = safeToSpend(state);
@@ -282,17 +285,17 @@ export function SafeBreakdown() {
         {sts.fixedPayday ? `Free until payday, ${fmtDate(sts.payday)}.` : `No fixed payday, so planned for ${sts.daysLeft} days.`}
       </p>
       <Row label="Available now" value={rupees(sts.available)} sub={state.accounts.filter((a) => a.spendable).map((a) => a.name).join(', ')} />
-      <Row label={sts.fixedPayday ? 'Bills before payday' : 'Bills in these days'} value={`−${rupees(sts.bills)}`} sub={sts.billItems.map((b) => `${b.name} ${rupees(b.amount)} · ${fmtDate(b.date)}`).join(', ') || 'Nothing due'} />
-      <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? sts.investItems.map((b) => b.name.replace('SIP · ', '')).join(', ') : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `None before payday. Next is ${n.name} on ${fmtDate(n.nextDate)}.` : 'No SIPs set up'; })()} />
+      <Row label={sts.fixedPayday ? 'Bills before payday' : 'Bills in these days'} value={`−${rupees(sts.bills)}`} sub={brief(sts.billItems.map((b) => b.name)) || 'Nothing due'} />
+      <Row label="Investments" value={`−${rupees(sts.invest)}`} sub={sts.investItems.length ? brief(sts.investItems.map((b) => b.name.replace('SIP · ', ''))) : (() => { const n = (state.investments ?? []).filter((i) => i.status === 'active').sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0]; return n ? `Next: ${n.name}, ${fmtDate(n.nextDate)}` : 'No SIPs set up'; })()} />
       {INSURANCE_ON && (state.insurance ?? []).length > 0 && (
         <Row
           label="Insurance kept aside"
           value={`−${rupees(sts.setAside)}`}
-          sub={sts.setAsideItems.length ? sts.setAsideItems.map((x) => `${x.policy.name} ${rupees(x.amount)}`).join(' · ') : 'Premiums due before payday are in bills above'}
+          sub={sts.setAsideItems.length ? brief(sts.setAsideItems.map((x) => x.policy.name)) : 'In bills above'}
         />
       )}
-      {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={sts.cardItems.map((c) => `${c.name} ${rupees(c.balance)}`).join(' · ') || 'Nothing owed'} />}
-      <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={sts.goalItems.map((g) => `${g.plan.name} ${rupees(g.amount)}`).join(' · ') || 'Nothing planned this cycle'} />
+      {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={brief(sts.cardItems.map((c) => c.name)) || 'Nothing owed'} />}
+      <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={brief(sts.goalItems.map((g) => g.plan.name)) || 'Nothing this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub={bufferNote(state)} />
       <Row label="Safe to spend" value={rupees(sts.safe)} strong />
       <p className="text-[13.5px] text-ink3">
