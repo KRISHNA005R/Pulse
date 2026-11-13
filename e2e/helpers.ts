@@ -26,6 +26,8 @@ export async function openDemo(p: Page, name = 'Krishna') {
   p.on('pageerror', (e) => errors.push(e.message));
   await p.goto('/?demo=1'); // opens the demo straight away (there's no demo button on the welcome screen)
   await p.waitForTimeout(1500);
+  // These tests use the demo month as the person's own data on purpose (lib/demoMix: demoAsMine).
+  await p.evaluate(() => localStorage.setItem('pulse-e2e-demo-as-mine', '1'));
   await setState(p, "s.mode = 'personal'; s.user.name = a; s.user.fullName = a; s.user.handle = '@' + a.toLowerCase(); s.bhisis = []; s.settings.newStuffSeen = true; s.settings.soundsAsked = true;", name);
   return errors;
 }

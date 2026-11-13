@@ -32,7 +32,7 @@ import { streak } from '../lib/streak';
 import { markDemo, startStats, track } from '../lib/stats';
 import { loadBase, loadSync, merge3, newSyncCode, normalizeCode, pull, push, removeRemote, sameData, saveBase, saveSync, SyncUnavailable } from '../lib/sync';
 import { suggestEmoji } from '../lib/lexicon';
-import { cleanDemoMix } from '../lib/demoMix';
+import { cleanDemoMix, isDemoUser, looksMixed, stripDemo } from '../lib/demoMix';
 import { loadSession } from '../lib/auth';
 import { acceptKnock, tidyPeople, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
@@ -94,6 +94,8 @@ const KEY = 'pulse-state-v1';
 const STASH = 'pulse-personal-stash-v1';
 /** A copy of saved data that couldn't be opened on launch (see load()). */
 const UNREADABLE = 'pulse-state-unreadable-v1';
+const STASH_BASE = 'pulse-personal-stash-base-v1';
+const SYNC_BASE = 'pulse-sync-base-v1';
 
 function readStash(): State | null {
   try {
@@ -107,8 +109,26 @@ function readStash(): State | null {
 }
 function writeStash(s: State | null) {
   try {
-    if (s) localStorage.setItem(STASH, JSON.stringify(s));
-    else localStorage.removeItem(STASH);
+    if (s) {
+      localStorage.setItem(STASH, JSON.stringify(s));
+      // The sync base that goes with it: back from the demo, the parked data merges against the
+      // version it last agreed with the account, so nothing synced meanwhile looks deleted.
+      const base = localStorage.getItem(SYNC_BASE);
+      if (base) localStorage.setItem(STASH_BASE, base);
+      else localStorage.removeItem(STASH_BASE);
+    } else {
+      localStorage.removeItem(STASH);
+      localStorage.removeItem(STASH_BASE);
+    }
+  } catch {
+    /* storage unavailable */
+  }
+}
+/** Back from the demo: put back the sync base that goes with the parked data. */
+function restoreStashBase() {
+  try {
+    const base = localStorage.getItem(STASH_BASE);
+    if (base) localStorage.setItem(SYNC_BASE, base);
   } catch {
     /* storage unavailable */
   }
@@ -347,13 +367,13 @@ let demoMixFixed: null | { restored: boolean } = null;
 export function refresh(input: State): State {
   let s = structuredClone(input);
   s.mode = s.mode ?? 'demo';
-  // Repair: the demo got mixed into this person's own data by an earlier bug. Take it out, and bring
-  // back what it dropped from the copy this phone parked when they opened the demo.
+  // Repair: the demo got into this person's own data. Take it out, and bring back anything it
+  // dropped from the other copies on this phone (parked when they opened the demo; last synced).
   const parked = readStash();
-  const fixed = cleanDemoMix(s, parked, loadSession()?.account.name);
+  const fixed = cleanDemoMix(s, [parked, loadBase()], loadSession()?.account.name);
   if (fixed) {
     s = fixed;
-    demoMixFixed = { restored: !!parked && fixed.user.name === parked.user.name };
+    demoMixFixed = { restored: !!parked && parked.mode === 'personal' };
   }
   // Older saves: add anything newer versions expect.
   s.investments = s.investments ?? [];
@@ -480,6 +500,27 @@ function useStoreImpl() {
       toast({ text: 'Fixed: demo data removed. Your entries are back.', tone: 'good', emoji: '✅' });
     } else toast({ text: 'Fixed: demo data removed from your money.', tone: 'heads-up' });
   }, [state, toast]);
+
+  // PULSE open in two tabs or windows (say the app and a browser tab): they share one saved copy.
+  // When the other one saves (opens the demo, comes back, syncs), this one follows it, so an old
+  // copy in memory never writes over newer data or ends up mixed with the demo.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === STASH || e.key === null) setHasStash(readStash() !== null);
+      if ((e.key !== KEY && e.key !== null) || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (!isState(parsed) || sameData(parsed, ref.current)) return;
+        const next = refresh(parsed);
+        ref.current = next;
+        setState(next);
+      } catch {
+        /* not readable: keep what's here */
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // A save the phone refused would otherwise be lost silently at the next reload. Say so once, until saving works again.
   const saveFailed = useRef(false);
@@ -1517,6 +1558,11 @@ function useStoreImpl() {
     [toast],
   );
   const startDemo = useCallback(() => {
+    // Someone's own data is never replaced by the demo: it is parked, as with Explore demo.
+    if (ref.current.mode === 'personal') {
+      writeStash(ref.current);
+      setHasStash(true);
+    }
     const demo = createSeed();
     demo.onboarding.done = true;
     ref.current = demo;
@@ -1541,6 +1587,7 @@ function useStoreImpl() {
   const backToMine = useCallback(() => {
     const mine = readStash();
     if (!mine) return;
+    restoreStashBase();
     const next = refresh(mine);
     writeStash(null);
     setHasStash(false);
@@ -1583,12 +1630,47 @@ function useStoreImpl() {
   }, []);
   const closeOnboarding = useCallback(() => commit((s) => void (s.onboarding.done = true)), [commit]);
   const resetDemo = useCallback(() => {
+    if (ref.current.mode === 'personal') return; // only ever resets the demo
     const fresh = createSeed();
     fresh.onboarding.done = true;
     ref.current = fresh;
     setState(fresh);
     toast({ text: 'Demo data restored.' });
   }, [toast]);
+
+  // ---------- earlier copies ----------
+  /** Other copies of the person's data on this phone: parked for the demo, and the last synced one. */
+  const localCopies = useCallback((): { label: string; state: State }[] => {
+    const out: { label: string; state: State }[] = [];
+    const parked = readStash();
+    if (parked?.mode === 'personal') out.push({ label: 'Parked when the demo was opened', state: parked });
+    const base = loadBase();
+    if (base?.mode === 'personal') out.push({ label: 'Last synced on this phone', state: base });
+    return out;
+  }, []);
+  /**
+   * Bring back an earlier copy: everything in it is added back, minus any demo, and nothing that's
+   * here now is removed. Returns how many entries came back.
+   */
+  const bringBack = useCallback(
+    (copy: State): number => {
+      const mine = ref.current.mode === 'personal' ? ref.current : readStash();
+      if (!mine) return 0;
+      const theirs = stripDemo({ ...copy, mode: 'personal' });
+      const clean = looksMixed(mine) ? stripDemo(mine) : mine;
+      const merged = merge3(null, clean, theirs, true);
+      if (isDemoUser(merged.user) && !isDemoUser(theirs.user)) merged.user = structuredClone(theirs.user);
+      const back = merged.transactions.length - clean.transactions.length;
+      const next = refresh(merged);
+      if (ref.current.mode !== 'personal') writeStash(next);
+      else {
+        ref.current = next;
+        setState(next);
+      }
+      return back;
+    },
+    [],
+  );
 
   // ---------- backup ----------
   const exportBackup = useCallback(() => JSON.stringify({ app: 'pulse', version: 1, savedAt: new Date().toISOString(), state: ref.current }), []);
@@ -1909,9 +1991,19 @@ function useStoreImpl() {
     setSync((x) => ({ ...x, status: 'syncing' }));
     try {
       for (let round = 0; round < 5; round++) {
-        const local = ref.current;
+        let local = ref.current;
         if (local.mode !== 'personal') break;
-        const base = loadBase();
+        let base = loadBase();
+        // The wall: the demo never goes up to the account. If it got into this data somehow, it comes
+        // out first, and this round merges without deleting anything (the copies only add).
+        if (looksMixed(local)) {
+          const fixed = cleanDemoMix(local, [readStash(), base], loadSession()?.account.name)!;
+          demoMixFixed = { restored: false };
+          ref.current = fixed;
+          setState(fixed);
+          local = fixed;
+          base = null;
+        }
         if (!sameData(local, base)) {
           // This device has changes: try to save them on top of the version it last saw.
           const res = await push(cfg.code, local, cfg.rev);
@@ -1925,9 +2017,13 @@ function useStoreImpl() {
             cfg.rev = 0; // the online copy was removed; start it again from this device
             continue;
           }
-          const merged = merge3(base, local, res.state, true);
+          // The account's copy has the demo in it (from another device): never take its deletions,
+          // only add what's in it, without the demo. This device's own data heals the account.
+          const bad = looksMixed(res.state);
+          const theirs = bad ? stripDemo(res.state) : res.state;
+          const merged = merge3(bad ? null : base, local, theirs, true);
           if (!applyMerged(local, merged)) break;
-          saveBase(res.state);
+          saveBase(theirs);
           cfg.rev = res.rev;
           continue; // push the merged result
         }
@@ -1939,12 +2035,15 @@ function useStoreImpl() {
           saveBase({ ...local, transactions: [] }); // forces a fresh upload next round
           continue;
         }
-        if (remote.rev === cfg.rev) break;
-        const merged = merge3(base, local, remote.state, false);
+        if (remote.rev === cfg.rev && !looksMixed(remote.state)) break;
+        const bad = looksMixed(remote.state);
+        const theirs = bad ? stripDemo(remote.state) : remote.state;
+        const merged = merge3(bad ? null : base, local, theirs, false);
         if (!applyMerged(local, merged)) break;
-        saveBase(remote.state);
+        // A copy with the demo in it is never the base: the next round uploads the clean one.
+        saveBase(bad ? remote.state : theirs);
         cfg.rev = remote.rev;
-        if (sameData(merged, remote.state)) break;
+        if (!bad && sameData(merged, remote.state)) break;
       }
       cfg.lastSync = new Date().toISOString();
       saveSync(cfg);
@@ -2165,6 +2264,8 @@ function useStoreImpl() {
     importBackup,
     personalState,
     restoreState,
+    localCopies,
+    bringBack,
     confirmPayday,
     skipPayday,
     checkIn,

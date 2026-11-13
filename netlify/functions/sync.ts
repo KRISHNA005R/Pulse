@@ -4,6 +4,11 @@
 //   GET    /api/sync?id=<64 hex>                        -> { rev, data, updatedAt } | 404
 //   PUT    /api/sync  { id, write, baseRev, data }      -> { rev, updatedAt } | 409 { rev, data, updatedAt }
 //   DELETE /api/sync  { id, write }                     -> { ok: true }
+//   GET    /api/sync?id=<64 hex>&history=1              -> { versions: [{ rev, at }] }  (newest first)
+//   GET    /api/sync?id=<64 hex>&rev=<n>                -> { rev, data, updatedAt } | 404
+//
+// Earlier versions are kept so a bad change can be undone: the newest 8, at least 30 minutes
+// apart, plus the first one of each day for 14 days. They're encrypted like the latest one.
 //
 // `write` is a second secret derived from the sync code. Its SHA-256 is saved with the first
 // write, and every later write or delete must present it.
@@ -17,6 +22,32 @@ type StoreLike = {
 };
 
 const HEX64 = /^[0-9a-f]{64}$/;
+type Snap = { rev: number; at: string };
+const GAP = 30 * 60_000;
+const RECENT = 8;
+const DAYS = 14;
+const hKey = (id: string) => `${id}.h`;
+const vKey = (id: string, rev: number) => `${id}.v${rev}`;
+
+async function snaps(store: StoreLike, id: string): Promise<Snap[]> {
+  const hit = await store.getWithMetadata(hKey(id), { type: 'json' });
+  return ((hit?.data as { snaps?: Snap[] } | undefined)?.snaps ?? []).slice().sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** Keep `rec` (the version being replaced) as an earlier version, then let go of ones no longer needed. */
+async function keep(store: StoreLike, id: string, rec: Stored) {
+  const list = await snaps(store, id);
+  if (list[0] && Date.parse(rec.updatedAt) - Date.parse(list[0].at) < GAP) return;
+  await store.setJSON(vKey(id, rec.rev), rec);
+  const all = [{ rev: rec.rev, at: rec.updatedAt }, ...list]; // newest first
+  // The newest 8; then, for older ones, the earliest of each day, for up to 14 days.
+  const daily = new Map<string, Snap>();
+  for (const x of all.slice(RECENT)) daily.set(x.at.slice(0, 10), x); // later in the list = earlier in the day
+  const out = [...all.slice(0, RECENT), ...[...daily.values()].slice(0, DAYS)];
+  const keepRevs = new Set(out.map((x) => x.rev));
+  for (const x of all) if (!keepRevs.has(x.rev)) await store.delete(vKey(id, x.rev));
+  await store.setJSON(hKey(id), { snaps: out });
+}
 const MAX_DATA = 3_000_000; // ~3 MB of encrypted text per person
 
 const json = (body: unknown, status = 200) =>
@@ -30,8 +61,18 @@ async function sha256(s: string) {
 export async function handle(req: Request, store: StoreLike): Promise<Response> {
   try {
     if (req.method === 'GET') {
-      const id = new URL(req.url).searchParams.get('id') ?? '';
+      const q = new URL(req.url).searchParams;
+      const id = q.get('id') ?? '';
       if (!HEX64.test(id)) return json({ error: 'bad id' }, 400);
+      if (q.get('history')) return json({ versions: await snaps(store, id) });
+      if (q.has('rev')) {
+        const rev = Number(q.get('rev'));
+        if (!Number.isInteger(rev) || rev < 1) return json({ error: 'bad rev' }, 400);
+        const old = await store.getWithMetadata(vKey(id, rev), { type: 'json' });
+        if (!old) return json({ error: 'not found' }, 404);
+        const r = old.data as Stored;
+        return json({ rev: r.rev, data: r.data, updatedAt: r.updatedAt });
+      }
       const hit = await store.getWithMetadata(id, { type: 'json' });
       if (!hit) return json({ error: 'not found' }, 404);
       const rec = hit.data as Stored;
@@ -48,7 +89,11 @@ export async function handle(req: Request, store: StoreLike): Promise<Response> 
       if (rec && rec.writeHash !== writeHash) return json({ error: 'forbidden' }, 403);
 
       if (req.method === 'DELETE') {
-        if (rec) await store.delete(body.id!);
+        if (rec) {
+          for (const x of await snaps(store, body.id!)) await store.delete(vKey(body.id!, x.rev));
+          await store.delete(hKey(body.id!));
+          await store.delete(body.id!);
+        }
         return json({ ok: true });
       }
 
@@ -63,6 +108,8 @@ export async function handle(req: Request, store: StoreLike): Promise<Response> 
         const now = (await store.getWithMetadata(body.id!, { type: 'json' }))?.data as Stored | undefined;
         return json({ rev: now?.rev ?? 0, data: now?.data ?? null, updatedAt: now?.updatedAt ?? null }, 409);
       }
+      // Keep what was there as an earlier version. Never lets a save fail.
+      if (rec) await keep(store, body.id!, rec).catch((e) => console.error('sync history', e));
       return json({ rev: next.rev, updatedAt: next.updatedAt });
     }
 

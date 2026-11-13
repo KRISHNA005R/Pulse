@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
 import type { BudgetPeriod, CategoryId, Debt, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
 import { decodeBackup, encodeBackup } from '../lib/backupCode';
+import { listVersions, loadSync, pullVersion } from '../lib/sync';
+import { demoCount } from '../lib/demoMix';
 import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
@@ -937,6 +939,81 @@ export function DebtForm({ debtId, onDone }: { debtId?: string; onDone: () => vo
 // ------------------------------------------------------------------
 // Backup & restore (data lives in this browser, so let people move it)
 // ------------------------------------------------------------------
+/** Earlier copies of your data: on this phone, and the versions your account keeps. Bringing one back only adds. */
+function EarlierCopies() {
+  const store = useStore();
+  const mine = store.personalState();
+  const cfg = loadSync();
+  const [versions, setVersions] = useState<{ rev: number; at: string }[] | null>(null);
+  const [open, setOpen] = useState<Record<number, State | 'loading' | 'none'>>({});
+  useEffect(() => {
+    let live = true;
+    if (cfg) void listVersions(cfg.code).then((v) => live && setVersions(v)).catch(() => live && setVersions([]));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!mine) return null;
+  const have = new Set(mine.transactions.map((t) => t.id));
+  const extra = (st: State) => st.transactions.filter((t) => !have.has(t.id) && demoCount({ ...st, transactions: [t] } as State) === 0).length;
+  const back = (st: State) => {
+    const n = store.bringBack(st);
+    haptic(12);
+    store.toast({ text: n > 0 ? `${n} ${n === 1 ? 'entry' : 'entries'} brought back. Nothing was removed.` : 'Nothing new in that copy.', tone: 'good', emoji: '↩️' });
+  };
+  const locals = store.localCopies().filter((c) => extra(c.state) > 0);
+  const when = (iso: string) => `${fmtDate(iso.slice(0, 10), true)}, ${new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}`;
+  const check = async (rev: number) => {
+    if (!cfg) return;
+    setOpen((o) => ({ ...o, [rev]: 'loading' }));
+    const st = await pullVersion(cfg.code, rev).catch(() => null);
+    setOpen((o) => ({ ...o, [rev]: st ?? 'none' }));
+  };
+  if (!locals.length && !versions?.length) return null;
+  return (
+    <div className="rounded-3xl border border-line bg-surface p-4" data-testid="earlier-copies">
+      <p className="eyebrow">Earlier copies</p>
+      <p className="mt-1 text-[13px] text-ink3">Bringing one back only adds. Nothing is removed.</p>
+      <ul className="mt-2 flex flex-col divide-y divide-line">
+        {locals.map((c) => (
+          <li key={c.label} className="flex items-center gap-3 py-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-semibold">{c.label}</p>
+              <p className="text-[12.5px] text-ink3">{extra(c.state)} not in your data now</p>
+            </div>
+            <button type="button" className="btn-quiet min-h-[38px] shrink-0 px-3 text-[13.5px]" onClick={() => back(c.state)}>
+              Bring back
+            </button>
+          </li>
+        ))}
+        {(versions ?? []).map((v) => {
+          const st = open[v.rev];
+          return (
+            <li key={v.rev} className="flex items-center gap-3 py-2.5">
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-semibold">{when(v.at)}</p>
+                <p className="text-[12.5px] text-ink3">
+                  {st === 'loading' ? 'Opening…' : st === 'none' ? 'Couldn’t open this one' : st ? `${st.transactions.length} entries · ${extra(st)} not here now` : 'Saved on your account'}
+                </p>
+              </div>
+              {st && typeof st === 'object' ? (
+                <button type="button" className="btn-quiet min-h-[38px] shrink-0 px-3 text-[13.5px]" onClick={() => back(st)}>
+                  Bring back
+                </button>
+              ) : (
+                <button type="button" className="btn-quiet min-h-[38px] shrink-0 px-3 text-[13.5px]" disabled={st === 'loading'} onClick={() => void check(v.rev)}>
+                  Check
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 export function BackupPanel() {
   const store = useStore();
   const ui = useUI();
@@ -1028,6 +1105,8 @@ export function BackupPanel() {
       ) : (
         <p className="rounded-2xl bg-sunk p-3 text-[14px] text-ink2">Nothing to back up yet. Start with your own money first.</p>
       )}
+
+      {mine && <EarlierCopies />}
 
       <div className="rounded-3xl border border-line bg-surface p-4">
         <label htmlFor="backup-code" className="eyebrow block">

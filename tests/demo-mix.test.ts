@@ -82,11 +82,13 @@ describe('cleanDemoMix', () => {
     expect(cleanDemoMix(aarav, null)).toBeNull();
   });
 
-  it("only the demo's own profile counts as a mix: demo entries under someone else's name are left alone", () => {
-    const s = createSeed();
-    s.mode = 'personal';
-    s.user = { ...s.user, name: 'Krishna', fullName: 'Krishna Rao', handle: '@krishna' };
-    expect(cleanDemoMix(s, null)).toBeNull();
+  it('demo entries under my own name are a mix too: they go, my name stays', () => {
+    const s = merge3(null, mine(), Object.assign(createSeed(), { mode: 'personal' as const }), true);
+    expect(s.user.name).toBe('Krishna');
+    const c = cleanDemoMix(s, null)!;
+    expect(c.user.name).toBe('Krishna');
+    expect(c.transactions.map((t) => t.id)).toEqual(['tx-me-1']);
+    expect(c.plans.map((p) => p.name)).toEqual(['Bike']);
   });
 
   it('never touches the demo itself', () => {

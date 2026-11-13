@@ -157,6 +157,21 @@ export async function pull(code: string): Promise<{ rev: number; state: State } 
   return { rev: body.rev, state: await open(code, body.data) };
 }
 
+/** Earlier versions the account keeps (newest first). */
+export async function listVersions(code: string): Promise<{ rev: number; at: string }[]> {
+  const { id } = await keysFor(code);
+  const res = await call('GET', undefined, `?id=${id}&history=1`);
+  if (!res.ok) return [];
+  return ((await res.json()) as { versions?: { rev: number; at: string }[] }).versions ?? [];
+}
+/** One earlier version, opened. */
+export async function pullVersion(code: string, rev: number): Promise<State | null> {
+  const { id } = await keysFor(code);
+  const res = await call('GET', undefined, `?id=${id}&rev=${rev}`);
+  if (!res.ok) return null;
+  return open(code, ((await res.json()) as { data: string }).data);
+}
+
 export type PushResult = { ok: true; rev: number } | { ok: false; rev: number; state: State | null };
 
 export async function push(code: string, state: State, baseRev: number): Promise<PushResult> {
