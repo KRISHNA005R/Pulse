@@ -4,6 +4,8 @@ import { state } from './helpers';
 // The demo (Aarav's sample month) never ends up in someone's own data or their account, by any
 // route, and if it ever did, PULSE takes it out and brings back what it dropped.
 
+/** A fresh sync code for each run, so runs never see each other's data. */
+const fresh = (tag: string) => `PULSE-${tag}-${Math.random().toString().slice(2, 6)}-${Math.random().toString().slice(2, 6)}-2345`;
 const DEMO_ID = /^t\d+$/; // the demo's entries are t1…t96; real ones are t-xxxxxxx
 
 /** This page with the person's own data (no demo in it), optionally syncing under `code`. */
@@ -39,7 +41,7 @@ const settle = async (p: Page) => {
 };
 
 test('demo items in my own data (under my name): taken out on this phone, and never uploaded', async ({ browser, baseURL }) => {
-  const CODE = 'PULSE-TEST-WALL-AAAA-2345';
+  const CODE = fresh('TEST');
   const a = await (await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' })).newPage();
   await own(a, [{ id: 't-mine1', merchant: 'My chai' }], { mixed: true, code: CODE });
   await expect(a.getByText(/Fixed: demo data removed/)).toBeVisible({ timeout: 8000 });
@@ -55,7 +57,7 @@ test('demo items in my own data (under my name): taken out on this phone, and ne
 });
 
 test('the account’s copy got the demo and lost an entry: a phone with clean data heals it', async ({ browser, baseURL }) => {
-  const CODE = 'PULSE-TEST-HEAL-BBBB-2345';
+  const CODE = fresh('HEAL');
   // Phone M uploads a mixed copy (the test switch turns the wall off, to play the old bug): demo
   // items in, and my "Old rent" entry dropped.
   const m = await (await browser.newContext({ ...devices['iPhone 13'], baseURL, serviceWorkers: 'block' })).newPage();
@@ -114,6 +116,11 @@ test('Earlier copies: an entry only in an older copy on this phone comes back, a
   await page.getByRole('button', { name: /Backup code & export/ }).click();
   const card = page.getByTestId('earlier-copies');
   await expect(card.getByText('1 not in your data now')).toBeVisible();
+  // Any sheet that popped up meanwhile (install, sign-in) out of the way.
+  while (await page.locator('.fixed.inset-0 [aria-hidden="true"].animate-fade').count()) {
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+  }
   await card.getByRole('button', { name: 'Bring back' }).click();
   await expect(page.getByText('1 entry brought back. Nothing was removed.')).toBeVisible();
   expect((await ids(page)).sort()).toEqual(['t-lost', 't-now']);
