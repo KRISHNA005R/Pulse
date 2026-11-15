@@ -13,6 +13,7 @@ import { TransactionDetail } from './TransactionDetail';
 import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
+import { SplitEdit } from './SplitEdit';
 import { AuthNudge, MemberCardSheet } from './Auth';
 import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, DebtEarlyForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
 import { RewindStory } from './Rewind';
@@ -180,6 +181,12 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
       return (
         <Sheet title="Your member card" onClose={close} size="sm" z={z}>
           <MemberCardSheet onDone={close} />
+        </Sheet>
+      );
+    case 'split-edit':
+      return (
+        <Sheet title="Edit expense" onClose={close} size="sm" z={z}>
+          <SplitEdit splitId={spec.splitId} onDone={close} />
         </Sheet>
       );
     case 'person-merge':

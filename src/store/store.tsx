@@ -1,3 +1,4 @@
+import { rescaleShares } from '../lib/splitEdit';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   Account,
@@ -678,6 +679,12 @@ function useStoreImpl() {
           if (sp) {
             sp.category = tx.category;
             sp.plan = tx.plan;
+            // The amount or name of a split spend changed: the split follows, with everyone's part kept.
+            if (patch.amount != null && patch.amount !== sp.amount) {
+              sp.shares = rescaleShares(sp, patch.amount);
+              sp.amount = patch.amount;
+            }
+            if (patch.merchant) sp.description = patch.merchant;
           }
         }
       });
@@ -1439,13 +1446,70 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
-  /** Remove a split that has no spend attached (one a friend paid). Splits with a spend go with that spend. */
+  /**
+   * Remove a split I recorded. One I paid goes with its spend (the money comes back to the account);
+   * Undo puts both back. A friend's entry can only be removed by them.
+   */
   const deleteSplit = useCallback(
     (id: string) => {
       const sp = ref.current.splits.find((x) => x.id === id);
-      if (!sp || sp.transactionId || sp.remote) return;
-      commit((s) => void (s.splits = s.splits.filter((x) => x.id !== id)));
-      toast({ text: `${sp.description} removed.`, action: { label: 'Undo', run: () => commit((s) => void s.splits.unshift(sp)) } });
+      if (!sp || sp.remote) return;
+      const tx = sp.transactionId ? ref.current.transactions.find((t) => t.id === sp.transactionId) : undefined;
+      const before = ref.current;
+      commit((s) => {
+        s.splits = s.splits.filter((x) => x.id !== id);
+        const i = tx ? s.transactions.findIndex((t) => t.id === tx.id) : -1;
+        if (i >= 0) {
+          applyMoney(s, s.transactions[i], -1);
+          s.transactions.splice(i, 1);
+        }
+      });
+      haptic(10);
+      toast({
+        text: `${sp.description} removed.`,
+        action: {
+          label: 'Undo',
+          run: () =>
+            commit((s) => {
+              if (s.splits.some((x) => x.id === id)) return;
+              s.splits.unshift(structuredClone(sp));
+              const old = tx && before.transactions.find((t) => t.id === tx.id);
+              if (old && !s.transactions.some((t) => t.id === old.id)) {
+                const back = structuredClone(old);
+                s.transactions.unshift(back);
+                applyMoney(s, back, 1);
+              }
+            }),
+        },
+      });
+    },
+    [commit, toast],
+  );
+  /** Change a split I recorded: its name and total. Everyone keeps their part; the spend follows. */
+  const editSplit = useCallback(
+    (id: string, patch: { description?: string; amount?: number }) => {
+      const sp0 = ref.current.splits.find((x) => x.id === id);
+      if (!sp0 || sp0.remote) return;
+      const amount = patch.amount != null && patch.amount > 0 ? roundMoney(patch.amount) : sp0.amount;
+      const description = patch.description?.trim() || sp0.description;
+      let mine = 0;
+      commit((s) => {
+        const sp = s.splits.find((x) => x.id === id);
+        if (!sp) return;
+        if (amount !== sp.amount) sp.shares = rescaleShares(sp, amount);
+        sp.amount = amount;
+        sp.description = description;
+        mine = sp.shares.find((x) => x.person === 'me')?.amount ?? 0;
+        const tx = sp.transactionId ? s.transactions.find((t) => t.id === sp.transactionId) : undefined;
+        if (tx) {
+          applyMoney(s, tx, -1);
+          tx.amount = amount;
+          tx.merchant = description;
+          applyMoney(s, tx, 1);
+        }
+      });
+      haptic(10);
+      toast({ text: mine ? `Saved. Your share is ${rupees(mine)}.` : 'Saved.', tone: 'good' });
     },
     [commit, toast],
   );
@@ -2285,6 +2349,7 @@ function useStoreImpl() {
     payInsurance,
     deleteInsurance,
     deleteSplit,
+    editSplit,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

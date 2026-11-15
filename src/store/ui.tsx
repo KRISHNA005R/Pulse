@@ -54,6 +54,7 @@ export type SheetSpec =
   | { type: 'friend-invite' }
   | { type: 'friend-join'; code?: string }
   | { type: 'person-merge'; personId: string }
+  | { type: 'split-edit'; splitId: string }
   | { type: 'auth-nudge' }
   | { type: 'member-card' }
   | { type: 'rewind'; month?: string }
