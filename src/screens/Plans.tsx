@@ -1,3 +1,4 @@
+import { SwipeRow } from '../components/ui/SwipeRow';
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { roundMoney } from '../lib/currency';
@@ -509,7 +510,7 @@ function Faces({ ids, max = 5 }: { ids: string[]; max?: number }) {
 type GroupTab = 'expenses' | 'balances' | 'settled';
 
 export function GroupDetail({ id }: { id: string }) {
-  const { state } = useStore();
+  const { state, deleteSplit } = useStore();
   const ui = useUI();
   const [tab, setTab] = useState<GroupTab>('expenses');
   const group = state.groups.find((g) => g.id === id);
@@ -605,8 +606,14 @@ export function GroupDetail({ id }: { id: string }) {
                     const lent = s.paidBy === 'me' ? s.amount - mine : 0;
                     const by = s.remote ? authorOf(state, group, s.id)?.short : undefined;
                     return (
-                      <li key={s.id}>
-                        <button type="button" className="tap flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left hover:bg-sunk" aria-label={`${s.remote ? 'See' : 'Edit'} ${s.description}`} onClick={() => ui.openSheet({ type: 'split-edit', splitId: s.id })}>
+                      <SwipeRow
+                        key={s.id}
+                        id={`sp-${s.id}`}
+                        rowClassName="rounded-2xl bg-surface px-3 py-3 hover:bg-sunk"
+                        onTap={() => ui.openSheet({ type: 'split-edit', splitId: s.id })}
+                        action={s.remote ? undefined : { label: 'Edit', icon: 'pencil', run: () => ui.openSheet({ type: 'split-edit', splitId: s.id }) }}
+                        onDelete={s.remote ? undefined : () => deleteSplit(s.id)}
+                      >
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-sunk text-center leading-none">
                           <span>
                             <span className="num block text-[15px] font-semibold">{fmtDate(s.date).split(' ')[0]}</span>
@@ -635,13 +642,7 @@ export function GroupDetail({ id }: { id: string }) {
                             <span className="text-[12px] text-ink3">not in it</span>
                           )}
                         </span>
-                        {!s.remote && (
-                          <span className="-mr-1 grid h-8 w-8 shrink-0 place-items-center text-ink3" aria-hidden="true">
-                            <Icon name="pencil" size={14} />
-                          </span>
-                        )}
-                        </button>
-                      </li>
+                      </SwipeRow>
                     );
                   })}
                 </ul>
@@ -819,7 +820,7 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
 // Person
 // ------------------------------------------------------------------
 export function PersonDetail({ id }: { id: string }) {
-  const { state } = useStore();
+  const { state, deleteSplit } = useStore();
   const ui = useUI();
   const p = state.people.find((x) => x.id === id);
   if (!p) return <TopNavigation title="Person" onBack={ui.pop} />;
@@ -874,8 +875,15 @@ export function PersonDetail({ id }: { id: string }) {
         <SectionHeader id="pp-s" title="Shared expenses" />
         <ul className="flex flex-col">
           {shared.map((s) => (
-            <li key={s.id}>
-              <button type="button" className="tap flex w-full items-center justify-between gap-3 rounded-xl px-2 py-2 text-left text-[14.5px] hover:bg-sunk" aria-label={`${s.remote ? 'See' : 'Edit'} ${s.description}`} onClick={() => ui.openSheet({ type: 'split-edit', splitId: s.id })}>
+            <SwipeRow
+              key={s.id}
+              id={`sp-${s.id}`}
+              className="rounded-xl"
+              rowClassName="justify-between rounded-xl bg-bg px-2 py-2 text-[14.5px] hover:bg-sunk/60"
+              onTap={() => ui.openSheet({ type: 'split-edit', splitId: s.id })}
+              action={s.remote ? undefined : { label: 'Edit', icon: 'pencil', run: () => ui.openSheet({ type: 'split-edit', splitId: s.id }) }}
+              onDelete={s.remote ? undefined : () => deleteSplit(s.id)}
+            >
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{s.description}</span>
                 <span className="block text-[13px] text-ink3">
@@ -884,13 +892,7 @@ export function PersonDetail({ id }: { id: string }) {
                 </span>
               </span>
               <span className="num shrink-0">{rupees(s.amount)}</span>
-              {!s.remote && (
-                <span className="-mr-1 grid h-8 w-8 shrink-0 place-items-center text-ink3" aria-hidden="true">
-                  <Icon name="pencil" size={14} />
-                </span>
-              )}
-              </button>
-            </li>
+            </SwipeRow>
           ))}
         </ul>
       </section>

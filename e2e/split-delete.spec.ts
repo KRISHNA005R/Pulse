@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openDemo, setState, state } from './helpers';
 
 // Every expense in Splits can be opened: change its name or amount, or delete it (with Undo).
@@ -31,7 +31,7 @@ test('a split I paid: change the amount (shares and my spend follow), then delet
   const before = await balance(page, acc);
   await openPerson(page, friend.name);
 
-  await page.getByRole('button', { name: 'Edit Dinner' }).click();
+  await page.getByText('Dinner', { exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Edit expense' });
   await sheet.locator('#se-amount').fill('900');
   await expect(sheet.getByTestId('se-shares')).toContainText('You ₹450');
@@ -45,7 +45,7 @@ test('a split I paid: change the amount (shares and my spend follow), then delet
   expect(await balance(page, acc)).toBe(before - 300);
 
   // Delete: the split and its spend go, the money comes back; Undo puts both back.
-  await page.getByRole('button', { name: 'Edit Team dinner' }).click();
+  await page.getByText('Team dinner', { exact: true }).click();
   await sheet.getByRole('button', { name: 'Delete expense' }).click();
   await sheet.getByRole('button', { name: 'Delete', exact: true }).click();
   expect(await split(page, 'sp-d')).toBeUndefined();
@@ -66,7 +66,7 @@ test('a split a friend paid can be deleted too; a friend’s own entry can only 
     friend.id,
   );
   await openPerson(page, friend.name);
-  await page.getByRole('button', { name: 'Edit Movie tickets' }).click();
+  await page.getByText('Movie tickets', { exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Edit expense' });
   await sheet.getByRole('button', { name: 'Delete expense' }).click();
   await sheet.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -74,7 +74,7 @@ test('a split a friend paid can be deleted too; a friend’s own entry can only 
   await page.getByRole('button', { name: 'Undo' }).click();
   expect(await split(page, 'sf1')).toBeDefined();
 
-  await page.getByRole('button', { name: 'See Their cab' }).click();
+  await page.getByText('Their cab', { exact: true }).click();
   await expect(sheet.getByText(/Only they can change it/)).toBeVisible();
   await expect(sheet.getByRole('button', { name: 'Delete expense' })).toHaveCount(0);
   await expect(sheet.locator('#se-amount')).toHaveCount(0);
@@ -97,4 +97,48 @@ test('changing a split spend’s amount on the spend itself updates who owes wha
   await page.keyboard.type('1000');
   await page.keyboard.press('Enter');
   await expect.poll(async () => (await split(page, 'sp-p'))?.shares.map((x) => x.amount)).toEqual([500, 500]);
+});
+
+test.describe('swipe, like Activity', () => {
+  async function swipe(page: Page, row: Locator, distance: number) {
+    await row.evaluate((e) => e.scrollIntoView({ block: 'center' }));
+    await page.waitForTimeout(250);
+    const b = (await row.boundingBox())!;
+    const y = b.y + b.height / 2;
+    const x0 = b.x + b.width - 20;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y }] });
+    for (let i = 1; i <= 14; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 - (distance * i) / 14, y }] });
+      await page.waitForTimeout(16);
+    }
+    await page.waitForTimeout(120);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+
+  test('swipe a split: Edit opens it, Delete removes it (Undo); a friend’s own entry doesn’t swipe', async ({ page }) => {
+    await openDemo(page);
+    const friend = (await state(page)).people[0];
+    await setState(
+      page,
+      `s.splits.unshift({ id: 'sf1', description: 'Movie tickets', amount: 600, paidBy: a, date: s.today, mode: 'equal', shares: [{ person: 'me', amount: 300 }, { person: a, amount: 300 }], category: 'entertainment' });
+       s.splits.unshift({ id: 'sr1', description: 'Their cab', amount: 400, paidBy: a, date: s.today, mode: 'equal', shares: [{ person: 'me', amount: 200 }, { person: a, amount: 200 }], category: 'transport', remote: 'chan1' });`,
+      friend.id,
+    );
+    await openPerson(page, friend.name);
+    const li = page.locator('li', { has: page.getByText('Movie tickets', { exact: true }) }).first();
+    await swipe(page, li.getByRole('button').last(), 150);
+    await li.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByRole('dialog', { name: 'Edit expense' }).locator('#se-amount')).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await swipe(page, li.getByRole('button').last(), 150);
+    await li.getByRole('button', { name: 'Delete' }).click();
+    await expect.poll(async () => await split(page, 'sf1')).toBeUndefined();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    expect(await split(page, 'sf1')).toBeDefined();
+
+    const theirs = page.locator('li', { has: page.getByText('Their cab', { exact: true }) }).first();
+    await expect(theirs.getByRole('button', { name: 'Delete' })).toHaveCount(0);
+  });
 });

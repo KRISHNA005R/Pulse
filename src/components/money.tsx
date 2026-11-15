@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPE } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { INSURANCE_ON } from '../lib/features';
 import type { Budget, Group, Insight, Plan, Subscription, Transaction } from '../types';
 import { useStore } from '../store/store';
@@ -6,6 +6,7 @@ import { useUI } from '../store/ui';
 import { budgetState, bufferNote, categoryName, groupSummary, isBack, myCost, netCost, paydaysBefore, pendingPaydays, planMetrics, safeToSpend, upcoming } from '../lib/finance';
 import { addMonths, daysBetween, fmtDate, fmtDayHeader, haptic, relDay, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
+import { SwipeRow } from './ui/SwipeRow';
 import { burstFrom } from '../lib/celebrate';
 import { RollingNumber } from './ui/RollingNumber';
 import { streak } from '../lib/streak';
@@ -309,24 +310,9 @@ export function SafeBreakdown() {
 // ------------------------------------------------------------------
 // TransactionRow with swipe actions
 // ------------------------------------------------------------------
-// Round buttons, like iPhone: two 52px circles with a 10px gap and 8px either side.
-const BTN = 52;
-const GAP = 10;
-const ACTIONS_W = BTN * 2 + GAP + 16;
-const ACTIONS_W_ONE = BTN + 16; // just Delete: money in, transfers and balance corrections can't be split
-const FULL_SWIPE = 0.62; // share of the row width that turns a swipe into delete
-
 export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boolean }) {
   const { state, deleteTransaction } = useStore();
   const ui = useUI();
-  const [open, setOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
-  const rowRef = useRef<HTMLButtonElement>(null);
-  const liRef = useRef<HTMLLIElement>(null);
-  const splitRef = useRef<HTMLButtonElement>(null);
-  const delRef = useRef<HTMLButtonElement>(null);
-  const drag = useRef<{ x: number; y: number; base: number; active: boolean; t: number; lastX: number; lastT: number; v: number; armed: boolean } | null>(null);
-  const moved = useRef(false);
   const plan = tx.plan ? state.plans.find((p) => p.id === tx.plan) : undefined;
   const people = (tx.people ?? []).map((id) => state.people.find((p) => p.id === id)?.short).filter(Boolean) as string[];
   const isIn = tx.type === 'income' || (tx.type === 'transfer' && tx.direction === 'in');
@@ -336,205 +322,45 @@ export function TransactionRow({ tx, compact }: { tx: Transaction; compact?: boo
   const card = state.cards.find((c) => c.id === tx.account);
   // Splitting is for money you spent. Income, transfers and balance corrections only offer Delete.
   const canSplit = tx.type === 'expense' && !tx.splitId;
-  const actionsW = canSplit ? ACTIONS_W : ACTIONS_W_ONE;
-
-  // Paint a drag position straight onto the DOM: no React render per frame, so it tracks the finger.
-  const paint = (x: number, animate: boolean) => {
-    const row = rowRef.current;
-    const sp = splitRef.current;
-    const del = delRef.current;
-    const li = liRef.current;
-    if (!row || !del || !li) return;
-    const w = li.clientWidth;
-    const ease = 'cubic-bezier(.2,.9,.25,1.12)';
-    const t = animate ? `transform .42s ${ease}` : 'none';
-    row.style.transition = t;
-    row.style.transform = x ? `translate3d(${x}px,0,0)` : '';
-    const reveal = Math.min(1, -x / actionsW);
-    const full = -x > w * FULL_SWIPE;
-    // Past the full-swipe point, delete stretches across the whole row.
-    const a = Math.min(1, Math.max(0, (reveal - 0.05) / 0.5));
-    const b = Math.min(1, Math.max(0, (reveal - 0.3) / 0.55));
-    const tr = animate ? `transform .42s ${ease}, opacity .25s ease, width .28s ${ease}` : 'width .22s cubic-bezier(.2,.9,.25,1), transform .12s linear, opacity .12s linear';
-    del.style.transition = tr;
-    // Delete sits at the edge so it shows first; split follows it in.
-    del.style.opacity = String(full ? 1 : a);
-    del.style.transform = `scale(${full ? 1 : 0.55 + a * 0.45})`;
-    if (sp) {
-      sp.style.transition = tr;
-      // A full swipe: Split stays in place, dimmed, while Delete stretches toward it (like iPhone).
-      sp.style.opacity = full ? '0.35' : String(b);
-      sp.style.transform = `scale(${0.55 + b * 0.45}) translateX(${(1 - b) * 30}px)`;
-    }
-    // Delete grows from a circle into a long pill that fills the space the row leaves behind.
-    const room = -x - 16 - (sp ? BTN + GAP : 0);
-    del.style.width = full ? `${Math.max(BTN, room)}px` : `${BTN}px`;
-    li.dataset.full = full ? '1' : '';
-  };
-
-  useEffect(() => {
-    // Only one row open at a time, and a tap anywhere else closes it.
-    if (!open) return;
-    const onOther = (e: Event) => (e as CustomEvent).detail !== tx.id && close();
-    const onDownAway = (e: PointerEvent) => !liRef.current?.contains(e.target as Node) && close();
-    window.addEventListener('pulse-swipe-open', onOther);
-    window.addEventListener('pointerdown', onDownAway, true);
-    return () => {
-      window.removeEventListener('pulse-swipe-open', onOther);
-      window.removeEventListener('pointerdown', onDownAway, true);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-
-  const close = () => {
-    setOpen(false);
-    paint(0, true);
-  };
-  const openRow = () => {
-    setOpen(true);
-    paint(-actionsW, true);
-    window.dispatchEvent(new CustomEvent('pulse-swipe-open', { detail: tx.id }));
-  };
-  const remove = () => {
-    const li = liRef.current;
-    const row = rowRef.current;
-    haptic(18);
-    setLeaving(true);
-    if (!li || !row || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return deleteTransaction(tx.id);
-    // Slide the row off, then fold the gap shut, then delete (the toast offers Undo).
-    row.style.transition = 'transform .26s cubic-bezier(.5,0,.75,0)';
-    row.style.transform = `translate3d(${-li.clientWidth - 40}px,0,0)`;
-    li.style.height = `${li.offsetHeight}px`;
-    window.setTimeout(() => {
-      li.style.transition = 'height .26s cubic-bezier(.4,0,.2,1), opacity .26s ease, margin .26s ease';
-      li.style.height = '0px';
-      li.style.opacity = '0';
-    }, 200);
-    window.setTimeout(() => deleteTransaction(tx.id), 470);
-  };
-
-  const onClickRow = () => {
-    if (moved.current) return;
-    if (open) return close();
-    ui.setSelectedTx(tx.id);
-    if (window.matchMedia('(min-width: 1280px)').matches) return; // desktop: detail shows in side panel
-    ui.openSheet({ type: 'tx', id: tx.id });
-  };
-
-  const onDown = (e: RPE) => {
-    if (e.pointerType === 'mouse' || leaving) return;
-    const base = open ? -actionsW : 0;
-    drag.current = { x: e.clientX, y: e.clientY, base, active: false, t: performance.now(), lastX: e.clientX, lastT: performance.now(), v: 0, armed: false };
-    moved.current = false;
-  };
-  const onMove = (e: RPE) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (!d.active) {
-      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (drag.current = null); // it's a scroll
-      if (Math.abs(dx) < 8) return;
-      d.active = true;
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }
-    moved.current = true;
-    const now = performance.now();
-    d.v = (e.clientX - d.lastX) / Math.max(1, now - d.lastT);
-    d.lastX = e.clientX;
-    d.lastT = now;
-    let x = d.base + dx;
-    const w = liRef.current?.clientWidth ?? 360;
-    if (x > 0) x = x * 0.25; // rubber band to the right
-    if (x < -w) x = -w + (x + w) * 0.2;
-    paint(x, false);
-    const full = -x > w * FULL_SWIPE;
-    if (full !== d.armed) {
-      d.armed = full;
-      haptic(full ? 14 : 6); // a tick when full-swipe delete arms or disarms
-    } else if (!open && -x > 60 && -x < 64) haptic(4);
-  };
-  const onUp = () => {
-    const d = drag.current;
-    drag.current = null;
-    window.setTimeout(() => (moved.current = false), 60);
-    if (!d || !d.active) return;
-    const row = rowRef.current;
-    const x = row ? new DOMMatrixReadOnly(getComputedStyle(row).transform).m41 : 0;
-    if (d.armed) return remove();
-    if (d.v < -0.45 || (d.v <= 0.3 && -x > actionsW * 0.42)) openRow();
-    else close();
-  };
   const back = isBack(tx);
   const sub = [back ? `↩ Got back · ${cat}` : cat, card ? `${card.name} card` : null].filter(Boolean).join(' · ');
 
   return (
-    <li ref={liRef} className="group/row relative overflow-hidden rounded-xl">
-      {/* swipe actions (touch): revealed as the row slides left */}
-      <div className="absolute inset-y-0 right-0 flex items-center justify-end gap-[10px] pr-2" aria-hidden={!open}>
-        {canSplit && (
-          <button
-            ref={splitRef}
-            type="button"
-            tabIndex={open ? 0 : -1}
-            aria-label="Split"
-            style={{ opacity: 0, transform: 'scale(.55)', width: BTN, height: BTN }}
-            className="grid shrink-0 origin-right place-items-center rounded-full bg-ink text-bg active:brightness-90"
-            onClick={() => {
-              close();
-              ui.openSheet({ type: 'group-expense', personId: tx.people?.[0] });
-            }}
-          >
-            <Icon name="split" size={21} />
-          </button>
-        )}
-        <button
-          ref={delRef}
-          type="button"
-          tabIndex={open ? 0 : -1}
-          aria-label="Delete"
-          style={{ opacity: 0, transform: 'scale(.55)', width: BTN, height: BTN }}
-          className="flex shrink-0 origin-right items-center justify-start overflow-hidden rounded-full bg-[#B83424] pl-[15.5px] text-white active:brightness-90"
-          onClick={remove}
-        >
-          <Icon name="trash" size={21} className="shrink-0 group-data-[full='1']/row:animate-wiggle" />
-        </button>
-      </div>
-      <button
-        ref={rowRef}
-        type="button"
-        onClick={onClickRow}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-        style={{ touchAction: 'pan-y' }}
-        className={`relative flex w-full items-center gap-3 rounded-xl bg-bg px-1 text-left will-change-transform hover:bg-sunk/60 ${compact ? 'py-2' : 'py-2.5'} ${ui.selectedTx === tx.id ? 'xl:bg-sunk' : ''}`}
-      >
-        <CategoryMark state={state} category={isPot ? 'transfer' : tx.category} emoji={isPot ? plan?.icon : undefined} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold">{tx.merchant}</span>
-          <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink3">
-            <span className="truncate">{sub}</span>
-            {plan && !isPot && (
-              <span className="shrink-0 rounded-md bg-accent-soft px-1.5 text-[11.5px] font-semibold text-accent-ink">
-                {plan.icon} {plan.name}
-              </span>
-            )}
-            {people.length > 0 && <span className="shrink-0 truncate">· with {people.join(', ')}</span>}
-          </span>
-        </span>
-        <span className="shrink-0 text-right">
-          <span className={`num block text-[15.5px] font-semibold ${back ? 'text-ink2' : isIn ? 'text-pos' : ''}`}>{isIn ? rupees(tx.amount, { sign: true }) : `−${rupees(tx.amount)}`}</span>
-          {share != null && <span className="block text-[12px] text-ink3">your share {rupees(share)}</span>}
-          {tx.recurring && share == null && (
-            <span className="inline-flex items-center gap-0.5 text-[12px] text-ink3">
-              <Icon name="repeat" size={11} /> Recurring
+    <SwipeRow
+      id={tx.id}
+      className="rounded-xl"
+      rowClassName={`rounded-xl bg-bg px-1 hover:bg-sunk/60 ${compact ? 'py-2' : 'py-2.5'} ${ui.selectedTx === tx.id ? 'xl:bg-sunk' : ''}`}
+      onTap={() => {
+        ui.setSelectedTx(tx.id);
+        if (window.matchMedia('(min-width: 1280px)').matches) return; // desktop: detail shows in side panel
+        ui.openSheet({ type: 'tx', id: tx.id });
+      }}
+      action={canSplit ? { label: 'Split', icon: 'split', run: () => ui.openSheet({ type: 'group-expense', personId: tx.people?.[0] }) } : undefined}
+      onDelete={() => deleteTransaction(tx.id)}
+    >
+      <CategoryMark state={state} category={isPot ? 'transfer' : tx.category} emoji={isPot ? plan?.icon : undefined} />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[15px] font-semibold">{tx.merchant}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-[13px] text-ink3">
+          <span className="truncate">{sub}</span>
+          {plan && !isPot && (
+            <span className="shrink-0 rounded-md bg-accent-soft px-1.5 text-[11.5px] font-semibold text-accent-ink">
+              {plan.icon} {plan.name}
             </span>
           )}
+          {people.length > 0 && <span className="shrink-0 truncate">· with {people.join(', ')}</span>}
         </span>
-      </button>
-    </li>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className={`num block text-[15.5px] font-semibold ${back ? 'text-ink2' : isIn ? 'text-pos' : ''}`}>{isIn ? rupees(tx.amount, { sign: true }) : `−${rupees(tx.amount)}`}</span>
+        {share != null && <span className="block text-[12px] text-ink3">your share {rupees(share)}</span>}
+        {tx.recurring && share == null && (
+          <span className="inline-flex items-center gap-0.5 text-[12px] text-ink3">
+            <Icon name="repeat" size={11} /> Recurring
+          </span>
+        )}
+      </span>
+    </SwipeRow>
   );
 }
 
