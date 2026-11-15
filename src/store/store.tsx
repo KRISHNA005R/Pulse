@@ -1,3 +1,4 @@
+import { removePayment } from '../lib/payments';
 import { rescaleShares } from '../lib/splitEdit';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
@@ -1368,7 +1369,7 @@ function useStoreImpl() {
         if (!st || st.banked) return;
         const other = st.from === 'me' ? st.to : st.from;
         const person = s.people.find((p) => p.id === other);
-        const tx: Transaction = { id: uid('t'), merchant: person?.name ?? 'Settle up', amount: st.amount, type: 'transfer', direction: st.from === 'me' ? 'out' : 'in', category: 'transfer', date: s.today, account: accountId ?? defaultAccount(s), people: [other], notes: 'Settled up', recurring: false, status: 'completed' };
+        const tx: Transaction = { id: uid('t'), merchant: person?.name ?? 'Settle up', amount: st.amount, type: 'transfer', direction: st.from === 'me' ? 'out' : 'in', category: 'transfer', date: s.today, account: accountId ?? defaultAccount(s), people: [other], notes: 'Settled up', recurring: false, status: 'completed', settlementId: st.id };
         s.transactions.unshift(tx);
         applyMoney(s, tx, 1);
         st.banked = true;
@@ -1485,6 +1486,33 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /**
+   * Remove a settle-up that shouldn't be there (no money moved). Its money entry goes too. One a friend
+   * recorded is removed from their phone as well. Undo puts it all back.
+   */
+  const deleteSettlement = useCallback(
+    (ids: string | string[]) => {
+      const list = Array.isArray(ids) ? ids : [ids];
+      const before = ref.current;
+      let total = 0;
+      commit((s) => {
+        for (const id of list) total += removePayment(s, id)?.amount ?? 0;
+      });
+      if (!total) return;
+      haptic(10);
+      toast({
+        text: `${rupees(total)} payment removed.`,
+        action: {
+          label: 'Undo',
+          run: () => {
+            ref.current = before;
+            setState(before);
+          },
+        },
+      });
+    },
+    [commit, toast],
+  );
   /** Change a split I recorded: its name and total. Everyone keeps their part; the spend follows. */
   const editSplit = useCallback(
     (id: string, patch: { description?: string; amount?: number }) => {
@@ -1516,7 +1544,8 @@ function useStoreImpl() {
   /** One settle-up: the record, and the money moving in or out of the account. */
   const settleOne = (s: State, st: Omit<Settlement, 'id' | 'date'>, accountId?: string) => {
     const account = accountId ?? defaultAccount(s);
-    s.settlements.unshift({ ...st, id: uid('st'), date: s.today });
+    const sid = uid('st');
+    s.settlements.unshift({ ...st, id: sid, date: s.today });
     const other = st.from === 'me' ? st.to : st.from;
     const person = s.people.find((p) => p.id === other);
     const g = s.groups.find((x) => x.id === st.group);
@@ -1533,6 +1562,7 @@ function useStoreImpl() {
       notes: `Settled up${g ? ` · ${g.name}` : ''}`,
       recurring: false,
       status: 'completed',
+      settlementId: sid,
     };
     s.transactions.unshift(tx);
     applyMoney(s, tx, 1);
@@ -2350,6 +2380,7 @@ function useStoreImpl() {
     deleteInsurance,
     deleteSplit,
     editSplit,
+    deleteSettlement,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

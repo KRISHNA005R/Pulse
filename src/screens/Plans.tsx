@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
 import { roundMoney } from '../lib/currency';
 import { useUI } from '../store/ui';
-import { budgetState, defaultAccount, nextPayday, weeklySaves, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
+import { budgetState, defaultAccount, nextPayday, weeklySaves, balanceFromPayments, groupNet, groupSummary, personBalances, planMetrics, socialTotals } from '../lib/finance';
 import { authorOf, groupSeat, inGroupOnPulse } from '../lib/friends';
 import { fmtDate, relDay, rupees, monthName } from '../lib/format';
 import { BudgetProgress, GoalCard, PlanCard, SplitCard, TransactionList } from '../components/money';
@@ -510,7 +510,7 @@ function Faces({ ids, max = 5 }: { ids: string[]; max?: number }) {
 type GroupTab = 'expenses' | 'balances' | 'settled';
 
 export function GroupDetail({ id }: { id: string }) {
-  const { state, deleteSplit } = useStore();
+  const { state, deleteSplit, deleteSettlement } = useStore();
   const ui = useUI();
   const [tab, setTab] = useState<GroupTab>('expenses');
   const group = state.groups.find((g) => g.id === id);
@@ -518,6 +518,8 @@ export function GroupDetail({ id }: { id: string }) {
   const g = groupSummary(state, id);
   const plan = group.plan ? state.plans.find((p) => p.id === group.plan) : undefined;
   const settlements = state.settlements.filter((s) => s.group === id).sort((a, b) => b.date.localeCompare(a.date));
+  // Someone who "owes" only because of a payment (an expense changed or went after it was paid).
+  const onlyPaid = new Map(state.people.map((p) => [p.id, balanceFromPayments(state, p.id, id)] as const).filter(([, v]) => v.length > 0));
   const name = (pid: string) => (pid === 'me' ? 'You' : state.people.find((p) => p.id === pid)?.short ?? '?');
   const others = group.members.filter((m) => m !== 'me');
   const open = others.filter((pid) => (g.balances.get(pid) ?? 0) !== 0);
@@ -666,6 +668,23 @@ export function GroupDetail({ id }: { id: string }) {
                             {v === 0 ? 'Settled' : v < 0 ? `You owe ${rupees(-v)}` : `Owes you ${rupees(v)}`}
                             {seat === 'name' ? ' · not on PULSE yet' : seat === 'left' ? ' · left' : ''}
                           </span>
+                          {onlyPaid.get(pid) && (
+                            <button
+                              type="button"
+                              className="mt-0.5 block text-left text-[12.5px] font-semibold text-accent-ink underline decoration-accent/40 underline-offset-2"
+                              onClick={() =>
+                                ui.openSheet({
+                                  type: 'confirm',
+                                  title: 'Remove that payment?',
+                                  body: `This comes only from a ${rupees(onlyPaid.get(pid)!.reduce((a, x) => a + x.amount, 0))} payment. If no money moved, remove it and you’re settled.`,
+                                  confirm: 'Remove payment',
+                                  run: () => deleteSettlement(onlyPaid.get(pid)!.map((x) => x.id)),
+                                })
+                              }
+                            >
+                              Didn’t pay? Remove it
+                            </button>
+                          )}
                         </span>
                         {v !== 0 ? (
                           <button type="button" className="btn-quiet min-h-[36px] px-3.5 text-[13.5px]" onClick={() => ui.openSheet({ type: 'settle', personId: pid, groupId: id })}>
@@ -696,17 +715,29 @@ export function GroupDetail({ id }: { id: string }) {
 
             {tab === 'settled' && (
               <ul className="flex flex-col divide-y divide-line rounded-3xl border border-line bg-surface px-1">
-                {settlements.map((s) => (
-                  <li key={s.id} className="flex items-center gap-3 px-3 py-2.5 text-[14px]">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">
-                        {name(s.from)} → {name(s.to)}
+                {settlements.map((s) => {
+                  // Either of the two people in a payment can remove it (no money moved).
+                  const mine = s.from === 'me' || s.to === 'me';
+                  const ask = () =>
+                    ui.openSheet({
+                      type: 'confirm',
+                      title: `Remove ${name(s.from)} → ${name(s.to)} ${rupees(s.amount)}?`,
+                      body: 'Only if no money moved. It goes from both phones.',
+                      confirm: 'Remove',
+                      run: () => deleteSettlement(s.id),
+                    });
+                  return (
+                    <SwipeRow key={s.id} id={`st-${s.id}`} rowClassName="rounded-2xl bg-surface px-3 py-2.5 text-[14px]" onTap={mine ? ask : () => {}} onDelete={mine ? () => deleteSettlement(s.id) : undefined}>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">
+                          {name(s.from)} → {name(s.to)}
+                        </span>
+                        <span className="block text-[12.5px] text-ink3">{relDay(s.date, state.today)}</span>
                       </span>
-                      <span className="block text-[12.5px] text-ink3">{relDay(s.date, state.today)}</span>
-                    </span>
-                    <span className="num font-semibold">{rupees(s.amount)}</span>
-                  </li>
-                ))}
+                      <span className="num font-semibold">{rupees(s.amount)}</span>
+                    </SwipeRow>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -820,11 +851,15 @@ export function GroupPeople({ groupId, onDone }: { groupId: string; onDone: () =
 // Person
 // ------------------------------------------------------------------
 export function PersonDetail({ id }: { id: string }) {
-  const { state, deleteSplit } = useStore();
+  const { state, deleteSplit, deleteSettlement } = useStore();
   const ui = useUI();
   const p = state.people.find((x) => x.id === id);
   if (!p) return <TopNavigation title="Person" onBack={ui.pop} />;
   const v = personBalances(state).get(id) ?? 0;
+  const pays = state.settlements.filter((st) => (st.from === 'me' && st.to === id) || (st.from === id && st.to === 'me')).sort((a, b) => b.date.localeCompare(a.date));
+  const onlyPaid = balanceFromPayments(state, id);
+  const removeAsk = (ids: string[], amount: number) =>
+    ui.openSheet({ type: 'confirm', title: `Remove the ${rupees(amount)} payment?`, body: 'Only if no money moved. It goes from both phones.', confirm: 'Remove payment', run: () => deleteSettlement(ids) });
   const groups = state.groups.filter((g) => g.members.includes(id));
   const shared = state.splits.filter((s) => s.paidBy === id || s.shares.some((x) => x.person === id)).sort((a, b) => b.date.localeCompare(a.date));
   /** Whose PULSE an entry came from: this friend's, or a member of a shared group. */
@@ -839,6 +874,20 @@ export function PersonDetail({ id }: { id: string }) {
       <div className="flex flex-col items-center rounded-3xl border border-line bg-surface p-6 text-center">
         <PersonAvatar person={p} size={64} />
         <p className="display mt-4 text-[24px]">{v === 0 ? 'All settled' : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</p>
+        {onlyPaid.length > 0 && (
+          <button
+            type="button"
+            className="mt-1 text-[13px] font-semibold text-accent-ink underline decoration-accent/40 underline-offset-2"
+            onClick={() =>
+              removeAsk(
+                onlyPaid.map((x) => x.id),
+                onlyPaid.reduce((a, x) => a + x.amount, 0),
+              )
+            }
+          >
+            Didn’t pay? Remove it
+          </button>
+        )}
         <div className="mt-4 flex gap-2">
           {v !== 0 && (
             <button type="button" className="btn-accent" onClick={() => ui.openSheet({ type: 'settle', personId: id })}>
@@ -896,6 +945,25 @@ export function PersonDetail({ id }: { id: string }) {
           ))}
         </ul>
       </section>
+      {pays.length > 0 && (
+        <section className="mt-6" aria-labelledby="pp-p">
+          <SectionHeader id="pp-p" title="Payments" />
+          <ul className="flex flex-col">
+            {pays.map((st) => (
+              <SwipeRow key={st.id} id={`st-${st.id}`} className="rounded-xl" rowClassName="justify-between rounded-xl bg-bg px-2 py-2 text-[14.5px] hover:bg-sunk/60" onTap={() => removeAsk([st.id], st.amount)} onDelete={() => deleteSettlement(st.id)}>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{st.from === 'me' ? `You paid ${p.short}` : `${p.short} paid you`}</span>
+                  <span className="block text-[13px] text-ink3">
+                    {fmtDate(st.date)}
+                    {st.group ? ` · ${state.groups.find((g) => g.id === st.group)?.name ?? ''}` : ''}
+                  </span>
+                </span>
+                <span className="num shrink-0">{rupees(st.amount)}</span>
+              </SwipeRow>
+            ))}
+          </ul>
+        </section>
+      )}
       {state.mode === 'personal' && state.people.length > 1 && (
         <button type="button" className="btn-ghost mt-6 min-h-[40px] px-1 text-[13.5px] text-ink3" onClick={() => ui.openSheet({ type: 'person-merge', personId: id })}>
           Is {p.short} in your list twice? Merge the two names

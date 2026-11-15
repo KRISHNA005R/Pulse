@@ -13,6 +13,7 @@
 //             and leaves a sealed note saying which; the owner's phone picks it up and joins
 //   #group=…  a shared group: everyone who opens it becomes a member, publishes their own box of
 //             group expenses, and reads everyone else's
+import { dropMine } from './payments';
 import type { Door, FriendLink, Group, GroupShare, ISODate, Person, Settlement, SplitExpense, State } from '../types';
 import { fromB64Url, toB64Url, utf8 } from './codec';
 import { roundMoney } from './currency';
@@ -120,6 +121,8 @@ export interface Box {
   /** The writer's UPI ID, so friends can pay them in one tap. '' = they have none. */
   upi?: string;
   items: BoxItem[];
+  /** Settle-ups the reader recorded that the writer removed: no money moved. */
+  drop?: string[];
 }
 
 const MID = /^[0-9a-f]{16}$/;
@@ -169,7 +172,11 @@ export function buildBox(s: State, personId: string): Box {
     else if (st.from === personId && st.to === 'me') items.push({ id: st.id, k: 'p', dir: 'you', amt: roundMoney(st.amount), date: st.date });
   }
   items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...myFace(s), items };
+  // Their settle-ups I removed (no money moved), so their phone drops them too.
+  const chan = s.people.find((p) => p.id === personId)?.link?.chan;
+  const pre = chan ? remoteId(chan, '') : '';
+  const drop = pre ? (s.droppedPays ?? []).filter((x) => x.startsWith(pre)).map((x) => x.slice(pre.length)).sort() : [];
+  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...myFace(s), items, ...(drop.length ? { drop } : {}) };
 }
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
@@ -208,6 +215,9 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
   const p = s.people.find((x) => x.id === personId);
   if (!p?.link) return [];
   const chan = p.link.chan;
+  // They removed settle-ups I recorded with them (no money moved): out here too.
+  for (const id of Array.isArray(box.drop) ? box.drop.slice(0, 300) : []) if (typeof id === 'string') dropMine(s, id, personId);
+  const dropped = new Set(s.droppedPays ?? []);
   const hadSplits = new Set(s.splits.filter((x) => x.remote === chan).map((x) => x.id));
   const oldPays = new Map(s.settlements.filter((x) => x.remote === chan).map((x) => [x.id, x]));
   s.splits = s.splits.filter((x) => x.remote !== chan);
@@ -264,7 +274,7 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
     } else if (it.k === 'p') {
       // Their "I paid you" is money coming to me.
       const toMe = it.dir === 'me';
-      if (twin('p', toMe, amt, it.date)) continue;
+      if (dropped.has(rid) || twin('p', toMe, amt, it.date)) continue;
       const old = oldPays.get(rid);
       s.settlements.push({ id: rid, from: toMe ? personId : 'me', to: toMe ? 'me' : personId, amount: amt, date: it.date, remote: chan, ...(old?.banked ? { banked: true } : {}) });
       if (!old) fresh.push({ ...it, amt });
@@ -756,6 +766,8 @@ export interface GroupBox {
   items: { id: string; d: string; t: number; date: ISODate; cat: string; by: string; sh: [string, number][] }[];
   /** `out` = a settle-up recorded outside the group, between the writer and one member. */
   pays: { id: string; from: string; to: string; a: number; date: ISODate; out?: 1 }[];
+  /** Settle-ups other members recorded that this member removed (no money moved): [their member id's first 6, their id]. */
+  drop?: [string, string][];
 }
 export interface MemberView {
   mid: string;
@@ -820,8 +832,16 @@ export function buildGroupBox(s: State, group: Group): GroupBox {
     if (mid) also.push([r, mid]);
   }
   const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  // Other members' settle-ups I removed (no money moved), so their phones drop them too.
+  const gpre = `gr-${sh.gid.slice(0, 8)}-`;
+  const drop = (s.droppedPays ?? [])
+    .filter((x) => x.startsWith(gpre))
+    .map((x) => x.slice(gpre.length))
+    .map((x) => [x.slice(0, 6), x.slice(7)] as [string, string])
+    .sort((a, b) => (a.join() < b.join() ? -1 : 1));
   return {
     v: 1,
+    ...(drop.length ? { drop } : {}),
     uid: s.user.uid ?? '',
     name: myName(s),
     ...myFace(s),
@@ -930,7 +950,18 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
   };
   const short = (id: string) => (id === 'me' ? 'you' : (person(id)?.short ?? 'someone'));
 
-  // 3. Their entries become entries here.
+  // 3. Settle-ups of mine another member removed (they say no money moved): out here too.
+  for (const m of others) {
+    const party = person(sh.refs[m.mid])?.id;
+    for (const pair of Array.isArray(m.box.drop) ? m.box.drop.slice(0, 300) : []) {
+      if (!party || String(pair?.[0]) !== sh.mid.slice(0, 6)) continue;
+      const gone = dropMine(s, String(pair?.[1]), party);
+      if (gone) news.push({ person: party, group: group.id, title: `${person(party)?.short ?? 'Someone'} removed a payment`, body: `${rupees(gone.amount)} in ${group.name}: no money moved.` });
+    }
+  }
+  const dropped = new Set(s.droppedPays ?? []);
+
+  // Their entries become entries here.
   const had = new Set(s.splits.filter((x) => x.remote === gid).map((x) => x.id));
   const oldPays = new Map(s.settlements.filter((x) => x.remote === gid).map((x) => [x.id, x]));
   s.splits = s.splits.filter((x) => x.remote !== gid);
@@ -983,6 +1014,7 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
       const mineToo = from === 'me' || to === 'me';
       if (pay.out && !mineToo) continue; // between two other people, outside the group: not mine to see
       if (chan) twice.add(remoteId(chan, id));
+      if (dropped.has(rid(m.mid, id))) continue; // I removed it: no money moved
       const twin = paid.find((x) => !x.used && x.by !== m.mid && x.from === from && x.to === to && Math.abs(x.amt - amt) < 0.01 && Math.abs(daysBetween(x.date, pay.date)) <= 3);
       if (twin) {
         twin.used = true;

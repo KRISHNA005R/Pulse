@@ -84,6 +84,8 @@ export interface Transaction {
   recurring: boolean;
   status: 'completed' | 'pending';
   splitId?: ID;
+  /** The settle-up this money moved for (removing the settle-up removes this too). */
+  settlementId?: ID;
   /** Transfers only: money leaving ('out') or arriving ('in') in `account`. */
   direction?: 'in' | 'out';
   /** For transfers into a plan pot ('pot:<planId>') or another account. */
@@ -457,6 +459,8 @@ export interface State {
   netWorthHistory: { month: string; value: number }[];
   onboarding: Onboarding;
   dismissedDetections: string[];
+  /** Settle-ups a friend recorded that I removed (no money moved): they don't come back, and their phone drops them too. */
+  droppedPays?: string[];
   /** Days the person tapped the streak to check in. They keep the streak going like a logged spend. */
   checkIns?: ISODate[];
   /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */

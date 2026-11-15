@@ -975,15 +975,18 @@ export function closingCharge(remaining: number, amount: number): { charge: numb
 }
 
 /**
- * When a balance with someone comes only from payments I recorded (say an expense was deleted or
+ * When a balance with someone comes only from recorded payments (say an expense was deleted or
  * changed after I marked it paid), those payments: then "owes you" may just be a payment that no
  * longer has anything to pay for. Empty when the balance has real expenses behind it.
  */
 export function balanceFromPayments(s: State, personId: string, groupId?: string): Settlement[] {
   const v = personBalances(s, groupId).get(personId) ?? 0;
-  if (Math.abs(v) < 0.5) return [];
-  // They owe me because I paid them; or I owe them because I recorded them paying me.
-  const mine = s.settlements.filter((st) => !st.remote && (!groupId || st.group === groupId) && (v > 0 ? st.from === 'me' && st.to === personId : st.from === personId && st.to === 'me'));
-  const paid = mine.reduce((a, st) => a + st.amount, 0);
-  return paid > 0 && Math.abs(v) <= paid + 0.5 ? mine : [];
+  if (Math.abs(v) <= 1) return []; // rounding (₹652.50 paid as ₹653) isn't a debt
+  const between = s.settlements.filter((st) => (!groupId || st.group === groupId) && ((st.from === 'me' && st.to === personId) || (st.from === personId && st.to === 'me')));
+  // What the expenses alone say, without any payments between us.
+  const fromPays = between.reduce((a, st) => a + (st.from === 'me' ? st.amount : -st.amount), 0);
+  const expensesOnly = v - fromPays;
+  // They owe me, but the expenses alone don't say so (or the reverse): it comes from the payments.
+  const flagged = v > 0 ? expensesOnly < 0.5 : expensesOnly > -0.5;
+  return flagged ? between.filter((st) => (v > 0 ? st.from === 'me' : st.to === 'me')) : [];
 }
