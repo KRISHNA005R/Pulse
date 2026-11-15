@@ -1,4 +1,4 @@
-import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, State, Subscription, Transaction } from '../types';
+import type { Account, Budget, CategoryId, CreditCard, Debt, FundType, IncomeSource, Insurance, Investment, ISODate, Plan, PremiumCycle, Settlement, State, Subscription, Transaction } from '../types';
 import { hasCents, roundMoney, scaled } from './currency';
 import { bhisiDues } from './bhisi';
 import { INSURANCE_ON } from './features';
@@ -972,4 +972,18 @@ export function prepaySavings(d: Debt, amount: number): { months: number; intere
 export function closingCharge(remaining: number, amount: number): { charge: number; big: boolean } {
   const charge = roundMoney(Math.max(0, amount - remaining));
   return { charge, big: charge > Math.max(remaining * 0.05, scaled(1000)) };
+}
+
+/**
+ * When a balance with someone comes only from payments I recorded (say an expense was deleted or
+ * changed after I marked it paid), those payments: then "owes you" may just be a payment that no
+ * longer has anything to pay for. Empty when the balance has real expenses behind it.
+ */
+export function balanceFromPayments(s: State, personId: string, groupId?: string): Settlement[] {
+  const v = personBalances(s, groupId).get(personId) ?? 0;
+  if (Math.abs(v) < 0.5) return [];
+  // They owe me because I paid them; or I owe them because I recorded them paying me.
+  const mine = s.settlements.filter((st) => !st.remote && (!groupId || st.group === groupId) && (v > 0 ? st.from === 'me' && st.to === personId : st.from === personId && st.to === 'me'));
+  const paid = mine.reduce((a, st) => a + st.amount, 0);
+  return paid > 0 && Math.abs(v) <= paid + 0.5 ? mine : [];
 }
