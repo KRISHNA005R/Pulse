@@ -105,7 +105,6 @@ export function YouScreen() {
         <NavRow icon="tags" label="Categories" sub={`${state.categories.filter((c) => c.kind === 'expense').length} categories`} onClick={() => go({ name: 'categories' })} />
         <NavRow icon="sliders" label="Budget preferences" sub={`Safety buffer ${rupees(state.settings.buffer)}`} onClick={() => go({ name: 'settings', section: 'budget-prefs' })} />
         <NavRow icon="bell" label="Reminders" sub={remindersSummary()} onClick={() => go({ name: 'reminders' })} />
-        <NavRow icon="zap" label="Shortcuts" sub="Siri, Back Tap or an NFC tag" onClick={() => go({ name: 'shortcuts' })} />
         <NavRow icon="palette" label="Appearance" sub={state.settings.theme === 'system' ? 'Match device' : state.settings.theme === 'dark' ? 'Dark' : 'Light'} onClick={() => go({ name: 'settings', section: 'appearance' })} />
         <NavRow icon="rupee" label="Currency" sub={`${currencyOf(state.settings.currency).name} (${currencyOf(state.settings.currency).symbol})`} onClick={() => go({ name: 'settings', section: 'currency' })} />
       </section>

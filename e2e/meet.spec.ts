@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { phone, signInAs, state, syncNow } from './helpers';
 
-// Usernames said once, Meet (phones together) with a real camera scan, and links for Shortcuts.
+// Usernames said once, Meet (phones together) with a real camera scan.
 
 const OUT = process.env.SHOTS;
 const shot = async (p: Page, n: string, wait = 400) => {
@@ -118,12 +118,11 @@ test('a Meet link opened from the phone’s own camera connects too; an old one 
   await expect(C.getByRole('dialog', { name: 'Meet' }).getByRole('alert')).toHaveText(/ran out/);
 });
 
-test('Shortcuts: a link fills in the add screen (never saves by itself)', async ({ browser, baseURL }) => {
+test('no Shortcuts screen; an add link still fills in the add screen (never saves by itself)', async ({ browser, baseURL }) => {
   const A = await phone(browser, baseURL!, 'Krishna');
   await tab(A, 'You');
-  await A.getByRole('button', { name: /^Shortcuts/ }).click();
-  await expect(A.getByTestId('quick-link')).toHaveText(/\?action=add&amount=20&note=Chai$/);
-  await shot(A, 'm05-shortcuts');
+  await expect(A.getByRole('button', { name: 'Friends', exact: false }).first()).toBeVisible();
+  await expect(A.getByRole('button', { name: /^Shortcuts/ })).toHaveCount(0);
   const before = (await state(A)).transactions.length;
   await A.goto('/?action=add&amount=60&note=Cutting%20chai');
   const sheet = A.getByRole('dialog').last();

@@ -12,7 +12,6 @@ export type Route =
   | { name: 'person'; id: string }
   | { name: 'people' }
   | { name: 'friends' }
-  | { name: 'shortcuts' }
   | { name: 'subscriptions' }
   | { name: 'networth' }
   | { name: 'investments' }

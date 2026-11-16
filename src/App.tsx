@@ -8,7 +8,6 @@ import { AuthProvider } from './store/auth';
 import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
 import { PeopleScreen } from './components/People';
 import { FriendsScreen, usePeopleNotices } from './components/FriendsHub';
-import { ShortcutsScreen } from './screens/Shortcuts';
 import { keepMeet, meetToken } from './lib/people';
 import { loadSession } from './lib/auth';
 import { UIProvider, useUI } from './store/ui';
@@ -86,8 +85,6 @@ function Screen() {
         return <PeopleScreen />;
       case 'friends':
         return <FriendsScreen />;
-      case 'shortcuts':
-        return <ShortcutsScreen />;
       case 'settings':
         return <SettingsScreen section={r.section} />;
     }
