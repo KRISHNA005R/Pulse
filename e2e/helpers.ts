@@ -63,3 +63,11 @@ export async function log(p: Page, amount: number, text: string, type?: 'Got') {
 
 /** Outside calls the test server refused (should always be empty: nothing real gets sent). */
 export const blockedCalls = async (p: Page): Promise<string[]> => (await (await p.request.get('/__e2e/blocked')).json()).blocked;
+
+/** Sign this phone in to a new PULSE account (the test server makes it; no email involved). */
+export async function signInAs(p: Page, name: string): Promise<{ uid: string; token: string }> {
+  const s = await p.evaluate(async (n) => (await fetch(`/__e2e/account?name=${encodeURIComponent(n)}`)).json(), name);
+  await p.evaluate((sess) => localStorage.setItem('pulse-auth-v1', JSON.stringify(sess)), s);
+  await p.reload();
+  return { uid: s.account.uid, token: s.token };
+}

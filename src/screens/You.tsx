@@ -49,6 +49,11 @@ export function YouScreen() {
         )}
         <div className="min-w-0 flex-1">
           <h1 className="display text-[28px] leading-tight">{state.user.fullName}</h1>
+          {state.mode === 'personal' && account && state.user.username && (
+            <button type="button" className="tap -ml-0.5 text-[14.5px] font-semibold text-accent-ink" onClick={() => ui.openSheet({ type: 'username' })}>
+              @{state.user.username}
+            </button>
+          )}
           <p className="text-[14px] text-ink3">
             {state.mode === 'demo' ? `Demo data as of ${fmtDate(state.today, true)}` : account ? `PULSE member #${account.n} · saved to your account` : `${state.user.handle} · your data stays on this device`}
           </p>

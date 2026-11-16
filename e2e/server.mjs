@@ -25,7 +25,7 @@ const BLOBS_PORT = PORT + 1082;
 // --- 1. No real keys, no real network -------------------------------------------------------------
 for (const k of ['RESEND_API_KEY', 'AUTH_FROM', 'FEEDBACK_FROM', 'FEEDBACK_TO', 'GOOGLE_CLIENT_ID', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY']) delete process.env[k];
 // The private stats pages open with this test password (never the real one).
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 export const E2E_STATS_KEY = 'e2e-stats-key';
 process.env.STATS_KEY_HASH = createHash('sha256').update(E2E_STATS_KEY).digest('hex');
 const local = (host) => /^(localhost|127\.0\.0\.1|\[::1\]|::1)$/.test(String(host).replace(/:\d+$/, ''));
@@ -84,8 +84,22 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.gif': 'image/gif' };
 
+let members = 0;
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
+  // Test only (this server is never deployed): a signed-in PULSE account, as if made by email sign-in.
+  if (u.pathname === '/__e2e/account') {
+    const { getStore } = await import('@netlify/blobs');
+    const store = getStore({ name: 'pulse-accounts', consistency: 'strong' });
+    const uid = randomBytes(16).toString('hex');
+    const token = randomBytes(32).toString('base64url');
+    const name = u.searchParams.get('name') || 'Friend';
+    const account = { uid, n: ++members, email: `${uid.slice(0, 8)}@e2e.test`, name, created: new Date().toISOString(), sess: [createHash('sha256').update(token).digest('hex')] };
+    await store.setJSON(`acct/${uid}`, account);
+    await store.setJSON(`sess/${account.sess[0]}`, { uid });
+    res.writeHead(200, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ token, account: { uid, n: account.n, email: account.email, name, created: account.created, code: '' } }));
+  }
   if (u.pathname === '/__e2e/blocked') {
     res.writeHead(200, { 'content-type': 'application/json' });
     return res.end(JSON.stringify({ blocked }));

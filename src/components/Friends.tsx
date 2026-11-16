@@ -1,3 +1,4 @@
+import { loadSession } from '../lib/auth';
 import { useEffect, useRef, useState } from 'react';
 import type { FriendLink, Group, Person } from '../types';
 import { useStore } from '../store/store';
@@ -41,7 +42,7 @@ import { Icon } from './ui/Icon';
 // Friends on PULSE: the screens. How the sharing works is in lib/friends.ts.
 
 /** The store, in the shape the sync needs. */
-function useHost(): FriendHost {
+export function useHost(): FriendHost {
   const store = useStore();
   const ref = useRef(store);
   ref.current = store;
@@ -73,7 +74,8 @@ export function useFriends() {
   const host = useHost();
   const ready = state.onboarding.done && state.mode === 'personal';
   // Anything to keep in step: a connected friend, a shared group, or my own link that people may have opened.
-  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door || !!state.bhisis?.some((b) => b.share) || pendingBhisiOutbox();
+  // Signed in: friend requests can arrive any time, so keep checking too.
+  const linked = state.people.some((p) => p.link) || state.groups.some((g) => g.shared) || !!state.user.door || !!state.bhisis?.some((b) => b.share) || pendingBhisiOutbox() || !!loadSession();
 
   // The id other people's apps know me by.
   useEffect(() => {

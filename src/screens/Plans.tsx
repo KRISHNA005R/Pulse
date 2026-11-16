@@ -1,3 +1,5 @@
+import { usePeople } from '../components/FriendsHub';
+import { act } from '../lib/people';
 import { SwipeRow } from '../components/ui/SwipeRow';
 import { useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/store';
@@ -123,6 +125,7 @@ function SplitsView() {
   const TOP = 3;
   const people = (everyone.length > TOP ? [...everyone].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, TOP) : everyone).sort((a, b) => a[1] - b[1]);
   const more = state.people.length - people.length;
+  const requests = usePeople().received.length;
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -174,8 +177,9 @@ function SplitsView() {
           </button>
         )}
         {state.mode === 'personal' && (
-          <button type="button" className="btn-quiet mt-3 min-h-[42px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'friend-invite' })}>
-            <Icon name="users" size={16} /> Invite friends
+          <button type="button" className="btn-quiet relative mt-3 min-h-[42px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'friends' })}>
+            <Icon name="user-plus" size={16} /> {requests > 0 ? `Friend requests · ${requests}` : 'Add friends'}
+            {requests > 0 && <span className="absolute right-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-accent" aria-hidden="true" />}
           </button>
         )}
       </section>
@@ -838,6 +842,7 @@ export function PersonDetail({ id }: { id: string }) {
       <TopNavigation title={p.name} onBack={ui.pop} />
       <div className="flex flex-col items-center rounded-3xl border border-line bg-surface p-6 text-center">
         <PersonAvatar person={p} size={64} />
+        {p.username && <p className="mt-2 text-[14px] text-ink3">@{p.username}</p>}
         <p className="display mt-4 text-[24px]">{v === 0 ? 'All settled' : v < 0 ? `You owe ${p.short} ${rupees(-v)}` : `${p.short} owes you ${rupees(v)}`}</p>
         <div className="mt-4 flex gap-2">
           {v !== 0 && (
@@ -896,11 +901,48 @@ export function PersonDetail({ id }: { id: string }) {
           ))}
         </ul>
       </section>
-      {state.mode === 'personal' && state.people.length > 1 && (
+      {/* Merging is only for old names typed by hand: two real PULSE people are never merged into one. */}
+      {state.mode === 'personal' && state.people.length > 1 && !p.acct && !p.link && (
         <button type="button" className="btn-ghost mt-6 min-h-[40px] px-1 text-[13.5px] text-ink3" onClick={() => ui.openSheet({ type: 'person-merge', personId: id })}>
           Is {p.short} in your list twice? Merge the two names
         </button>
       )}
+      {state.mode === 'personal' && p.acct && <FriendActions name={p.short} acct={p.acct} friend={p.link?.via === 'acct'} />}
+    </div>
+  );
+}
+
+/** Remove, block or report someone on PULSE. Each asks first. */
+function FriendActions({ name, acct, friend }: { name: string; acct: string; friend: boolean }) {
+  const ui = useUI();
+  const { toast } = useStore();
+  const people = usePeople();
+  const blocked = people.blocked.some((x) => x.uid === acct);
+  const go = (action: string, done: string, extra: Record<string, unknown> = {}) => async () => {
+    const r = await act(action, acct, extra);
+    toast(r.error ? { text: r.error, tone: 'heads-up' } : { text: done, tone: 'good' });
+    await people.refresh();
+  };
+  const ask = (title: string, body: string, confirm: string, run: () => void) => ui.openSheet({ type: 'confirm', title, body, confirm, run });
+  return (
+    <div className="mt-6 flex flex-wrap gap-2">
+      {friend && (
+        <button type="button" className="btn-ghost min-h-[40px] px-3 text-[13.5px]" onClick={() => ask(`Remove ${name}?`, 'What you split stays.', 'Remove', go('remove', `${name} removed.`))}>
+          Remove friend
+        </button>
+      )}
+      {blocked ? (
+        <button type="button" className="btn-ghost min-h-[40px] px-3 text-[13.5px]" onClick={() => void go('unblock', `${name} unblocked.`)()}>
+          Unblock
+        </button>
+      ) : (
+        <button type="button" className="btn-ghost min-h-[40px] px-3 text-[13.5px]" onClick={() => ask(`Block ${name}?`, 'They can’t find you or send requests.', 'Block', go('block', `${name} blocked.`))}>
+          Block
+        </button>
+      )}
+      <button type="button" className="btn-ghost min-h-[40px] px-3 text-[13.5px] text-ink3" onClick={() => ask(`Report ${name}?`, 'PULSE’s team will take a look.', 'Report', go('report', 'Thanks. We’ll look into it.', { reason: 'Reported from their profile' }))}>
+        Report
+      </button>
     </div>
   );
 }
