@@ -65,8 +65,11 @@ export async function log(p: Page, amount: number, text: string, type?: 'Got') {
 export const blockedCalls = async (p: Page): Promise<string[]> => (await (await p.request.get('/__e2e/blocked')).json()).blocked;
 
 /** Sign this phone in to a new PULSE account (the test server makes it; no email involved). */
-export async function signInAs(p: Page, name: string): Promise<{ uid: string; token: string }> {
+/** A new account, signed in on this phone. `hello`: keep the one-time "You're @…" for the test to see. */
+export async function signInAs(p: Page, name: string, opts: { hello?: boolean } = {}): Promise<{ uid: string; token: string }> {
   const s = await p.evaluate(async (n) => (await fetch(`/__e2e/account?name=${encodeURIComponent(n)}`)).json(), name);
+  if (!opts.hello)
+    await p.evaluate((t) => fetch('/api/people', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${t}` }, body: JSON.stringify({ action: 'told' }) }), s.token);
   await p.evaluate((sess) => localStorage.setItem('pulse-auth-v1', JSON.stringify(sess)), s);
   await p.reload();
   return { uid: s.account.uid, token: s.token };

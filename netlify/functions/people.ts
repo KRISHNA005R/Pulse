@@ -8,6 +8,10 @@
 //   POST /api/people  { action: 'list' }                       -> friends, requests received and sent, blocked
 //   POST /api/people  { action: 'request' | 'cancel' | 'accept' | 'decline' | 'remove' | 'block' | 'unblock', uid }
 //   POST /api/people  { action: 'report', uid, reason }
+//   POST /api/people  { action: 'told' }                       -> the app has shown "You're @…" (once)
+//   POST /api/people  { action: 'meet-open', fresh? }          -> a Meet code to show as a QR (3 minutes)
+//   POST /api/people  { action: 'meet', token }                -> scanned someone's code: friends now
+//   POST /api/people  { action: 'meet-poll', token }           -> who has scanned my code
 import { getStore } from '@netlify/blobs';
 import { handlePeople, type PeopleStore } from '../lib/people';
 import { json } from './stats';

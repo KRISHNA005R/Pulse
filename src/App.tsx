@@ -7,7 +7,10 @@ import { StoreProvider, useStore } from './store/store';
 import { AuthProvider } from './store/auth';
 import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
 import { PeopleScreen } from './components/People';
-import { FriendsScreen } from './components/FriendsHub';
+import { FriendsScreen, usePeopleNotices } from './components/FriendsHub';
+import { ShortcutsScreen } from './screens/Shortcuts';
+import { keepMeet, meetToken } from './lib/people';
+import { loadSession } from './lib/auth';
 import { UIProvider, useUI } from './store/ui';
 import { BottomNavigation, MobileTopBar, SideNavigation } from './components/Navigation';
 import { SheetHost } from './components/SheetHost';
@@ -83,6 +86,8 @@ function Screen() {
         return <PeopleScreen />;
       case 'friends':
         return <FriendsScreen />;
+      case 'shortcuts':
+        return <ShortcutsScreen />;
       case 'settings':
         return <SettingsScreen section={r.section} />;
     }
@@ -166,6 +171,7 @@ function Shell() {
   // Someone who isn't signed in: a friendly ask for a week, then sign-in is needed to carry on.
   const wall = useAuthGate();
   useFriends();
+  usePeopleNotices();
   // Keep this device's queued reminders in step with the data (a few seconds after things settle).
   useEffect(() => {
     const t = window.setTimeout(() => void syncReminders(state), 6000);
@@ -215,6 +221,22 @@ function Shell() {
     return () => window.removeEventListener('hashchange', check);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.onboarding.done, store.sync.enabled]);
+
+  // A Meet code (#meet=…), scanned with the phone's own camera: connect right away. Not signed in
+  // yet: kept for a few minutes and opened after (usePeopleNotices).
+  useEffect(() => {
+    const check = () => {
+      const t = meetToken(location.hash);
+      if (!t) return;
+      history.replaceState(history.state, '', location.pathname + location.search);
+      if (state.onboarding.done && state.mode === 'personal' && loadSession()) ui.openSheet({ type: 'meet', token: t });
+      else keepMeet(t);
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.onboarding.done, state.mode]);
 
   // A shared bhisi draw (#draw=…): replay the same chit coming out.
   useEffect(() => {
@@ -268,7 +290,15 @@ function Shell() {
       ui.resetTo('plans');
       ui.setPlansSegment('splits');
     }
-    if (action === 'add') ui.openSheet({ type: 'composer' });
+    // From iPhone Shortcuts, Back Tap or an NFC tag: /?action=add&amount=20&note=Chai opens the add
+    // screen filled in. It never saves by itself: one tap to confirm.
+    if (action === 'add') {
+      const amount = Number(q.get('amount'));
+      const text = (q.get('note') ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      ui.openSheet({ type: 'composer', ...(amount > 0 && amount < 1e8 ? { preset: { amount: Math.round(amount * 100) / 100, ...(text ? { text } : {}) } } : text ? { preset: { text } } : {}) });
+    }
+    if (action === 'meet') ui.openSheet({ type: 'meet' });
+    if (action === 'friends') ui.resetTo('you', { name: 'friends' });
     if (action === 'afford') ui.openSheet({ type: 'afford' });
     if (action === 'ai') ui.openSheet({ type: 'ai' });
     // The announcement email's "Start a gullak" button.
@@ -280,6 +310,8 @@ function Shell() {
     q.delete('action');
     q.delete('tab');
     q.delete('source');
+    q.delete('amount');
+    q.delete('note');
     const rest = q.toString();
     history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
     // eslint-disable-next-line react-hooks/exhaustive-deps

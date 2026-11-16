@@ -12,6 +12,13 @@
 //   rel/<uid>|<uid>   one record per pair of people (the smaller uid first): request, friends, blocks
 //   ln/<uid>/<other>  a pointer so each side can list their own pairs
 //   rep/<id>          a report about someone, for the PULSE team
+//   mt/<token>        a Meet code (shown as a QR for 3 minutes): { uid, exp, got[] }
+//   mtu/<uid>         the Meet code someone is showing now, so reopening reuses it
+//
+// Usernames for everyone: a profile (and username) is made the first time someone's app asks, and a
+// daily job (backfillProfiles) makes one for every account that hasn't asked yet. Both are safe to run
+// again and at the same time: names are taken with a compare-and-swap, and a profile is only ever
+// written once (onlyIfNew).
 //
 // Every change to a pair is a compare-and-swap on its one record, so two taps, two phones or both
 // people acting at once can't make duplicates or a half-done state.
@@ -36,6 +43,8 @@ export interface Profile {
   /** When the username was changed, newest last (at most 2 in 14 days). */
   renames: string[];
   created: string;
+  /** When the app showed them their username ("You're @…"), so it's said once, on one phone. */
+  told?: string;
 }
 interface Name {
   uid: string;
@@ -65,6 +74,19 @@ const REQUESTS_PER_DAY = 30;
 const FINDS_PER_HOUR = 60;
 const MAX_PUB = 400;
 const UID = /^[0-9a-f]{8,64}$/i;
+const TOKEN = /^[A-Za-z0-9_-]{16}$/;
+const MEET_SECS = 180;
+interface Meet {
+  uid: string;
+  exp: string;
+  /** Who scanned it. */
+  got: string[];
+}
+const addSecs = (d: Date, n: number) => new Date(d.getTime() + n * 1000).toISOString();
+function randomToken() {
+  const b = crypto.getRandomValues(new Uint8Array(12));
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_');
+}
 
 const pairKey = (x: string, y: string) => (x < y ? `rel/${x}|${y}` : `rel/${y}|${x}`);
 const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -127,8 +149,10 @@ async function ensureProfile(store: PeopleStore, acct: Account, now: Date): Prom
   // Two first visits at once: whoever writes first wins, and the other's username is given back.
   const res = (await store.setJSON(`pf/${acct.uid}`, pf, { onlyIfNew: true })) as { modified?: boolean } | undefined;
   if (res && res.modified === false) {
-    await store.delete(`un/${u}`);
-    return get<Profile>(store, `pf/${acct.uid}`);
+    const won = await get<Profile>(store, `pf/${acct.uid}`);
+    // Both may have picked the same name: only give it back if the winner kept a different one.
+    if (won?.u !== u) await update<Name>(store, `un/${u}`, (cur) => (cur?.uid === acct.uid && !cur.hold ? { uid: acct.uid, hold: now.toISOString() } : null));
+    return won;
   }
   return pf;
 }
@@ -171,7 +195,61 @@ export async function handlePeople(body: Record<string, unknown>, store: PeopleS
       me.pub = pub;
       await store.setJSON(`pf/${me.uid}`, me);
     }
-    return ok({ me: { ...card(me), renamesLeft: renamesLeft(me, now) } });
+    return ok({ me: { ...card(me), renamesLeft: renamesLeft(me, now), ...(me.told ? {} : { fresh: true }) } });
+  }
+
+  // The app has shown them their username. Said once, whichever phone shows it first.
+  if (action === 'told') {
+    await update<Profile>(store, `pf/${me.uid}`, (cur) => (!cur || cur.told ? null : { ...cur, told: now.toISOString() }));
+    return ok();
+  }
+
+  // ---- Meet: two phones together. One shows a code (QR), the other scans it, and they're friends. ----
+  // Showing your code is your yes; scanning it is theirs. A code lasts 3 minutes, and the person
+  // showing it sees who connected (and can undo it).
+  if (action === 'meet-open') {
+    const cur = await get<{ token: string; exp: string }>(store, `mtu/${me.uid}`);
+    if (cur && cur.exp > addSecs(now, 60) && body.fresh !== true) return ok({ token: cur.token, exp: cur.exp });
+    if (!(await allow(store as never, 'meet-open', me.uid, now.toISOString().slice(0, 13), 40))) return fail(429, 'Too many codes. Try again in a bit.');
+    const token = randomToken();
+    const exp = addSecs(now, MEET_SECS);
+    await store.setJSON(`mt/${token}`, { uid: me.uid, exp, got: [] } satisfies Meet);
+    await store.setJSON(`mtu/${me.uid}`, { token, exp });
+    return ok({ token, exp });
+  }
+  if (action === 'meet-poll') {
+    const token = String(body.token ?? '');
+    const m = TOKEN.test(token) ? await get<Meet>(store, `mt/${token}`) : null;
+    if (!m || m.uid !== me.uid) return ok({ got: [], over: true });
+    const got = (await Promise.all(m.got.map((u) => get<Profile>(store, `pf/${u}`)))).filter((x): x is Profile => !!x).map(card);
+    return ok({ got, over: m.exp < now.toISOString() });
+  }
+  if (action === 'meet') {
+    const token = String(body.token ?? '');
+    if (!(await allow(store as never, 'meet', me.uid, now.toISOString().slice(0, 13), 30))) return fail(429, 'Too many tries. Try again in a bit.');
+    const m = TOKEN.test(token) ? await get<Meet>(store, `mt/${token}`) : null;
+    const gone = fail(410, 'That code ran out. Ask them to show it again.');
+    if (!m || m.exp < now.toISOString()) return gone;
+    if (m.uid === me.uid) return fail(400, 'That’s your own code.');
+    const them = await get<Profile>(store, `pf/${m.uid}`);
+    if (!them) return gone;
+    const key = pairKey(me.uid, them.uid);
+    const before = await get<Rel>(store, key);
+    // Blocked either way: it looks like an old code, so a block can't be detected.
+    if (before?.blk?.length) return gone;
+    // So their phone can show who just connected. A code holds up to 20 people (a whole table).
+    const room = await update<Meet>(store, `mt/${token}`, (cur) => (!cur || cur.got.includes(me.uid) || cur.got.length >= 20 ? null : { ...cur, got: [...cur.got, me.uid] }));
+    if (!room?.got.includes(me.uid)) return room === undefined ? fail(503, 'Busy. Try again in a moment.') : fail(409, 'This code is full. Ask them for a new one.');
+    const [a, b] = me.uid < them.uid ? [me.uid, them.uid] : [them.uid, me.uid];
+    const r = await update<Rel>(store, key, (cur) => {
+      const x = cur ?? { a, b, s: 'none' as const, at: now.toISOString() };
+      if (x.blk?.length || x.s === 'friends') return null;
+      return { ...x, s: 'friends', by: undefined, since: now.toISOString(), at: now.toISOString() };
+    });
+    if (r === undefined) return fail(503, 'Busy. Try again in a moment.');
+    if (r?.blk?.length) return gone;
+    if (r) await point(store, r);
+    return ok({ standing: 'friends', person: card(them), already: before?.s === 'friends' });
   }
 
   if (action === 'check' || action === 'rename') {
@@ -316,6 +394,36 @@ async function freeIdeas(store: PeopleStore, me: Profile, now: Date) {
   return out;
 }
 
+/**
+ * Usernames for everyone who has an account but hasn't opened a PULSE that asks for one yet (people
+ * who signed up before usernames existed). Safe to run again, and alongside the app: an account that
+ * already has a profile is skipped, and two runs at once can't give anyone two names.
+ */
+export async function backfillProfiles(store: PeopleStore, now = new Date(), budgetMs = 20_000): Promise<{ made: number; had: number; failed: number; left: number }> {
+  const start = Date.now();
+  const accts = (await store.list({ prefix: 'acct/' })).blobs.map((b) => b.key.slice('acct/'.length)).filter((x) => UID.test(x));
+  const out = { made: 0, had: 0, failed: 0, left: 0 };
+  for (const uid of accts) {
+    if (Date.now() - start > budgetMs) {
+      out.left++;
+      continue;
+    }
+    if (await get<Profile>(store, `pf/${uid}`)) {
+      out.had++;
+      continue;
+    }
+    const acct = await get<Account>(store, `acct/${uid}`);
+    if (!acct?.uid || !acct.name) continue;
+    try {
+      if (await ensureProfile(store, acct, now)) out.made++;
+      else out.failed++;
+    } catch {
+      out.failed++;
+    }
+  }
+  return out;
+}
+
 /** Someone deleted their account: their profile, username and every pair with them go. */
 export async function forgetPerson(store: PeopleStore, uid: string) {
   const pf = await get<Profile>(store, `pf/${uid}`);
@@ -329,5 +437,8 @@ export async function forgetPerson(store: PeopleStore, uid: string) {
     await store.delete(`ln/${other}/${uid}`);
     await store.delete(b.key);
   }
+  const mine = await get<{ token: string }>(store, `mtu/${uid}`);
+  if (mine) await store.delete(`mt/${mine.token}`);
+  await store.delete(`mtu/${uid}`);
   await store.delete(`pf/${uid}`);
 }

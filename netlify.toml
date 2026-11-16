@@ -14,3 +14,7 @@
 # Reminders: send whatever has fallen due, every 15 minutes.
 [functions."push-cron"]
   schedule = "*/15 * * * *"
+
+# Usernames for accounts that don't have one yet (signed up before usernames). Daily, 08:47 India time.
+[functions."people-cron"]
+  schedule = "17 3 * * *"

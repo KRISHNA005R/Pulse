@@ -121,7 +121,7 @@ export interface PeopleHost {
   update(fn: (s: State) => void): void;
 }
 export interface PeopleView {
-  me: { uid: string; u: string; name: string; renamesLeft: number } | null;
+  me: { uid: string; u: string; name: string; renamesLeft: number; face?: string; fresh?: boolean } | null;
   friends: FriendRow[];
   received: FriendRow[];
   sent: FriendRow[];
@@ -175,6 +175,36 @@ export async function syncPeople(host: PeopleHost, leave: (l: FriendLink) => Pro
   });
   for (const l of gone) await leave(l);
   return true;
+}
+
+/** "You're @…" has been shown: never again, on any phone. */
+export function markTold() {
+  if (view.me?.fresh) setView({ ...view, me: { ...view.me, fresh: false } });
+  void peopleCall({ action: 'told' });
+}
+
+/** A Meet code from someone's QR or link (#meet=…), or ''. */
+export function meetToken(text: string): string {
+  return text.match(/[#?&]meet=([A-Za-z0-9_-]{16})(?![A-Za-z0-9_-])/)?.[1] ?? '';
+}
+const PENDING = 'pulse-meet-pending-v1';
+/** A Meet link opened before signing in: kept for a few minutes (the code only lasts 3). */
+export function keepMeet(token: string) {
+  try {
+    localStorage.setItem(PENDING, JSON.stringify({ token, at: Date.now() }));
+  } catch {
+    /* it's only a convenience */
+  }
+}
+export function takeMeet(): string {
+  try {
+    const raw = localStorage.getItem(PENDING);
+    localStorage.removeItem(PENDING);
+    const x = raw ? (JSON.parse(raw) as { token?: string; at?: number }) : null;
+    return x?.token && Date.now() - (x.at ?? 0) < 4 * 60_000 ? x.token : '';
+  } catch {
+    return '';
+  }
 }
 
 /** Do something with another person, then refresh. Returns the error to show, or ''. */

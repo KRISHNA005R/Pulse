@@ -141,11 +141,19 @@ export function askPulse(s: State, asked: string): AIAnswer {
   const fresh = askNew(s, q);
   if (fresh) return fresh;
 
-  // --- Friends: only real ones, connected with a link ---
-  if (/\b(add|invite|connect|new)\b.*\b(friends?|dost|people|someone|members?)\b|\bfriends?\b.*\b(add|invite|connect)\b/.test(q) && !/\d/.test(q) && !/bhisi|bisi/.test(q)) {
+  // --- Friends: You → Friends (Meet, @username, your card); groups: pick friends or share a link ---
+  if (/\b(username|user name)\b/.test(q))
+    return { text: `You’re @${s.user.username ?? 'you'}. Change it in You → Profile.`, blocks: [{ type: 'link', label: 'Change username', to: { kind: 'sheet', sheet: { type: 'username' } } }] };
+  if (/\b(add|invite|connect|new|meet)\b.*\b(friends?|dost|people|someone|members?)\b|\bfriends?\b.*\b(add|invite|connect)\b|\bnamedrop\b/.test(q) && !/\d/.test(q) && !/bhisi|bisi/.test(q)) {
     if (/\bgroups?\b/.test(q))
-      return { text: 'Share the group’s link. Whoever opens it joins.', blocks: [{ type: 'link', label: 'Open Splits', to: { kind: 'route', tab: 'plans', segment: 'splits' } }] };
-    return { text: 'Send your PULSE link. Whoever opens it is connected with you.', blocks: [{ type: 'link', label: 'Share my PULSE link', to: { kind: 'sheet', sheet: { type: 'friend-invite' } } }] };
+      return { text: 'Open the group and tap Pick friends, or share its link.', blocks: [{ type: 'link', label: 'Open Splits', to: { kind: 'route', tab: 'plans', segment: 'splits' } }] };
+    return {
+      text: 'Hold phones together and tap Meet: they scan, you’re friends. Or add by @username.',
+      blocks: [
+        { type: 'link', label: 'Meet', to: { kind: 'sheet', sheet: { type: 'meet' } } },
+        { type: 'link', label: 'Friends', to: { kind: 'route', tab: 'you', route: { name: 'friends' } } },
+      ],
+    };
   }
 
   // --- Monthly / yearly report ---
@@ -213,7 +221,7 @@ export function askPulse(s: State, asked: string): AIAnswer {
         : action.kind === 'settle'
           ? 'Got it. Check this and tap Save.'
           : strangers.length
-            ? `${strangers.join(', ')} isn’t on PULSE with you, so this is your spend. Send your PULSE link to split.`
+            ? `${strangers.join(', ')} isn’t on PULSE with you, so this is your spend. Add them in You → Friends to split.`
             : "Here's what I'll add. Tap Add to save it.";
     return { text, blocks: [{ type: 'action', action }, ...(strangers.length ? [{ type: 'link' as const, label: 'Share my PULSE link', to: { kind: 'sheet' as const, sheet: { type: 'friend-invite' } } }] : [])] };
   }

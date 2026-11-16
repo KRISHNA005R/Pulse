@@ -25,7 +25,7 @@ const SHOWN = 10;
 /**
  * Pick people for a split or a group: friends connected on PULSE only (no typed names, so no
  * doubles and nobody made up). With a few it is a row of names to tap; with many, the ones picked
- * and the most recent show, and the box searches the rest. New friends come through your PULSE link.
+ * and the most recent show, and the box searches the rest. New friends are added in You → Friends.
  */
 export function PeoplePicker({ selected, onChange, inputId, center }: { selected: string[]; onChange: (ids: string[]) => void; inputId: string; center?: boolean }) {
   const store = useStore();

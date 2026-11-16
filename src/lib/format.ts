@@ -147,12 +147,47 @@ export function clamp(n: number, lo: number, hi: number) {
 }
 
 /** Light, optional haptic tick. Visual feedback is always handled by CSS. */
+/**
+ * A light tap. Android: the vibration motor. iPhone (Safari 17.4+): the web has no vibration there,
+ * but switching a switch control gives the system's own tick, so a hidden one is flipped. Only works
+ * during a tap; anywhere else it quietly does nothing.
+ */
 export function haptic(ms = 8) {
   try {
-    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(ms);
+    if (typeof navigator === 'undefined') return;
+    if ('vibrate' in navigator) return void navigator.vibrate(ms);
+    iosTick();
   } catch {
     /* not supported */
   }
+}
+/** Something worked: two taps. */
+export function hapticSuccess() {
+  try {
+    if (typeof navigator === 'undefined') return;
+    if ('vibrate' in navigator) return void navigator.vibrate([14, 70, 28]);
+    iosTick();
+    window.setTimeout(iosTick, 110);
+  } catch {
+    /* not supported */
+  }
+}
+let tick: HTMLLabelElement | null = null;
+function iosTick() {
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios || typeof document === 'undefined') return;
+  if (!tick) {
+    tick = document.createElement('label');
+    tick.setAttribute('aria-hidden', 'true');
+    tick.style.cssText = 'position:fixed;left:-100px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.setAttribute('switch', '');
+    box.tabIndex = -1;
+    tick.appendChild(box);
+    document.body.appendChild(tick);
+  }
+  tick.click();
 }
 
 export function ordinal(n: number): string {

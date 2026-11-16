@@ -9,7 +9,7 @@ import { markBhisiAutoJoin } from '../lib/bhisiShare';
 import { invitedTo, openInvites } from '../lib/invites';
 import { QR } from '../screens/Sync';
 import { EmptyState, PersonAvatar, TopNavigation } from './ui/bits';
-import { act, peopleCall, peopleView, type FriendRow, type PeopleView } from '../lib/people';
+import { act, markTold, peopleCall, peopleView, takeMeet, type FriendRow, type PeopleView } from '../lib/people';
 import { canon, problem } from '../../netlify/lib/username';
 import { haptic, rupees } from '../lib/format';
 import { copyText, shareText, useHost, type Shared } from './Friends';
@@ -144,12 +144,24 @@ export function FriendsScreen() {
           </div>
           <div className="shrink-0">{url ? <QR text={url} size={112} label="QR code to add you as a friend" /> : <span className="block h-[112px] w-[112px] rounded-xl bg-white/20" />}</div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button type="button" className="tap flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-[#FFFBF4] text-[14px] font-semibold text-[#17140F]" disabled={!url} onClick={async () => say(await shareText(`Add me on PULSE${u ? ` (@${u})` : ''} and we can split bills:`, url))}>
+        <div className="mt-4 flex gap-2">
+          {signedIn && (
+            <button
+              type="button"
+              className="tap flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-full bg-[#17140F] text-[14px] font-semibold text-[#FFFBF4]"
+              onClick={() => {
+                haptic(10);
+                ui.openSheet({ type: 'meet' });
+              }}
+            >
+              <Icon name="scan" size={16} /> Meet
+            </button>
+          )}
+          <button type="button" className="tap flex min-h-[42px] flex-1 items-center justify-center gap-2 rounded-full bg-[#FFFBF4] text-[14px] font-semibold text-[#17140F]" disabled={!url} onClick={async () => say(await shareText(`Add me on PULSE${u ? ` (@${u})` : ''} and we can split bills:`, url))}>
             <Icon name="share" size={16} /> Share
           </button>
-          <button type="button" className="tap flex min-h-[42px] items-center justify-center gap-2 rounded-full bg-black/15 text-[14px] font-semibold" disabled={!url} onClick={async () => say((await copyText(url)) ? 'copied' : 'failed')}>
-            <Icon name="copy" size={16} /> Copy link
+          <button type="button" className="tap grid min-h-[42px] w-[42px] shrink-0 place-items-center rounded-full bg-black/15" aria-label="Copy link" disabled={!url} onClick={async () => say((await copyText(url)) ? 'copied' : 'failed')}>
+            <Icon name="copy" size={16} />
           </button>
         </div>
       </section>
@@ -409,6 +421,67 @@ export function InviteCards({ k }: { k: 'g' | 'b' }) {
       })}
     </div>
   );
+}
+
+/** Shown once: the username PULSE made for you (and how to change it). */
+export function HelloUsername({ onDone }: { onDone: () => void }) {
+  const store = useStore();
+  const ui = useUI();
+  const u = peopleView().me?.u ?? store.state.user.username ?? '';
+  // Said once, even if they close it with the X.
+  useEffect(() => markTold(), []);
+  return (
+    <div className="flex flex-col items-center gap-4 pb-1 text-center">
+      <PersonAvatar me size={72} />
+      <div>
+        <p className="display break-all text-[28px] leading-tight">@{u}</p>
+        <p className="mt-2 text-[14.5px] text-ink2">Friends can find and add you with it.</p>
+      </div>
+      <button type="button" className="btn-accent w-full" onClick={onDone}>
+        Love it
+      </button>
+      <button
+        type="button"
+        className="btn-ghost -mt-2 w-full"
+        onClick={() => {
+          onDone();
+          ui.openSheet({ type: 'username' });
+        }}
+      >
+        Change it
+      </button>
+    </div>
+  );
+}
+
+/**
+ * App-wide: say hello to a new username once, open a Meet link kept from before signing in, and put
+ * friend requests and invites on the app icon (the badge, where the phone supports it).
+ */
+export function usePeopleNotices() {
+  const store = useStore();
+  const ui = useUI();
+  const people = usePeople();
+  const { state } = store;
+  const ready = state.onboarding.done && state.mode === 'personal';
+  const quiet = ui.sheets.length === 0;
+  useEffect(() => {
+    if (!ready || !quiet || !loadSession()) return;
+    const kept = takeMeet();
+    if (kept) return ui.openSheet({ type: 'meet', token: kept });
+    if (people.me?.fresh) ui.openSheet({ type: 'hello-username' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, quiet, people.me?.fresh]);
+  const badge = ready ? people.received.length + openInvites(state).length : 0;
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    try {
+      if (badge > 0) void nav.setAppBadge?.(badge).catch(() => {});
+      else void nav.clearAppBadge?.().catch(() => {});
+    } catch {
+      /* no badges here */
+    }
+  }, [badge]);
 }
 
 /** Change your @username: any free one; a few ideas from your name. */

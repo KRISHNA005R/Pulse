@@ -108,9 +108,16 @@ describe('real friends only', () => {
     expect(act && act.type === 'action' && act.action.kind).toBe('expense');
     expect(a.text).toMatch(/Aman isn’t on PULSE with you/);
   });
-  it('how to add a friend: your PULSE link', () => {
+  it('how to add a friend: Meet, or You → Friends', () => {
     const a = ask(personal(), 'how do i add a friend?');
-    expect(links(a.blocks).some((l) => l.to.kind === 'sheet' && l.to.sheet.type === 'friend-invite')).toBe(true);
+    expect(links(a.blocks).some((l) => l.to.kind === 'sheet' && l.to.sheet.type === 'meet')).toBe(true);
+    expect(links(a.blocks).some((l) => l.to.kind === 'route' && l.to.route?.name === 'friends')).toBe(true);
+  });
+  it('my username, and where to change it', () => {
+    const s = personal();
+    s.user.username = 'krishna.mood';
+    const a = ask(s, 'what is my username');
+    expect(a.text).toContain('@krishna.mood');
   });
 });
 

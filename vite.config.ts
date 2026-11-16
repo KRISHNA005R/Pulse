@@ -78,6 +78,7 @@ export default defineConfig(({ mode }) => {
                 ],
                 shortcuts: [
                   { name: 'Add expense', short_name: 'Add', description: 'Log money in or out', url: '/?action=add', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
+                  { name: 'Meet a friend', short_name: 'Meet', description: 'Phones together to add a friend', url: '/?action=meet', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
                   { name: 'Can I afford this?', short_name: 'Afford?', description: 'Check a purchase against your week', url: '/?action=afford', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
                   { name: 'Plans', short_name: 'Plans', description: 'Your plans, splits and budgets', url: '/?tab=plans', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },
                   { name: 'Ask PULSE AI', short_name: 'Ask AI', description: 'Ask about your money', url: '/?action=ai', icons: [{ src: '/icon-192.png', sizes: '192x192' }] },

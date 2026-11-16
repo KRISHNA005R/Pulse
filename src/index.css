@@ -375,3 +375,30 @@ body {
 /* Sideways rows: the ‹ › arrows only on a laptop/desktop with a mouse (touch already swipes). */
 .hscroll-arrow { display: none; }
 @media (hover: hover) and (pointer: fine) { .hscroll-arrow { display: grid; } }
+
+/* ---------- Meet (phones together) ---------- */
+.meet-ring {
+  position: absolute; inset: 22px; border-radius: 9999px;
+  border: 2px solid rgb(var(--accent)); opacity: 0;
+  animation: meet-ring 2.1s cubic-bezier(.2,.7,.3,1) infinite;
+}
+.meet-ring-fast { animation-duration: 1.05s; }
+@keyframes meet-ring { 0% { transform: scale(.7); opacity: .85; } 100% { transform: scale(1.45); opacity: 0; } }
+.meet-left { animation: meet-left .62s cubic-bezier(.2,.9,.3,1.15) both; }
+.meet-right { animation: meet-right .62s cubic-bezier(.2,.9,.3,1.15) both; }
+@keyframes meet-left { from { transform: translateX(-140px) rotate(-8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes meet-right { from { transform: translateX(140px) rotate(8deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.meet-burst {
+  position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px;
+  border-radius: 9999px; background: rgb(var(--accent) / .22); opacity: 0;
+  animation: meet-burst 1s .5s ease-out both;
+}
+@keyframes meet-burst { 0% { transform: scale(.3); opacity: .9; } 100% { transform: scale(2.6); opacity: 0; } }
+.meet-check { animation: meet-check .45s .62s cubic-bezier(.2,.9,.3,1.4) both; }
+@keyframes meet-check { from { transform: translateX(-50%) scale(0); } to { transform: translateX(-50%) scale(1); } }
+.meet-text { animation: rise-in .45s .75s cubic-bezier(.2,.8,.3,1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .meet-ring { animation: none; opacity: .35; transform: scale(1.1); }
+  .meet-left, .meet-right, .meet-burst, .meet-text { animation: none; }
+  .meet-check { animation: none; transform: translateX(-50%); }
+}
