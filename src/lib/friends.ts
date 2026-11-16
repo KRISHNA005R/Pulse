@@ -907,12 +907,23 @@ export function applyGroup(s: State, groupId: string, view: GroupView): GroupNew
     if (m.deleted && (sh.on ?? []).includes(m.mid)) news.push({ person: p.id, group: group.id, title: `${p.short} deleted their PULSE account`, body: `They’ve left ${group.name}. What they added stays.` });
   }
   // The writer of a hand-typed name can also say who it is (they merged the two names on their phone).
+  const asks: NonNullable<GroupShare['asks']> = [];
   for (const m of others) {
     for (const pair of Array.isArray(m.box.also) ? m.box.also.slice(0, 60) : []) {
       const ghost = String(pair?.[0]);
       const mid = String(pair?.[1]);
+      // Never "that name is you": only I can say a name is me (my own claim). Someone else's phone
+      // folding their typed name into me made their entries mine here (Krishna's ₹653).
+      if (mid === sh.mid) {
+        if (sh.claim !== ghost && !(sh.notMe ?? []).includes(ghost)) asks.push({ ghost, name: clip(m.box.ghosts?.find((g) => g?.id === ghost)?.name, 40) || 'a name', by: person(sh.refs[m.mid])?.short ?? 'Someone' });
+        continue;
+      }
       if (GHOST.test(ghost) && ghost.startsWith(`${m.mid}.`) && MID.test(mid) && !claimedBy.has(ghost)) claimedBy.set(ghost, mid);
     }
+  }
+  if (asks.length || sh.asks?.length) {
+    if (asks.length) sh.asks = asks.slice(0, 5);
+    else delete sh.asks;
   }
   // Wherever a hand-typed name is a separate person here, fold it into the member it turned out to be.
   for (const [ghost, mid] of claimedBy) {

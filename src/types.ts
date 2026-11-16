@@ -302,6 +302,10 @@ export interface GroupShare {
   on: string[];
   /** A name someone else typed by hand that turned out to be me. */
   claim?: string;
+  /** Other members say a name they typed is me: asked here, never assumed. [their typed name's id, the name, who says so]. */
+  asks?: { ghost: string; name: string; by: string }[];
+  /** Names I said aren't me. */
+  notMe?: string[];
   since: ISODate;
 }
 

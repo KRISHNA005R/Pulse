@@ -514,7 +514,7 @@ function Faces({ ids, max = 5 }: { ids: string[]; max?: number }) {
 type GroupTab = 'expenses' | 'balances' | 'settled';
 
 export function GroupDetail({ id }: { id: string }) {
-  const { state, deleteSplit } = useStore();
+  const { state, deleteSplit, answerNameAsk } = useStore();
   const ui = useUI();
   const [tab, setTab] = useState<GroupTab>('expenses');
   const group = state.groups.find((g) => g.id === id);
@@ -585,6 +585,23 @@ export function GroupDetail({ id }: { id: string }) {
           </button>
         )}
       </section>
+
+      {/* Another member says a name they typed is me. Nothing becomes mine until I say so. */}
+      {(group.shared?.asks ?? []).map((a) => (
+        <div key={a.ghost} className="mt-4 rounded-2xl border border-line bg-surface p-4" role="alert">
+          <p className="text-[14.5px]">
+            {a.by} says “{a.name}” is you.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button type="button" className="btn-quiet min-h-[40px] flex-1 text-[14px]" onClick={() => answerNameAsk(id, a.ghost, false)}>
+              Not me
+            </button>
+            <button type="button" className="btn-accent min-h-[40px] flex-1 text-[14px]" onClick={() => answerNameAsk(id, a.ghost, true)}>
+              That’s me
+            </button>
+          </div>
+        </div>
+      ))}
 
       {others.length > 0 && (
         <>
@@ -902,7 +919,7 @@ export function PersonDetail({ id }: { id: string }) {
         </ul>
       </section>
       {/* Merging is only for old names typed by hand: two real PULSE people are never merged into one. */}
-      {state.mode === 'personal' && state.people.length > 1 && !p.acct && !p.link && (
+      {state.mode === 'personal' && state.people.length > 1 && !p.acct && !p.link && !p.uid && (
         <button type="button" className="btn-ghost mt-6 min-h-[40px] px-1 text-[13.5px] text-ink3" onClick={() => ui.openSheet({ type: 'person-merge', personId: id })}>
           Is {p.short} in your list twice? Merge the two names
         </button>

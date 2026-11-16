@@ -1485,6 +1485,19 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** Someone in a shared group says a name they typed is me: I say yes (it becomes mine) or no (never asked again). */
+  const answerNameAsk = useCallback(
+    (groupId: string, ghost: string, mine: boolean) =>
+      commit((s) => {
+        const sh = s.groups.find((g) => g.id === groupId)?.shared;
+        if (!sh) return;
+        if (mine && !sh.claim) sh.claim = ghost;
+        if (!mine) sh.notMe = [...new Set([...(sh.notMe ?? []), ghost])].slice(-50);
+        sh.asks = (sh.asks ?? []).filter((a) => a.ghost !== ghost);
+        if (!sh.asks.length) delete sh.asks;
+      }),
+    [commit],
+  );
   /** Friends made by request (lib/people.ts): their entries and channels. Only ever the person's own data. */
   const peopleUpdate = useCallback(
     (fn: (s: State) => void) => {
@@ -2359,6 +2372,7 @@ function useStoreImpl() {
     deleteSplit,
     editSplit,
     peopleUpdate,
+    answerNameAsk,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,
