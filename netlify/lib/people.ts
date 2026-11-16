@@ -211,17 +211,18 @@ export async function handlePeople(body: Record<string, unknown>, store: PeopleS
 
   if (action === 'list') {
     const keys = (await store.list({ prefix: `ln/${me.uid}/` })).blobs.map((b) => b.key.slice(`ln/${me.uid}/`.length)).filter((x) => UID.test(x));
-    const out: Record<'friends' | 'received' | 'sent' | 'blocked', ReturnType<typeof card> & { since?: string; at: string }[]> = { friends: [], received: [], sent: [], blocked: [] } as never;
+    type Row = ReturnType<typeof card> & { since?: string; at: string };
+    const out: Record<'friends' | 'received' | 'sent' | 'blocked', Row[]> = { friends: [], received: [], sent: [], blocked: [] };
     await Promise.all(
       keys.map(async (other) => {
         const [r, pf] = await Promise.all([get<Rel>(store, pairKey(me.uid, other)), get<Profile>(store, `pf/${other}`)]);
         if (!r || !pf) return;
         const st = standing(r, me.uid);
         if (st === 'none') return;
-        (out[st] as unknown[]).push({ ...card(pf), at: r.at, ...(r.since ? { since: r.since } : {}) });
+        out[st].push({ ...card(pf), at: r.at, ...(r.since ? { since: r.since } : {}) });
       }),
     );
-    for (const k of Object.keys(out) as (keyof typeof out)[]) (out[k] as { u: string }[]).sort((x, y) => x.u.localeCompare(y.u));
+    for (const k of Object.keys(out) as (keyof typeof out)[]) out[k].sort((x, y) => x.u.localeCompare(y.u));
     return ok(out);
   }
 
