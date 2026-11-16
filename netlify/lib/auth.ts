@@ -20,6 +20,7 @@
 //   meta/count               -> { n }                   the highest number given out
 //   rate/<kind>/<key>/<hour> -> { c }                   how many emails went out, per sender and in all
 //   face/<id>                -> a GIF profile photo (netlify/lib/faces.ts)
+import { forgetPerson } from './people';
 import { EMAIL, type Mail } from './emails';
 
 export interface AuthStore {
@@ -295,6 +296,8 @@ export async function handleAuth(body: Record<string, unknown>, ctx: AuthCtx, be
     await store.delete(`sess/${th}`);
     await store.delete(`mail/${await sha256(acct.email)}`);
     if (acct.face) await store.delete(`face/${acct.face}`);
+    // Their username and friends go too (netlify/lib/people.ts).
+    await forgetPerson(store as never, acct.uid);
     await store.delete(`acct/${acct.uid}`);
     return { status: 200, body: { ok: true } };
   }

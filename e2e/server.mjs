@@ -60,7 +60,7 @@ const edge = `http://127.0.0.1:${BLOBS_PORT}`;
 process.env.NETLIFY_BLOBS_CONTEXT = Buffer.from(JSON.stringify({ siteID: 'e2e-site', token: 'local', edgeURL: edge, uncachedEdgeURL: edge })).toString('base64');
 
 // --- 3. The real server functions, bundled the way Netlify does ----------------------------------
-const routes = { '/api/sync': 'sync', '/api/ping': 'stats', '/api/stats': 'stats', '/api/push': 'push', '/api/friends': 'friends', '/api/auth': 'auth', '/api/face': 'face', '/api/feedback': 'feedback', '/api/announce': 'announce' };
+const routes = { '/api/sync': 'sync', '/api/ping': 'stats', '/api/stats': 'stats', '/api/push': 'push', '/api/friends': 'friends', '/api/auth': 'auth', '/api/face': 'face', '/api/people': 'people', '/api/feedback': 'feedback', '/api/announce': 'announce' };
 const out = path.join(dir, 'fn');
 const fns = {};
 for (const name of new Set(Object.values(routes))) {
