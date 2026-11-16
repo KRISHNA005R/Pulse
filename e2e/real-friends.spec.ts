@@ -3,7 +3,7 @@ import { openDemo, setState, state } from './helpers';
 
 // Real friends only: on a real account people come from your PULSE link, never from a typed name.
 
-test('splitting: only friends connected on PULSE to pick, no box to type a new name, and "Add a friend" sends your link', async ({ page }) => {
+test('splitting: only friends connected on PULSE to pick, no box to type a new name, and "Add a friend" opens Friends', async ({ page }) => {
   await openDemo(page, 'Krishna');
   await setState(
     page,
@@ -24,7 +24,9 @@ test('splitting: only friends connected on PULSE to pick, no box to type a new n
   await expect(dialog.getByRole('button', { name: /^Riya/ })).toHaveCount(0);
   await expect(dialog.getByPlaceholder(/add a friend|by name/i)).toHaveCount(0);
   await dialog.getByRole('button', { name: /Add a friend/ }).first().click();
-  await expect(page.getByText('Your PULSE link')).toBeVisible();
+  // It goes to You → Friends (your card), not a link inside the split.
+  await expect(page.getByLabel('Your friend card')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('opening PULSE tidies the list: the same friend twice becomes one, unused names go, names with history stay', async ({ page }) => {

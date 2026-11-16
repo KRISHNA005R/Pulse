@@ -155,6 +155,7 @@ test('friends tab: request, accept, then invite to a bhisi and a group without l
   await expect(gi).toBeVisible();
   await shot(B, '15-saloni-group-invite');
   await gi.getByRole('button', { name: 'Join' }).click();
-  await B.getByRole('dialog').last().getByRole('button', { name: /I.m Saloni/ }).click();
+  // Asks "Is one of these you?" when Krishna's group already lists her by name; else plain Join.
+  await B.getByRole('dialog').last().getByRole('button', { name: /I.m Saloni|Join Goa trip/ }).first().click();
   await expect.poll(async () => (await state(B)).groups.some((g: { name: string; shared?: unknown }) => g.name === 'Goa trip' && g.shared), { timeout: 20_000 }).toBe(true);
 });
