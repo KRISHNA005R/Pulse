@@ -32,7 +32,7 @@ const settle = async (...ps: Page[]) => {
     }
 };
 
-test('people join with the link (opened, or pasted in PULSE): everyone sees the same three, and pays by UPI', async ({ browser, baseURL }) => {
+test('people join with an older invite link: everyone sees the same three, and pays by UPI', async ({ browser, baseURL }) => {
   test.setTimeout(150_000);
   const A = await phone(browser, baseURL!, 'Krishna');
   await setState(A, 's.user.upi = a;', 'krishna@okaxis');
@@ -42,11 +42,8 @@ test('people join with the link (opened, or pasted in PULSE): everyone sees the 
   const B = await phone(browser, baseURL!, 'Rahul');
   const P = await phone(browser, baseURL!, 'Priya');
   await join(B, invite);
-  // Priya pastes the link inside PULSE instead (her home-screen app on iPhone).
-  await P.getByRole('button', { name: 'Plans', exact: true }).last().click();
-  await P.getByRole('radio', { name: 'Bhisi' }).or(P.getByRole('button', { name: 'Bhisi', exact: true })).first().click();
-  await P.getByRole('button', { name: /I have an invite link/ }).click();
-  await P.getByRole('textbox', { name: /Bhisi invite link/ }).fill(`Join my bhisi "Hostel gang BC" on PULSE: ${invite}`);
+  // Old links still open: Priya opens it too.
+  await P.goto(invite);
   await expect(P.getByText(/Join Hostel gang BC\?/)).toBeVisible();
   await expect(P.getByText(/By Krishna · ₹2,000 a month/)).toBeVisible();
   await P.getByRole('button', { name: /Join the bhisi/ }).click();

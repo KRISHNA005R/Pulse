@@ -7,6 +7,7 @@ import { roundMoney } from '../lib/currency';
 import { chances, currentRound, EARLY_DAYS, inBowl, isDone, myStanding, pot, replayUrl, ticketLabel, tickets, TICKETS, type DrawReplay } from '../lib/bhisi';
 import { bhisiUrl, parseBhisiLink, peekBhisi, seatOf, type BhisiInvite, type BhisiPeek } from '../lib/bhisiShare';
 import { cleanVpa, okVpa, phoneKind, UPI_ICONS } from '../lib/upi';
+import { InviteCards } from './FriendsHub';
 import { Icon } from './ui/Icon';
 import { UpiPay } from './UpiPay';
 import { Field, MoneyInput, PersonAvatar, TopNavigation } from './ui/bits';
@@ -65,6 +66,8 @@ export function BhisiList() {
   useEffect(() => void markTried('bhisi'), []); // eslint-disable-line react-hooks/exhaustive-deps
   if (!list.length)
     return (
+      <>
+      <InviteCards k="b" />
       <section className="relative overflow-hidden rounded-3xl border border-line bg-surface px-6 pb-6 pt-4 text-center">
         <img src="/illustrations/bhisi.webp" alt="" aria-hidden="true" width={1000} height={558} decoding="async" data-testid="bhisi-art" className="-mx-2 mb-2 h-auto w-[calc(100%+16px)] max-w-none" />
         <h2 className="display mt-1 text-[23px] leading-tight">Bhisi, but make it digital</h2>
@@ -86,20 +89,16 @@ export function BhisiList() {
         <button type="button" className="btn-accent mt-5 w-full" onClick={() => ui.openSheet({ type: 'bhisi-form' })}>
           <Icon name="plus" size={17} className="shrink-0" /> Start a bhisi
         </button>
-        <button type="button" className="btn-ghost mt-1 w-full" onClick={() => ui.openSheet({ type: 'bhisi-join' })}>
-          I have an invite link
-        </button>
         <p className="mt-3 text-[12px] text-ink3">PULSE runs the draw. It never holds your money.</p>
       </section>
+      </>
     );
   return (
     <div className="flex flex-col gap-3">
+      <InviteCards k="b" />
       {list.map((b) => (
         <BhisiCard key={b.id} b={b} />
       ))}
-      <button type="button" className="btn-ghost w-full text-[14px]" onClick={() => ui.openSheet({ type: 'bhisi-join' })}>
-        I have an invite link
-      </button>
     </div>
   );
 }
@@ -154,6 +153,7 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
     return [...state.people].sort((a, b) => Number(inGroups.has(b.id) || splitWith.has(b.id) || !!b.link) - Number(inGroups.has(a.id) || splitWith.has(a.id) || !!a.link) || a.name.localeCompare(b.name));
   }, [state.people, state.groups, state.splits]);
   const groups = state.groups.filter((g) => g.members.some((m) => m !== 'me'));
+  const onPulse = useMemo(() => state.people.filter((p) => p.link?.status === 'linked').sort((a, b) => a.name.localeCompare(b.name)), [state.people]);
   const toggle = (id: string) => setPeople((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
   // On a real account nobody is picked or typed in: everyone joins with the link, as themselves.
   const real = state.mode === 'personal';
@@ -178,9 +178,39 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
       </div>
 
       {real ? (
-        <div className="rounded-2xl bg-sunk p-4">
-          <p className="text-[13px] font-semibold text-ink2">Who’s in?</p>
-          <p className="mt-1 text-[13.5px] text-ink2">You, plus everyone who joins with the link.</p>
+        <div>
+          <div className="mb-2 flex items-baseline justify-between">
+            <p className="text-[13px] font-semibold text-ink2">Invite friends</p>
+            <p className="text-[12.5px] text-ink3">You + {people.length}</p>
+          </div>
+          {onPulse.length ? (
+            <div className="grid grid-cols-4 gap-2">
+              {onPulse.slice(0, 24).map((p) => {
+                const on = people.includes(p.id);
+                return (
+                  <button key={p.id} type="button" aria-pressed={on} onClick={() => toggle(p.id)} className={`tap relative flex flex-col items-center gap-1 rounded-2xl px-1 py-2 ${on ? 'bg-accent-soft' : 'bg-sunk/60'}`}>
+                    <PersonAvatar person={p} size={40} />
+                    <span className="max-w-full truncate text-[12px] font-semibold">{p.short}</span>
+                    {on && <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-accent text-[#17140F]"><Icon name="check" size={12} strokeWidth={3} /></span>}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="row-btn rounded-2xl bg-sunk px-3"
+              onClick={() => {
+                onDone();
+                ui.push({ name: 'friends' }, 'you');
+              }}
+            >
+              <Icon name="user-plus" size={18} className="shrink-0 text-ink2" />
+              <span className="min-w-0 flex-1 text-left text-[14px] font-semibold">Add friends first</span>
+              <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
+            </button>
+          )}
+          <p className="mt-2 text-[12.5px] text-ink3">They get the invite in PULSE.</p>
         </div>
       ) : (
         <div>
@@ -221,7 +251,6 @@ export function BhisiForm({ onDone }: { onDone: () => void }) {
               })}
             </div>
           )}
-          <p className="mt-2 text-[12.5px] text-ink3">Share the invite link after you start it.</p>
         </div>
       )}
 
@@ -392,8 +421,8 @@ export function BhisiDetail({ id }: { id: string }) {
               {b.members.filter((m) => !byName(m)).length} on PULSE{b.members.some(byName) ? ` · ${b.members.filter(byName).length} added by name` : ''}
             </span>
           </div>
-          <button type="button" className="btn-primary mt-3 w-full" onClick={() => void shareLink(`Join my bhisi "${b.name}" on PULSE 🏺 ${rupees(b.amount)} a month, lucky chit every month:`, invite, store.toast)}>
-            <Icon name="share" size={16} /> Send the invite link
+          <button type="button" className="btn-primary mt-3 w-full" onClick={() => ui.openSheet({ type: 'invite-friends', k: 'b', url: invite, name: b.name })}>
+            <Icon name="user-plus" size={16} /> Invite friends
           </button>
           <p className="mt-2 text-[12px] text-ink3">Joining closes at the first draw.</p>
         </section>

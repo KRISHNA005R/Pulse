@@ -7,6 +7,7 @@ import { StoreProvider, useStore } from './store/store';
 import { AuthProvider } from './store/auth';
 import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
 import { PeopleScreen } from './components/People';
+import { FriendsScreen } from './components/FriendsHub';
 import { UIProvider, useUI } from './store/ui';
 import { BottomNavigation, MobileTopBar, SideNavigation } from './components/Navigation';
 import { SheetHost } from './components/SheetHost';
@@ -80,6 +81,8 @@ function Screen() {
         return <AccountScreen />;
       case 'people':
         return <PeopleScreen />;
+      case 'friends':
+        return <FriendsScreen />;
       case 'settings':
         return <SettingsScreen section={r.section} />;
     }

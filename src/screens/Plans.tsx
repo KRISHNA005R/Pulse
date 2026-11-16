@@ -1,4 +1,4 @@
-import { usePeople } from '../components/FriendsHub';
+import { InviteCards, usePeople } from '../components/FriendsHub';
 import { act } from '../lib/people';
 import { SwipeRow } from '../components/ui/SwipeRow';
 import { useMemo, useRef, useState } from 'react';
@@ -125,7 +125,6 @@ function SplitsView() {
   const TOP = 3;
   const people = (everyone.length > TOP ? [...everyone].sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, TOP) : everyone).sort((a, b) => a[1] - b[1]);
   const more = state.people.length - people.length;
-  const requests = usePeople().received.length;
   return (
     <div className="flex flex-col gap-8">
       <div className="grid grid-cols-2 gap-4 rounded-2xl border border-line bg-surface p-4">
@@ -176,16 +175,11 @@ function SplitsView() {
             <Icon name="chevron" size={18} className="shrink-0 text-ink3" />
           </button>
         )}
-        {state.mode === 'personal' && (
-          <button type="button" className="btn-quiet relative mt-3 min-h-[42px] w-full text-[14px]" onClick={() => ui.openSheet({ type: 'friends' })}>
-            <Icon name="user-plus" size={16} /> {requests > 0 ? `Friend requests · ${requests}` : 'Add friends'}
-            {requests > 0 && <span className="absolute right-4 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-accent" aria-hidden="true" />}
-          </button>
-        )}
       </section>
 
       <section aria-labelledby="groups-h">
         <SectionHeader id="groups-h" title="Groups" action={{ label: 'New group', onClick: () => ui.openSheet({ type: 'group-form' }) }} />
+        <InviteCards k="g" />
         {state.groups.length ? (
           <div className="flex flex-col gap-3">
             {state.groups.map((g) => (

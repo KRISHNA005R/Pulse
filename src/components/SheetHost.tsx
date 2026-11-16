@@ -13,7 +13,7 @@ import { TransactionDetail } from './TransactionDetail';
 import { AffordView, AIChat } from './Assistant';
 import { InsightDetailView, SafeBreakdown } from './money';
 import { FriendInvite, FriendJoin, PersonMerge } from './Friends';
-import { FriendsHub, UsernameSheet } from './FriendsHub';
+import { InviteFriends, UsernameSheet } from './FriendsHub';
 import { SplitEdit } from './SplitEdit';
 import { AuthNudge, MemberCardSheet } from './Auth';
 import { AccountForm, CategoryForm, EraseForm, InvestmentForm, BudgetForm, CardForm, ContributeForm, WithdrawForm, DebtForm, DebtEarlyForm, GroupForm, IncomeForm, PlanForm, SettleForm, SubscriptionForm } from './Forms';
@@ -160,10 +160,10 @@ function SheetFor({ spec, z }: { spec: SheetSpec; z: number }) {
           <SettleForm personId={spec.personId} groupId={spec.groupId} onDone={close} />
         </Sheet>
       );
-    case 'friends':
+    case 'invite-friends':
       return (
-        <Sheet title="Friends" onClose={close} size="sm" z={z}>
-          <FriendsHub onDone={close} />
+        <Sheet title={`Invite to ${spec.name}`} onClose={close} size="sm" z={z}>
+          <InviteFriends k={spec.k} url={spec.url} name={spec.name} onDone={close} />
         </Sheet>
       );
     case 'username':

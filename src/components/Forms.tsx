@@ -3,7 +3,7 @@ import { phoneKind } from '../lib/upi';
 import { useAuth } from '../store/auth';
 import { useEffect, useMemo, useState } from 'react';
 import { roundMoney, sym } from '../lib/currency';
-import type { BudgetPeriod, CategoryId, Debt, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
+import type { BudgetPeriod, CategoryId, Debt, Group, FundType, IncomeKind, Investment, InvestmentKind, ISODate, Plan, State, Subscription } from '../types';
 import { decodeBackup, encodeBackup } from '../lib/backupCode';
 import { listVersions, loadSync, pullVersion } from '../lib/sync';
 import { demoCount } from '../lib/demoMix';
@@ -16,6 +16,8 @@ import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closi
 import { Icon } from './ui/Icon';
 import { INV_KIND_ORDER, INV_META, kindMeta, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { PeoplePicker } from './People';
+import { createGroupChannel, groupUrl } from '../lib/friends';
+import { reminderDeviceId } from '../lib/reminders';
 import { Field, MoneyInput, PersonAvatar, Segmented, Toggle, AmountInput } from './ui/bits';
 
 export const PLAN_TEMPLATES: { key: string; name: string; icon: string; target: number; months: number; kind: Plan['kind']; categories: CategoryId[] }[] = [
@@ -487,6 +489,14 @@ export function GroupForm({ onDone }: { onDone: () => void }) {
         className="btn-accent w-full disabled:opacity-40"
         onClick={() => {
           const id = store.addGroup({ name: name.trim(), emoji, members: ['me', ...members], plan: plan || undefined });
+          // Friends picked here get an invite in their PULSE (the group is shared for it).
+          const friends = store.state.mode === 'personal' ? members.filter((m) => store.state.people.some((p) => p.id === m && p.link?.status === 'linked')) : [];
+          const share = friends.length ? store.shareGroup(id) : null;
+          if (share) {
+            void createGroupChannel(share, reminderDeviceId());
+            const n = store.sendInvites('g', groupUrl({ name: name.trim(), shared: share } as Group), name.trim(), friends);
+            if (n) store.toast({ text: n === 1 ? 'Invite sent.' : `${n} invites sent.`, tone: 'good', emoji: '💌' });
+          }
           onDone();
           window.setTimeout(() => ui.resetTo('plans', { name: 'group', id }), 30);
         }}

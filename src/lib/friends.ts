@@ -20,6 +20,7 @@ import { roundMoney } from './currency';
 import { daysBetween, rupees } from './format';
 import { okFace, okGif } from './photo';
 import { cleanVpa, okVpa } from './upi';
+import { invitesFor, takeInvites, type BoxInvite } from './invites';
 import { flushBhisiOutbox, syncBhisi, type BhisiHost } from './bhisiShare';
 
 // ---------------------------------------------------------------------------------------------
@@ -123,6 +124,8 @@ export interface Box {
   items: BoxItem[];
   /** The writer's PULSE account id: lets a friend connected by link be recognised when they're also a friend by request. */
   acct?: string;
+  /** Invites to a group or a bhisi, for this friend only. */
+  inv?: BoxInvite[];
 }
 
 const MID = /^[0-9a-f]{16}$/;
@@ -172,7 +175,7 @@ export function buildBox(s: State, personId: string): Box {
     else if (st.from === personId && st.to === 'me') items.push({ id: st.id, k: 'p', dir: 'you', amt: roundMoney(st.amount), date: st.date });
   }
   items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...(s.user.acct ? { acct: s.user.acct } : {}), ...myFace(s), items };
+  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...(s.user.acct ? { acct: s.user.acct } : {}), ...myFace(s), items, ...(invitesFor(s, personId).length ? { inv: invitesFor(s, personId) } : {}) };
 }
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
@@ -283,6 +286,7 @@ export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
     ownName(p, name);
   }
   setFace(p, box);
+  takeInvites(s, personId, box.inv);
   // The same friend may already be here from a shared group: keep one of them.
   if (typeof box.uid === 'string' && UID.test(box.uid)) {
     for (const twinP of s.people.filter((x) => x.uid === box.uid && x.id !== personId && !x.link)) mergePeople(s, twinP.id, personId);
@@ -634,7 +638,9 @@ async function run(host: FriendHost) {
     const added = box.items.filter((i) => !had.has(i.id));
     const me = state.user.name || box.name;
     // Only a new entry is worth a notification, and only once the friend is there to get it.
-    const notify = theirs && added.length ? summary(added, me) : undefined;
+    const asked = new Set((prev?.inv ?? []).map((i) => i.id));
+    const inv = (box.inv ?? []).filter((i) => !asked.has(i.id));
+    const notify = !theirs ? undefined : inv.length ? { title: `${me} invited you to ${inv[0].name}`, body: 'Open PULSE to join.' } : added.length ? summary(added, me) : undefined;
     await api({ action: 'put', ...cred(link), box: await sealBox(link.key, box), dev, notify });
   }
 }

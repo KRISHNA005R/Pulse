@@ -54,14 +54,17 @@ export function PeoplePicker({ selected, onChange, inputId, center }: { selected
   }, [pool]);
   const label = (p: { name: string; short: string }) => ((twins.get(p.short.toLowerCase()) ?? 0) > 1 ? p.name : p.short);
   const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  const invite = () => ui.openSheet({ type: 'friend-invite' });
+  const invite = () => {
+    ui.closeAllSheets();
+    ui.push({ name: 'friends' }, 'you');
+  };
   if (!pool.length)
     return (
       <div className={`rounded-2xl bg-sunk p-4 ${center ? 'mx-auto max-w-[340px] text-center' : ''}`}>
         <p className="text-[14px] font-semibold">No friends on PULSE yet</p>
-        <p className="mt-1 text-[13px] text-ink3">Send your PULSE link. Friends show up here.</p>
+        <p className="mt-1 text-[13px] text-ink3">Add friends in You → Friends.</p>
         <button type="button" className="btn-accent mt-3 w-full" onClick={invite}>
-          <Icon name="user-plus" size={16} /> Add a friend
+          <Icon name="user-plus" size={16} /> Add friends
         </button>
       </div>
     );
@@ -83,7 +86,7 @@ export function PeoplePicker({ selected, onChange, inputId, center }: { selected
             <Icon name="user-plus" size={15} /> Add a friend
           </button>
         )}
-        {needle && !match.length && <p className="w-full text-[13px] text-ink3">No friend called “{q.trim()}”. New friends join with your PULSE link.</p>}
+        {needle && !match.length && <p className="w-full text-[13px] text-ink3">No friend called “{q.trim()}”.</p>}
       </div>
       {many && (
         <div className={`mt-3 ${center ? 'mx-auto max-w-[320px]' : ''}`}>
@@ -183,7 +186,7 @@ export function PeopleScreen() {
         <p className="px-1 py-8 text-center text-[14.5px] text-ink3">Nobody matches that.</p>
       ) : (
         <div className="mt-4">
-          <EmptyState icon="users" title="Nobody here yet." body="Split an expense or invite a friend, and they show up here." action={{ label: 'Invite friends', onClick: () => ui.openSheet({ type: 'friend-invite' }) }} />
+          <EmptyState icon="users" title="Nobody here yet." body="Split an expense or invite a friend, and they show up here." action={{ label: 'Add friends', onClick: () => ui.push({ name: 'friends' }, 'you') }} />
         </div>
       )}
     </div>

@@ -11,6 +11,7 @@ export type Route =
   | { name: 'group'; id: string }
   | { name: 'person'; id: string }
   | { name: 'people' }
+  | { name: 'friends' }
   | { name: 'subscriptions' }
   | { name: 'networth' }
   | { name: 'investments' }
@@ -74,7 +75,7 @@ export type SheetSpec =
   | { type: 'card-form'; cardId?: string }
   | { type: 'debt-form'; debtId?: string }
   | { type: 'debt-early'; debtId: string }
-  | { type: 'friends' }
+  | { type: 'invite-friends'; k: 'g' | 'b'; url: string; name: string }
   | { type: 'username' }
   | { type: 'confirm'; title: string; body: string; confirm: string; run: () => void };
 

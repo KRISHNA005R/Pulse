@@ -1,3 +1,4 @@
+import { addInvites } from '../lib/invites';
 import { rescaleShares } from '../lib/splitEdit';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
@@ -38,7 +39,7 @@ import { loadSession } from '../lib/auth';
 import { acceptKnock, tidyPeople, applyBox, applyGroup, closeDoor, inGroupOnPulse, deleteGroupChannel, removeGroup, leaveChannel, leaveGroupChannel, mergePeople as mergePeopleIn, newDoor, newShare, unshareGroup as unshareGroupIn, type Box, type BoxItem, type GroupNews, type GroupView } from '../lib/friends';
 import { addDays, addMonths, daysBetween, fmtDate, haptic, monthKey, realToday, rupees, uid } from '../lib/format';
 import { notePayday, nextCoin, gullakFull } from '../lib/fun';
-import { applyBhisi as applyBhisiIn, createBhisiChannel, dropBhisi, leaveOrDeleteBhisi, seatOf, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
+import { applyBhisi as applyBhisiIn, bhisiLink, createBhisiChannel, dropBhisi, leaveOrDeleteBhisi, seatOf, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
 import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
 import { holdingAccounts, mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
@@ -820,6 +821,7 @@ function useStoreImpl() {
   const createBhisi = useCallback(
     (b: { name: string; emoji: string; amount: number; members: string[]; start: ISODate }) => {
       const id = uid('bh');
+      let invited = 0;
       const next = commit((s) => {
         s.bhisis ??= [];
         // On a real account it's shared: friends picked here hold a seat by name until they join with the link.
@@ -829,11 +831,13 @@ function useStoreImpl() {
           share.seats = { [share.mid]: 'me', ...Object.fromEntries(share.ghosts.map((g) => [g.id, g.pid])) };
         }
         s.bhisis.unshift({ id, name: b.name, emoji: b.emoji, amount: roundMoney(b.amount), members: b.members, createdAt: s.today, start: b.start, rounds: b.members.map((_, i) => ({ date: addMonths(b.start, i), paid: [] })), ...(share ? { share } : {}) });
+        // Friends picked here get the invite in their PULSE.
+        if (share) invited = addInvites(s, 'b', bhisiLink(location.origin, { name: b.name, share }), b.name, b.members.filter((m) => m !== 'me'));
       });
       const made = next.bhisis?.find((x) => x.id === id);
       if (made?.share) void createBhisiChannel(made, reminderDeviceId());
       burst({ kind: 'mini', power: 1.2 });
-      toast({ text: `${b.name} is on. Send the invite link so everyone can join.`, tone: 'good', emoji: b.emoji });
+      toast({ text: next.mode !== 'personal' ? `${b.name} is on.` : invited ? `${b.name} is on. ${invited === 1 ? 'Invite sent.' : `${invited} invites sent.`}` : `${b.name} is on. Invite your friends.`, tone: 'good', emoji: b.emoji });
       return id;
     },
     [commit, toast],
@@ -1495,6 +1499,26 @@ function useStoreImpl() {
         if (!mine) sh.notMe = [...new Set([...(sh.notMe ?? []), ghost])].slice(-50);
         sh.asks = (sh.asks ?? []).filter((a) => a.ghost !== ghost);
         if (!sh.asks.length) delete sh.asks;
+      }),
+    [commit],
+  );
+  /** Invite friends to a group or a bhisi (lib/invites.ts). How many were invited. */
+  const sendInvites = useCallback(
+    (k: 'g' | 'b', url: string, name: string, to: string[]) => {
+      let n = 0;
+      if (ref.current.mode !== 'personal') return 0;
+      commit((s) => {
+        n = addInvites(s, k, url, name, to);
+      });
+      return n;
+    },
+    [commit],
+  );
+  const answerInvite = useCallback(
+    (id: string, done: 'joined' | 'no') =>
+      commit((s) => {
+        const x = s.invites?.find((y) => y.id === id);
+        if (x) x.done = done;
       }),
     [commit],
   );
@@ -2373,6 +2397,8 @@ function useStoreImpl() {
     editSplit,
     peopleUpdate,
     answerNameAsk,
+    sendInvites,
+    answerInvite,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,

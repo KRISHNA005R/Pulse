@@ -23,6 +23,7 @@ import { syncSummary } from './Sync';
 import { useAuth } from '../store/auth';
 import { PhotoEditor } from '../components/PhotoEditor';
 import { okPhoto } from '../lib/photo';
+import { usePeople } from '../components/FriendsHub';
 
 export function YouScreen() {
   const store = useStore();
@@ -34,6 +35,8 @@ export function YouScreen() {
   const rec = recurringTotals(state);
   const ins = insuranceTotals(state);
   const go = (r: Route) => ui.push(r);
+  const requests = usePeople().received.length;
+  const friendCount = state.people.filter((p) => p.link?.status === 'linked').length;
   return (
     <div>
       <div className="mb-6 flex items-center gap-4">
@@ -50,7 +53,7 @@ export function YouScreen() {
         <div className="min-w-0 flex-1">
           <h1 className="display text-[28px] leading-tight">{state.user.fullName}</h1>
           {state.mode === 'personal' && account && state.user.username && (
-            <button type="button" className="tap -ml-0.5 text-[14.5px] font-semibold text-accent-ink" onClick={() => ui.openSheet({ type: 'username' })}>
+            <button type="button" className="tap -ml-0.5 text-[14.5px] font-semibold text-accent-ink" onClick={() => go({ name: 'friends' })}>
               @{state.user.username}
             </button>
           )}
@@ -68,6 +71,19 @@ export function YouScreen() {
         </span>
         <Icon name="chevron" size={22} />
       </button>
+
+      {state.mode === 'personal' && (
+        <section aria-labelledby="you-friends" className="mb-8">
+          <SectionHeader id="you-friends" title="People" />
+          <NavRow
+            icon="users"
+            label="Friends"
+            sub={requests ? `${requests} new ${requests === 1 ? 'request' : 'requests'}` : friendCount ? `${friendCount} on PULSE` : 'Add friends, share your card'}
+            value={requests ? <span className="grid h-6 min-w-6 place-items-center rounded-full bg-accent px-1.5 text-[12.5px] font-bold text-on-accent">{requests}</span> : undefined}
+            onClick={() => go({ name: 'friends' })}
+          />
+        </section>
+      )}
 
       <section aria-labelledby="you-money" className="mb-8">
         <SectionHeader id="you-money" title="Money" />
@@ -967,6 +983,15 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
             <input id="profile-name" className="field" value={nm} onChange={(e) => setNm(e.target.value)} onBlur={() => nm.trim() && store.updateUser({ fullName: nm.trim(), name: nm.trim().split(' ')[0] })} />
           </Field>
           <p className="text-[13.5px] text-ink3">Your first name is used in the greeting.</p>
+          {state.mode === 'personal' && state.user.username && (
+            <div>
+              <p className="mb-1.5 text-[13px] font-semibold text-ink2">Username</p>
+              <button type="button" className="field flex w-full items-center justify-between text-left" onClick={() => ui.openSheet({ type: 'username' })}>
+                <span className="truncate">@{state.user.username}</span>
+                <span className="shrink-0 text-[13.5px] font-semibold text-accent-ink">Change</span>
+              </button>
+            </div>
+          )}
           {state.mode === 'personal' && (
             <Field label="Your UPI ID" htmlFor="profile-upi" hint="Friends on PULSE can pay you in one tap. Leave empty to keep it private.">
               <input

@@ -118,6 +118,7 @@ export function useFriends() {
         state.user.face,
         state.user.gif,
         state.user.door?.id,
+        (state.invitesOut ?? []).map((x) => x.id + x.at),
         (state.bhisis ?? []).filter((b) => b.share).map((b) => [b.id, b.name, b.emoji, b.amount, b.rounds.map((r) => r.paid.includes('me')), b.share?.marks, b.share?.ghosts?.length]),
       ])
     : '';
@@ -144,8 +145,8 @@ export function useFriends() {
   }, [ready, linked]);
 }
 
-type Shared = 'shared' | 'copied' | 'cancelled' | 'failed';
-async function copyText(text: string): Promise<boolean> {
+export type Shared = 'shared' | 'copied' | 'cancelled' | 'failed';
+export async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
@@ -154,7 +155,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 /** Hand a link to WhatsApp or whatever the phone offers; copy it where there's no share sheet. */
-async function shareText(text: string, url: string): Promise<Shared> {
+export async function shareText(text: string, url: string): Promise<Shared> {
   if (typeof navigator.share === 'function') {
     try {
       await navigator.share({ text: `${text} ${url}` });
@@ -619,27 +620,33 @@ export function GroupShareCard({ group }: { group: Group }) {
     else if (how === 'failed') store.toast({ text: 'Couldn’t share from here. Open PULSE in your browser and try again.' });
   };
 
+  const pick = (g: Group) => ui.openSheet({ type: 'invite-friends', k: 'g', url: groupUrl(g), name: g.name });
+  const start = async (friends: boolean) => {
+    setBusy(true);
+    const share = store.shareGroup(group.id);
+    if (share) await createGroupChannel(share, reminderDeviceId());
+    setBusy(false);
+    haptic(12);
+    if (share) {
+      if (friends) pick({ ...group, shared: share });
+      else await send({ ...group, shared: share });
+    }
+    void syncFriends(host);
+  };
+
   if (!sh)
     return (
       <section className="mt-4 rounded-2xl border border-line bg-surface p-4" aria-label="Invite to group">
-        <p className="text-[15px] font-semibold">Invite people with a link</p>
-        <p className="mt-1 text-[13.5px] text-ink3">Share the link in your group chat. Whoever opens it joins.</p>
-        <button
-          type="button"
-          className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            const share = store.shareGroup(group.id);
-            if (share) await createGroupChannel(share, reminderDeviceId());
-            setBusy(false);
-            haptic(12);
-            if (share) await send({ ...group, shared: share });
-            void syncFriends(host);
-          }}
-        >
-          <Icon name="share" size={16} /> {busy ? 'Making the link…' : 'Share group link'}
-        </button>
+        <p className="text-[15px] font-semibold">Invite people</p>
+        <p className="mt-1 text-[13.5px] text-ink3">Pick friends, or share a link in your group chat.</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button type="button" className="btn-accent min-h-[40px] px-3 text-[14px]" disabled={busy} onClick={() => void start(true)}>
+            <Icon name="user-plus" size={16} /> Pick friends
+          </button>
+          <button type="button" className="btn-quiet min-h-[40px] px-3 text-[14px]" disabled={busy} onClick={() => void start(false)}>
+            <Icon name="share" size={16} /> {busy ? 'Making…' : 'Share link'}
+          </button>
+        </div>
       </section>
     );
 
@@ -651,10 +658,15 @@ export function GroupShareCard({ group }: { group: Group }) {
         <p className="text-[15px] font-semibold">Shared group</p>
         <StatusPill status={joined.length ? 'good' : 'close'}>{joined.length ? `${joined.length + 1} on PULSE` : 'Waiting for people'}</StatusPill>
       </div>
-      <p className="mt-1 text-[13.5px] text-ink3">Whoever opens the link joins.{sh.closed ? ' New people can’t join right now.' : ''}</p>
-      <button type="button" className="btn-primary mt-3 min-h-[40px] px-4 text-[14px]" onClick={() => void send(group)}>
-        <Icon name="share" size={16} /> Share link
-      </button>
+      <p className="mt-1 text-[13.5px] text-ink3">{sh.closed ? 'New people can’t join right now.' : 'Pick friends, or share the link.'}</p>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button type="button" className="btn-accent min-h-[40px] px-3 text-[14px]" disabled={sh.closed} onClick={() => pick(group)}>
+          <Icon name="user-plus" size={16} /> Pick friends
+        </button>
+        <button type="button" className="btn-quiet min-h-[40px] px-3 text-[14px]" onClick={() => void send(group)}>
+          <Icon name="share" size={16} /> Share link
+        </button>
+      </div>
       {sh.owner && (
         <div className="mt-3 border-t border-line pt-1">
           <Toggle

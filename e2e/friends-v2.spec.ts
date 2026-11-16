@@ -5,10 +5,9 @@ import { phone, signInAs, state, syncNow } from './helpers';
 // by @username is accepted on the other phone, and both are connected (their channel works).
 
 async function openFriends(p: Page) {
-  await p.getByRole('button', { name: 'Plans', exact: true }).last().click();
-  await p.getByRole('radio', { name: 'Splits' }).click();
-  await p.getByRole('button', { name: /Add friends|Friend requests/ }).click();
-  return p.getByRole('dialog', { name: 'Friends' });
+  await p.getByRole('button', { name: 'You', exact: true }).last().click();
+  await p.getByRole('button', { name: /^Friends/ }).click();
+  return p.locator('main');
 }
 const me = (p: Page, token: string) =>
   p.evaluate(async (t) => (await (await fetch('/api/people', { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${t}` }, body: JSON.stringify({ action: 'me' }) })).json()).me, token);
@@ -29,7 +28,7 @@ test('request by @username, accepted on the other phone: friends on both, connec
 
   // Everyone already has a username, made from their name.
   const sheetA = await openFriends(A);
-  await expect(sheetA.getByText(/You’re @/)).toBeVisible({ timeout: 15_000 });
+  await expect(sheetA.getByLabel('Your friend card').getByText(/^@/)).toBeVisible({ timeout: 15_000 });
   const ua = (await me(A, a.token)).u as string;
   const ub = (await me(B, b.token)).u as string;
   expect(ua).toMatch(/krishna/);
@@ -42,12 +41,14 @@ test('request by @username, accepted on the other phone: friends on both, connec
   await sheetA.getByRole('button', { name: 'Add friend' }).click();
   await expect(sheetA.getByRole('button', { name: 'Requested' })).toBeVisible();
   // A second tap can't send a second request.
-  await expect(sheetA.getByText(/Sent · 1/)).toBeVisible();
+  await sheetA.getByRole('tab', { name: /Requests/ }).click();
+  await expect(sheetA.getByText('Sent')).toBeVisible();
+  await expect(sheetA.getByRole('button', { name: 'Cancel' })).toHaveCount(1);
 
   // Saloni sees it on her phone and accepts.
   await B.reload();
   const sheetB = await openFriends(B);
-  await expect(sheetB.getByText('Requests · 1')).toBeVisible({ timeout: 15_000 });
+  await sheetB.getByRole('tab', { name: /Requests 1/ }).click({ timeout: 15_000 });
   await sheetB.getByRole('button', { name: 'Accept' }).click();
   await expect(B.getByText('You’re friends now.')).toBeVisible();
 
@@ -59,8 +60,6 @@ test('request by @username, accepted on the other phone: friends on both, connec
     console.log('DBG list', JSON.stringify(list).slice(0, 400));
     console.log('DBG A user', sa.user.acct, sa.user.username, !!sa.user.keys, sa.mode, sa.people.map((p: { id: string; acct?: string }) => `${p.id}:${p.acct ?? ''}`).join(','));
   }
-  await A.keyboard.press('Escape');
-  await B.keyboard.press('Escape');
   await expect
     .poll(
       async () => {
@@ -83,8 +82,10 @@ test('change your username: a taken one is refused, an idea is one tap', async (
   await signInAs(B, 'Riya');
   const taken = (await me(A, a.token)).u as string;
 
-  const sheet = await openFriends(B);
-  await sheet.getByRole('button', { name: 'Change' }).click();
+  // Your username is changed in Profile.
+  await B.getByRole('button', { name: 'You', exact: true }).last().click();
+  await B.getByRole('button', { name: /^Profile/ }).click();
+  await B.getByRole('button', { name: /Change/ }).click();
   const un = B.getByRole('dialog', { name: 'Your username' });
   await un.locator('#un-input').fill(taken);
   await expect(un.getByTestId('un-status')).toHaveText('That one’s taken.', { timeout: 10_000 });

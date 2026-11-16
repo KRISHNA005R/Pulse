@@ -480,10 +480,33 @@ export interface State {
   checkIns?: ISODate[];
   /** Bhisi (rotating group savings with a lucky draw). Missing until the first one. */
   bhisis?: Bhisi[];
+  /** Invites to a group or a bhisi sent to friends, carried over the two-person channel. */
+  invitesOut?: InviteOut[];
+  /** Invites friends sent me. */
+  invites?: InviteIn[];
   /** Money left just before each main payday ("survived payday"). */
   paydays?: { date: ISODate; left: number }[];
   /** "Guess the bill" answers, one per week. */
   guesses?: { week: ISODate; cat: string; guess: number; actual: number }[];
+}
+
+/** An invite to a group (g) or a bhisi (b). `h` is the link's #part, the same as the invite link. */
+export interface InviteOut {
+  id: string;
+  to: string;
+  k: 'g' | 'b';
+  h: string;
+  name: string;
+  at: string;
+}
+export interface InviteIn {
+  id: string;
+  from: string;
+  k: 'g' | 'b';
+  h: string;
+  name: string;
+  at: string;
+  done?: 'joined' | 'no';
 }
 
 export interface Gullak {
