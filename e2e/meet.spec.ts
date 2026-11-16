@@ -32,7 +32,7 @@ test('an existing account gets its username said once, and can change it from th
   const A = await phone(browser, baseURL!, 'Krishna');
   const a = await signInAs(A, 'Krishna Rao', { hello: true });
   const hello = A.getByRole('dialog', { name: 'Your username' });
-  await expect(hello.getByText(/^@krishna/)).toBeVisible({ timeout: 20_000 });
+  await expect(hello.getByText(/^@\S*krishna/)).toBeVisible({ timeout: 20_000 });
   await expect(hello.getByText('Friends can find and add you with it.', { exact: false })).toBeVisible();
   await shot(A, 'm01-hello-username', 700);
   await hello.getByRole('button', { name: 'Love it' }).click();

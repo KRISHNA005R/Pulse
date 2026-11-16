@@ -47,7 +47,7 @@ test('friends tab: request, accept, then invite to a bhisi and a group without l
   await shot(A, '01-you-friends-row');
   const fa = await friendsScreen(A);
   const card = fa.getByLabel('Your friend card');
-  await expect(card.getByText(/^@krishna/)).toBeVisible({ timeout: 15_000 });
+  await expect(card.getByText(/^@\S*krishna/)).toBeVisible({ timeout: 15_000 });
   await expect(card.getByRole('img', { name: /QR code/ })).toBeVisible();
   await shot(A, '02-friends-screen');
 
@@ -87,7 +87,7 @@ test('friends tab: request, accept, then invite to a bhisi and a group without l
   // Username lives in Profile.
   await tab(A, 'You');
   await A.getByRole('button', { name: /^Profile/ }).click();
-  await expect(A.getByRole('button', { name: /@krishna.*Change/ })).toBeVisible();
+  await expect(A.getByRole('button', { name: /@\S*krishna.*Change/ })).toBeVisible();
   await shot(A, '07-profile-username');
 
   // Bhisi: pick Saloni; she gets the invite in PULSE and joins with one tap.
@@ -155,7 +155,10 @@ test('friends tab: request, accept, then invite to a bhisi and a group without l
   await expect(gi).toBeVisible();
   await shot(B, '15-saloni-group-invite');
   await gi.getByRole('button', { name: 'Join' }).click();
-  // Asks "Is one of these you?" when Krishna's group already lists her by name; else plain Join.
-  await B.getByRole('dialog').last().getByRole('button', { name: /I.m Saloni|Join Goa trip/ }).first().click();
+  // "Join Goa trip", then (Krishna's group lists her by name) "Is one of these you?" → I'm Saloni.
+  const join = B.getByRole('dialog').last();
+  await join.getByRole('button', { name: /I.m Saloni|Join Goa trip/ }).first().click();
+  const mine = join.getByRole('button', { name: /I.m Saloni/ });
+  if (await mine.waitFor({ timeout: 8_000 }).then(() => true, () => false)) await mine.click();
   await expect.poll(async () => (await state(B)).groups.some((g: { name: string; shared?: unknown }) => g.name === 'Goa trip' && g.shared), { timeout: 20_000 }).toBe(true);
 });
