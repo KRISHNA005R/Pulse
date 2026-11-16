@@ -20,7 +20,7 @@ test('Splits: 3 people on top, the rest under "See all N people", and no "I have
   const total = (await state(page)).people.length;
   await expect(page.getByRole('button', { name: new RegExp(`See all ${total} people`) })).toBeVisible();
   await expect(page.getByRole('button', { name: /I have a link/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Invite friends/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Add friends/ })).toBeVisible();
 });
 
 test('Splits with 4 people: still 3 on top plus "See all"', async ({ page }) => {
