@@ -55,6 +55,7 @@ function useHost(): FriendHost {
     knocked: (name, link, uid) => ref.current.friendKnocked(name, link, uid),
     applyGroup: (id, view) => ref.current.applyGroupView(id, view),
     groupLeft: (id) => ref.current.unshareGroup(id),
+    update: (fn) => ref.current.peopleUpdate(fn),
     applyBhisi: (id, view) => ref.current.applyBhisiView(id, view),
     bhisiGone: (id, why) => ref.current.bhisiGone(id, why),
     bhisiNews: (id, news) => ref.current.bhisiNews(id, news),

@@ -13,6 +13,7 @@
 //             and leaves a sealed note saying which; the owner's phone picks it up and joins
 //   #group=…  a shared group: everyone who opens it becomes a member, publishes their own box of
 //             group expenses, and reads everyone else's
+import { syncPeople } from './people';
 import type { Door, FriendLink, Group, GroupShare, ISODate, Person, Settlement, SplitExpense, State } from '../types';
 import { fromB64Url, toB64Url, utf8 } from './codec';
 import { roundMoney } from './currency';
@@ -120,6 +121,8 @@ export interface Box {
   /** The writer's UPI ID, so friends can pay them in one tap. '' = they have none. */
   upi?: string;
   items: BoxItem[];
+  /** The writer's PULSE account id: lets a friend connected by link be recognised when they're also a friend by request. */
+  acct?: string;
 }
 
 const MID = /^[0-9a-f]{16}$/;
@@ -169,7 +172,7 @@ export function buildBox(s: State, personId: string): Box {
     else if (st.from === personId && st.to === 'me') items.push({ id: st.id, k: 'p', dir: 'you', amt: roundMoney(st.amount), date: st.date });
   }
   items.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...myFace(s), items };
+  return { v: 1, name: myName(s), ...(s.user.uid ? { uid: s.user.uid } : {}), ...(s.user.acct ? { acct: s.user.acct } : {}), ...myFace(s), items };
 }
 
 const myName = (s: State) => (s.user.fullName || s.user.name || 'Your friend').trim().slice(0, 40);
@@ -207,6 +210,8 @@ const clip = (x: unknown, max: number) => (typeof x === 'string' ? x.replace(/\s
 export function applyBox(s: State, personId: string, box: Box): BoxItem[] {
   const p = s.people.find((x) => x.id === personId);
   if (!p?.link) return [];
+  // Their account, so a friend request from the same person finds this entry instead of making a second.
+  if (typeof box.acct === 'string' && /^[0-9a-f]{32}$/.test(box.acct) && !p.acct && !s.people.some((x) => x.acct === box.acct)) p.acct = box.acct;
   const chan = p.link.chan;
   const hadSplits = new Set(s.splits.filter((x) => x.remote === chan).map((x) => x.id));
   const oldPays = new Map(s.settlements.filter((x) => x.remote === chan).map((x) => [x.id, x]));
@@ -539,6 +544,8 @@ export interface FriendHost {
   applyGroup(groupId: string, view: GroupView): GroupNews[];
   /** I'm no longer in this shared group (taken out, or it's gone): it becomes an ordinary group here. */
   groupLeft(groupId: string): void;
+  /** Change the data (friends made by request). */
+  update(fn: (s: State) => void): void;
   // Shared bhisis (lib/bhisiShare.ts)
   applyBhisi: BhisiHost['applyBhisi'];
   bhisiGone: BhisiHost['bhisiGone'];
@@ -560,6 +567,8 @@ async function run(host: FriendHost) {
   const first = host.state();
   if (!first || !navigator.onLine) return;
   const dev = host.dev();
+  // Friends made by request: who they are, and a channel to each (lib/people.ts).
+  if (!(await syncPeople({ state: host.state, update: host.update }, (l) => leaveChannel(l)))) return;
   if (first.user.door && !(await readDoor(host, first.user.door, dev))) return;
   for (const g of (host.state()?.groups ?? []).filter((x) => x.shared)) if (!(await syncGroup(host, g.id, dev))) return;
   await flushBhisiOutbox(); // a leave or delete made offline
@@ -569,8 +578,12 @@ async function run(host: FriendHost) {
     let r = await api({ action: 'get', ...cred(link), dev });
     if (!r) return; // offline: try again later
     if (r.status === 403 && link.status === 'invited') {
-      // The invite was made offline, so its channel was never opened. Open it now.
-      if (!(await createChannel(link, dev))) continue;
+      // The invite was made offline, so its channel was never opened. Open it now. (A friend by
+      // request with the second seat joins instead, once the other phone has opened it.)
+      if (link.role === 'b') {
+        const j = await api({ action: 'join', ...cred(link), dev });
+        if (!j || j.status !== 200) continue;
+      } else if (!(await createChannel(link, dev))) continue;
       r = await api({ action: 'get', ...cred(link), dev });
       if (!r) return;
     }

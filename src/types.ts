@@ -38,6 +38,11 @@ export interface User {
   uid?: string;
   /** This person's own PULSE link: one link for everybody (lib/friends.ts). */
   door?: Door;
+  /** Their PULSE account id and @username (from the server, once signed in). */
+  acct?: string;
+  username?: string;
+  /** Key pair for locking channels with friends made by request (lib/people.ts). Kept in their synced data. */
+  keys?: { pub: string; priv: JsonWebKey };
   /** Profile photo: a small square JPEG kept as a data URL (lib/photo.ts). */
   photo?: string;
   /** A much smaller copy of the photo: the one connected friends and group members see. */
@@ -241,6 +246,10 @@ export interface Person {
   link?: FriendLink;
   /** Their PULSE id (User.uid), once known from a link or a shared group. */
   uid?: string;
+  /** Their PULSE account (server-checked), when they're a friend made with a request. */
+  acct?: string;
+  /** Their @username on PULSE. */
+  username?: string;
   /** Their profile photo (the small copy), when they are on PULSE and have added one. */
   photo?: string;
   /** When their photo is a GIF: its id on PULSE's server. `photo` is then its first frame. */
@@ -264,6 +273,12 @@ export interface FriendLink {
   theirName?: string;
   /** Started by opening the friend's personal link (its id): connected once their phone picks it up. */
   door?: string;
+  /** Made from a friend request: both phones worked out this channel from their keys. */
+  via?: 'acct';
+  /** Which side opens the channel: 'a' creates it, 'b' joins it. */
+  role?: 'a' | 'b';
+  /** Their public key's fingerprint this channel was made with (a new key means a new channel). */
+  peer?: string;
 }
 
 /** A group that several people keep together, each in their own PULSE (lib/friends.ts). */

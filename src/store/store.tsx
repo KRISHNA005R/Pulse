@@ -1485,6 +1485,14 @@ function useStoreImpl() {
     },
     [commit, toast],
   );
+  /** Friends made by request (lib/people.ts): their entries and channels. Only ever the person's own data. */
+  const peopleUpdate = useCallback(
+    (fn: (s: State) => void) => {
+      if (ref.current.mode !== 'personal') return;
+      commit(fn);
+    },
+    [commit],
+  );
   /** Change a split I recorded: its name and total. Everyone keeps their part; the spend follows. */
   const editSplit = useCallback(
     (id: string, patch: { description?: string; amount?: number }) => {
@@ -2350,6 +2358,7 @@ function useStoreImpl() {
     deleteInsurance,
     deleteSplit,
     editSplit,
+    peopleUpdate,
     setInvestmentStatus,
     deleteInvestment,
     saveCard,
