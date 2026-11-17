@@ -70,16 +70,26 @@ export function useInstallNudge() {
   const ui = useUI();
   const inst = useInstall();
   const ready = state.onboarding.done && state.mode === 'personal';
+  // Only when nothing is going on: never over a screen, a sheet or typing. It waits until they're back.
+  const calm = atRest(ui);
   useEffect(() => {
-    if (!ready || read().first || !eligible(inst.canPrompt) || setUpNow()) return;
+    if (!ready || !calm || read().first || !eligible(inst.canPrompt) || setUpNow()) return;
     const t = window.setTimeout(() => {
-      if (read().first || isStandalone()) return;
+      if (read().first || isStandalone() || typing()) return;
       write({ ...read(), first: state.today });
       ui.openSheet({ type: 'install' });
     }, 1400);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, inst.canPrompt]);
+  }, [ready, calm, inst.canPrompt]);
+}
+
+/** Nobody's in the middle of something: on Home's main screen, no sheet open. */
+export const atRest = (ui: { tab: string; depth: number; sheets: unknown[] }) => ui.tab === 'home' && ui.depth === 0 && ui.sheets.length === 0;
+/** A text box is in use right now. */
+export function typing() {
+  const el = typeof document !== 'undefined' ? document.activeElement : null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable);
 }
 
 /** Why install. The data line says what's true: signed in, the account keeps a copy anyway. */
