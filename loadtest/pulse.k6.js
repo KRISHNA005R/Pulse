@@ -19,6 +19,10 @@
 //   2. Sends the daily usage ping
 //   3. Loads their saved data (sync), logs an expense, saves it back
 //   4. Opens Splits: reads their friend's box and publishes their own
+//   5. Opens You → Friends (signed in): their @username, friends and requests; sometimes shows their
+//      Meet code (and the phone checks who scanned it), sometimes finds someone by @username.
+//      Only on the local stand-in (node e2e/server.mjs), which can make test accounts; skipped
+//      on netlify dev.
 // Not included, because they call paid or outside services: Google sign-in, email codes (Resend),
 // feedback (emails through Resend), and push notifications (sent through Google/Apple/Mozilla).
 import http from 'k6/http';
@@ -57,6 +61,8 @@ export const options = {
     'http_req_duration{part:sync_load}': ['p(95)<500'],
     'http_req_duration{part:sync_save}': ['p(95)<500'],
     'http_req_duration{part:friends}': ['p(95)<500'],
+    'http_req_duration{part:people}': ['p(95)<500'],
+    'http_req_duration{part:meet}': ['p(95)<500'],
   },
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'max'],
 };
@@ -73,7 +79,23 @@ const today = () => new Date().toISOString().slice(0, 10);
 const fakeCipher = (bytes) => encoding.b64encode(crypto.randomBytes(bytes), 'rawurl');
 
 // One phone per virtual person, kept across its sessions.
-const me = { device: null, syncId: null, write: null, rev: 0, chan: null, token: null, assetJs: null };
+const me = { device: null, syncId: null, write: null, rev: 0, chan: null, token: null, assetJs: null, session: null, u: null, sessions: 0 };
+
+// Test accounts (local stand-in only): a few to find by @username, made once before the run.
+export function setup() {
+  const made = [];
+  for (let i = 0; i < 20; i++) {
+    const r = http.get(`${BASE}/__e2e/account?name=${encodeURIComponent(`Load Friend ${i}`)}`, { tags: { part: 'setup' } });
+    if (r.status !== 200) return { people: false, names: [] };
+    const t = r.json('token');
+    const m = http.post(`${BASE}/api/people`, JSON.stringify({ action: 'me' }), { headers: { 'content-type': 'application/json', authorization: `Bearer ${t}` }, tags: { part: 'setup' } });
+    if (m.status === 200) made.push(m.json('me.u'));
+  }
+  return { people: made.length > 0, names: made };
+}
+const auth = () => ({ headers: { 'content-type': 'application/json', authorization: `Bearer ${me.session}` } });
+// "Slow down" (429) from the rate limits is the app working, not failing.
+const people = (action, extra, part) => http.post(`${BASE}/api/people`, JSON.stringify({ action, ...extra }), { ...auth(), tags: { part: part || 'people' }, responseCallback: http.expectedStatuses({ min: 200, max: 299 }, 404, 410, 429) });
 
 function firstVisit() {
   me.device = hex(16);
@@ -85,8 +107,13 @@ function firstVisit() {
   check(r, { 'friend invite made': (x) => x.status === 200 });
 }
 
-export default function () {
+export default function (data) {
   if (!me.device) firstVisit();
+  me.sessions++;
+  if (data && data.people && !me.session) {
+    const r = http.get(`${BASE}/__e2e/account?name=${encodeURIComponent(`Load User ${__VU}`)}`, { tags: { part: 'setup' } });
+    if (r.status === 200) me.session = r.json('token');
+  }
 
   group('1 open the app', () => {
     const page = http.get(`${BASE}/`, { tags: { part: 'open' } });
@@ -127,6 +154,34 @@ export default function () {
     const put = http.post(`${BASE}/api/friends`, JSON.stringify({ action: 'put', chan: me.chan, token: me.token, box: fakeCipher(3000) }), { ...json, tags: { part: 'friends' } });
     check(put, { 'friend box saves': (r) => r.status === 200 });
   });
+
+  if (me.session) {
+    sleep(1 + Math.random() * 2);
+    group('5 you → friends', () => {
+      const m = people('me');
+      check(m, { 'my @username loads': (r) => r.status === 200 && !!r.json('me.u') });
+      if (m.status === 200) me.u = m.json('me.u');
+      const l = people('list');
+      check(l, { 'friends list loads': (r) => r.status === 200 });
+      // Every 3rd visit: show the Meet code for a bit; the phone checks every ~2 s who scanned it.
+      if (me.sessions % 3 === 0) {
+        const o = people('meet-open', {}, 'meet');
+        check(o, { 'meet code made': (r) => r.status === 200 || r.status === 429 });
+        if (o.status === 200) {
+          const token = o.json('token');
+          for (let i = 0; i < 3; i++) {
+            sleep(1.8);
+            check(people('meet-poll', { token }, 'meet'), { 'meet poll works': (r) => r.status === 200 });
+          }
+        }
+      }
+      // Every 4th visit: find someone by @username.
+      if (me.sessions % 4 === 0 && data.names.length) {
+        const f = people('find', { u: data.names[Math.floor(Math.random() * data.names.length)] });
+        check(f, { 'find by @username works': (r) => r.status === 200 || r.status === 429 });
+      }
+    });
+  }
 
   sleep(3 + Math.random() * 4); // phone goes back in the pocket
 }
