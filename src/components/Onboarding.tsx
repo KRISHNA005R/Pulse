@@ -8,12 +8,14 @@ import { bufferNote, safeToSpend } from '../lib/finance';
 import { addDays, fmtDate, ordinal, realToday, rupees } from '../lib/format';
 import { Icon } from './ui/Icon';
 import { MoneyInput, AmountInput } from './ui/bits';
-import { JoinWithCode } from '../screens/Sync';
+import { Lazy, lazyNamed } from './Lazy';
 import { takeSyncLink } from '../lib/sync';
 import { useAuth } from '../store/auth';
 import { LoginLegal, LoginPanel } from './Auth';
 import { justSetUp } from './InstallPrompt';
 import { bhisiLink, clearBhisiLink, markBhisiAutoJoin, peekBhisi, pendingBhisiLink, type BhisiPeek } from '../lib/bhisiShare';
+// "I already use PULSE": the sync-code screen loads only when chosen.
+const JoinWithCode = lazyNamed(() => import('../screens/Sync'), 'JoinWithCode');
 
 const PAY = ['Salary', 'Freelance', 'Allowance', 'Multiple sources', 'Other'];
 // Monthly payments people forget to mention. Picked during setup, they're kept aside before they're due.
@@ -344,7 +346,9 @@ export function Onboarding() {
             </h1>
             <p className="mt-3 text-[15.5px] text-ink2">On your other device: You → Sync my devices. Enter the code it shows.</p>
             <div className="mt-6 rounded-3xl border border-line bg-surface p-4">
-              <JoinWithCode initial={linkCode ?? ''} />
+              <Lazy>
+                <JoinWithCode initial={linkCode ?? ''} />
+              </Lazy>
             </div>
             <p className="mt-4 text-[13px] text-ink3">Backup code? Paste it later in You → Backup code &amp; export.</p>
             <button type="button" className="btn-ghost mt-auto w-full" onClick={() => setStep('welcome')}>

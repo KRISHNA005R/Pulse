@@ -7,7 +7,7 @@ import { haptic, rupees } from '../lib/format';
 import { reminderDeviceId } from '../lib/reminders';
 import { faceOf, okPhoto } from '../lib/photo';
 import { parseBhisiLink, pendingBhisiOutbox } from '../lib/bhisiShare';
-import { BhisiJoin } from './Bhisi';
+import { lazyNamed } from './Lazy';
 import {
   clearFriendNews,
   clearJoinLink,
@@ -38,6 +38,8 @@ import {
 } from '../lib/friends';
 import { Field, PersonAvatar, StatusPill, Toggle } from './ui/bits';
 import { Icon } from './ui/Icon';
+// The bhisi join screen loads only when a bhisi link is opened.
+const BhisiJoin = lazyNamed(() => import('./Bhisi'), 'BhisiJoin');
 
 // Friends on PULSE: the screens. How the sharing works is in lib/friends.ts.
 

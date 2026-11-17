@@ -1,13 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { revealIn } from './lib/motion';
-import { HistoryScreen } from './screens/History';
-import { SyncScreen } from './screens/Sync';
 import { takeSyncLink } from './lib/sync';
 import { StoreProvider, useStore } from './store/store';
 import { AuthProvider } from './store/auth';
 import { AccountScreen, MemberMoment, useAuthGate } from './components/Auth';
-import { PeopleScreen } from './components/People';
-import { FriendsScreen, usePeopleNotices } from './components/FriendsHub';
+import { usePeopleNotices } from './components/peopleHooks';
 import { keepMeet, meetToken } from './lib/people';
 import { loadSession } from './lib/auth';
 import { UIProvider, useUI } from './store/ui';
@@ -16,25 +13,45 @@ import { SheetHost } from './components/SheetHost';
 import { Toasts } from './components/money';
 import { Tour } from './components/Tour';
 import { Onboarding } from './components/Onboarding';
-import { AIChat } from './components/Assistant';
-import { TransactionDetail } from './components/TransactionDetail';
 import { Icon } from './components/ui/Icon';
+import { Lazy, lazyNamed } from './components/Lazy';
 import { HomeScreen } from './screens/Home';
-import { ActivityScreen } from './screens/Activity';
-import { GroupDetail, PersonDetail, PlanDetail, PlansScreen } from './screens/Plans';
-import { DemoGuideScreen, InstallScreen } from './screens/Learn';
 import { MIGRATED_FLAG } from './lib/migrate';
 import { applyUpdate, onUpdateReady } from './lib/update';
-import { InsuranceScreen } from './screens/Insurance';
 import { useInstallNudge } from './components/InstallPrompt';
 import { useFriends } from './components/Friends';
-import { RemindersScreen } from './screens/Reminders';
-import { BhisiDetail } from './components/Bhisi';
 import { takeReplay } from './lib/bhisi';
 import { takeBhisiAutoJoin, takeBhisiLink } from './lib/bhisiShare';
 import { syncReminders } from './lib/reminders';
-import { FeedbackScreen } from './screens/Feedback';
-import { AccountsScreen, InvestmentsScreen, CardsScreen, CategoriesScreen, DebtScreen, IncomeScreen, NetWorthScreen, SettingsScreen, SubscriptionsScreen, YouScreen } from './screens/You';
+
+// Every screen but Home loads when first opened (components/Lazy.tsx), so PULSE opens faster.
+const HistoryScreen = lazyNamed(() => import('./screens/History'), 'HistoryScreen');
+const SyncScreen = lazyNamed(() => import('./screens/Sync'), 'SyncScreen');
+const PeopleScreen = lazyNamed(() => import('./components/People'), 'PeopleScreen');
+const AIChat = lazyNamed(() => import('./components/Assistant'), 'AIChat');
+const TransactionDetail = lazyNamed(() => import('./components/TransactionDetail'), 'TransactionDetail');
+const ActivityScreen = lazyNamed(() => import('./screens/Activity'), 'ActivityScreen');
+const GroupDetail = lazyNamed(() => import('./screens/Plans'), 'GroupDetail');
+const PersonDetail = lazyNamed(() => import('./screens/Plans'), 'PersonDetail');
+const PlanDetail = lazyNamed(() => import('./screens/Plans'), 'PlanDetail');
+const PlansScreen = lazyNamed(() => import('./screens/Plans'), 'PlansScreen');
+const DemoGuideScreen = lazyNamed(() => import('./screens/Learn'), 'DemoGuideScreen');
+const InstallScreen = lazyNamed(() => import('./screens/Learn'), 'InstallScreen');
+const InsuranceScreen = lazyNamed(() => import('./screens/Insurance'), 'InsuranceScreen');
+const RemindersScreen = lazyNamed(() => import('./screens/Reminders'), 'RemindersScreen');
+const BhisiDetail = lazyNamed(() => import('./components/Bhisi'), 'BhisiDetail');
+const FeedbackScreen = lazyNamed(() => import('./screens/Feedback'), 'FeedbackScreen');
+const AccountsScreen = lazyNamed(() => import('./screens/You'), 'AccountsScreen');
+const InvestmentsScreen = lazyNamed(() => import('./screens/You'), 'InvestmentsScreen');
+const CardsScreen = lazyNamed(() => import('./screens/You'), 'CardsScreen');
+const CategoriesScreen = lazyNamed(() => import('./screens/You'), 'CategoriesScreen');
+const DebtScreen = lazyNamed(() => import('./screens/You'), 'DebtScreen');
+const IncomeScreen = lazyNamed(() => import('./screens/You'), 'IncomeScreen');
+const NetWorthScreen = lazyNamed(() => import('./screens/You'), 'NetWorthScreen');
+const SettingsScreen = lazyNamed(() => import('./screens/You'), 'SettingsScreen');
+const SubscriptionsScreen = lazyNamed(() => import('./screens/You'), 'SubscriptionsScreen');
+const YouScreen = lazyNamed(() => import('./screens/You'), 'YouScreen');
+const FriendsScreen = lazyNamed(() => import('./components/FriendsHub'), 'FriendsScreen');
 
 function Screen() {
   const ui = useUI();
@@ -101,8 +118,26 @@ function Screen() {
   }
 }
 
-/** Desktop contextual panel: the selected transaction, otherwise PULSE AI. */
+/** Is the screen wide enough for the desktop side panel (xl, 1280px)? */
+function useWide() {
+  const q = '(min-width: 1280px)';
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setWide(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
+
+/** Desktop contextual panel: the selected transaction, otherwise PULSE AI. Not made at all on phones. */
 function ContextPanel() {
+  const wide = useWide();
+  if (!wide) return null;
+  return <ContextPanelWide />;
+}
+function ContextPanelWide() {
   const ui = useUI();
   return (
     <aside aria-label="Context" className="sticky top-0 hidden h-screen w-[380px] shrink-0 flex-col border-l border-line bg-surface/60 px-5 py-6 xl:flex">
@@ -115,7 +150,9 @@ function ContextPanel() {
             </button>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            <TransactionDetail key={ui.selectedTx} id={ui.selectedTx} inline onClose={() => ui.setSelectedTx(null)} />
+            <Lazy>
+              <TransactionDetail key={ui.selectedTx} id={ui.selectedTx} inline onClose={() => ui.setSelectedTx(null)} />
+            </Lazy>
           </div>
         </>
       ) : (
@@ -132,7 +169,9 @@ function ContextPanel() {
             )}
           </div>
           <div className="min-h-0 flex-1">
-            <AIChat compact />
+            <Lazy>
+              <AIChat compact />
+            </Lazy>
           </div>
         </>
       )}
@@ -422,9 +461,11 @@ function Shell() {
               </button>
             </div>
           )}
-          <ScreenReveal>
-            <Screen />
-          </ScreenReveal>
+          <Lazy tall>
+            <ScreenReveal>
+              <Screen />
+            </ScreenReveal>
+          </Lazy>
         </div>
       </main>
       <ContextPanel />

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Person } from '../types';
 import { useStore } from '../store/store';
 import { rupees } from '../lib/format';
-import { QR } from '../screens/Sync';
+import { QR } from './QR';
 import { UPI_APPS, UPI_ICONS, cleanVpa, okVpa, phoneKind, upiAppLink, upiLink, type UpiApp } from '../lib/upi';
 
 const Logo = ({ id }: { id: UpiApp }) => (

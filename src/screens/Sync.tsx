@@ -1,29 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import qrcode from 'qrcode-generator';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { normalizeCode, syncLink } from '../lib/sync';
 import { haptic } from '../lib/format';
 import { TopNavigation } from '../components/ui/bits';
 import { Icon } from '../components/ui/Icon';
+import { QR } from '../components/QR';
 
-/** A QR code as crisp SVG squares, in the page's ink colour. */
-export function QR({ text, size = 176, label = 'QR code with your sync link' }: { text: string; size?: number; label?: string }) {
-  const cells = useMemo(() => {
-    const q = qrcode(0, 'M');
-    q.addData(text);
-    q.make();
-    const n = q.getModuleCount();
-    let d = '';
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-    return { n, d };
-  }, [text]);
-  return (
-    <svg viewBox={`-2 -2 ${cells.n + 4} ${cells.n + 4}`} width={size} height={size} role="img" aria-label={label} className="rounded-xl bg-white p-1" shapeRendering="crispEdges">
-      <path d={cells.d} fill="#17140F" />
-    </svg>
-  );
-}
+export { QR };
 
 export function timeAgo(iso: string | null): string {
   if (!iso) return 'not yet';

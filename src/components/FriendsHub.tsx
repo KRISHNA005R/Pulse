@@ -7,28 +7,18 @@ import { socialTotals } from '../lib/finance';
 import { reminderDeviceId } from '../lib/reminders';
 import { markBhisiAutoJoin } from '../lib/bhisiShare';
 import { invitedTo, openInvites } from '../lib/invites';
-import { QR } from '../screens/Sync';
+import { QR } from './QR';
 import { EmptyState, PersonAvatar, TopNavigation } from './ui/bits';
-import { act, markTold, peopleCall, peopleView, takeMeet, type FriendRow, type PeopleView } from '../lib/people';
+import { act, markTold, peopleCall, peopleView, type FriendRow } from '../lib/people';
 import { canon, problem } from '../../netlify/lib/username';
 import { haptic, rupees } from '../lib/format';
 import { copyText, shareText, useHost, type Shared } from './Friends';
+import { usePeople } from './peopleHooks';
 import { Icon } from './ui/Icon';
-import { atRest, typing } from './InstallPrompt';
+
+export { usePeople } from './peopleHooks';
 
 // Friends: your card to share, add by @username, requests, blocked; change your @username; invite friends to a group or bhisi.
-
-/** The friends list and requests, kept fresh. */
-export function usePeople(): PeopleView & { refresh: () => Promise<void> } {
-  const host = useHost();
-  const [v, setV] = useState(peopleView());
-  useEffect(() => {
-    const on = () => setV(peopleView());
-    window.addEventListener('pulse-people', on);
-    return () => window.removeEventListener('pulse-people', on);
-  }, []);
-  return { ...v, refresh: () => syncFriends(host) };
-}
 
 const Initial = ({ name }: { name: string }) => (
   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent-soft text-[15px] font-semibold text-accent-ink" aria-hidden="true">
@@ -453,38 +443,6 @@ export function HelloUsername({ onDone }: { onDone: () => void }) {
       </button>
     </div>
   );
-}
-
-/**
- * App-wide: say hello to a new username once, open a Meet link kept from before signing in, and put
- * friend requests and invites on the app icon (the badge, where the phone supports it).
- */
-export function usePeopleNotices() {
-  const store = useStore();
-  const ui = useUI();
-  const people = usePeople();
-  const { state } = store;
-  const ready = state.onboarding.done && state.mode === 'personal';
-  const quiet = ui.sheets.length === 0;
-  // "You're @…" waits until they're not in the middle of something (like the home-screen nudge).
-  const calm = atRest(ui);
-  useEffect(() => {
-    if (!ready || !quiet || !loadSession()) return;
-    const kept = takeMeet();
-    if (kept) return ui.openSheet({ type: 'meet', token: kept });
-    if (people.me?.fresh && calm && !typing()) ui.openSheet({ type: 'hello-username' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, quiet, calm, people.me?.fresh]);
-  const badge = ready ? people.received.length + openInvites(state).length : 0;
-  useEffect(() => {
-    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
-    try {
-      if (badge > 0) void nav.setAppBadge?.(badge).catch(() => {});
-      else void nav.clearAppBadge?.().catch(() => {});
-    } catch {
-      /* no badges here */
-    }
-  }, [badge]);
 }
 
 /** Change your @username: any free one; a few ideas from your name. */

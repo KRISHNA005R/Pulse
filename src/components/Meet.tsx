@@ -6,7 +6,7 @@ import { syncFriends } from '../lib/friends';
 import { haptic, hapticSuccess } from '../lib/format';
 import { act, keepMeet, meetToken, peopleCall, peopleView } from '../lib/people';
 import { calm, gifUrl, okFace } from '../lib/photo';
-import { QR } from '../screens/Sync';
+import { QR } from './QR';
 import { useHost } from './Friends';
 import { PersonAvatar } from './ui/bits';
 import { Icon } from './ui/Icon';

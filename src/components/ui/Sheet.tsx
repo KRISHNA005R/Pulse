@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { Icon } from './Icon';
+import { Lazy } from '../Lazy';
 
 /**
  * Sheet: a bottom sheet on phones, a centred modal on wider screens.
@@ -199,7 +200,9 @@ export function Sheet({
             <Icon name="x" size={20} />
           </button>
         </div>
-        <div ref={body} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5">{children}</div>
+        <div ref={body} className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-5 pb-5">
+          <Lazy>{children}</Lazy>
+        </div>
         {footer && <div className="shrink-0 border-t border-line bg-inherit px-5 py-3">{footer}</div>}
       </div>
     </div>
