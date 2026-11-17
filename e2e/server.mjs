@@ -84,6 +84,25 @@ if (!fs.existsSync(path.join(DIST, 'index.html'))) {
 }
 const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.svg': 'image/svg+xml', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.mp3': 'audio/mpeg', '.gif': 'image/gif' };
 
+// Netlify's _headers file, applied to the app's files the way Netlify does, so tests see the same
+// security headers (and Permissions-Policy) the real site sends.
+const headerRules = [];
+{
+  let cur = null;
+  for (const line of (fs.existsSync(path.join(DIST, '_headers')) ? fs.readFileSync(path.join(DIST, '_headers'), 'utf8') : '').split('\n')) {
+    if (!line.trim() || line.trim().startsWith('#')) continue;
+    if (!/^\s/.test(line)) {
+      const pat = line.trim();
+      cur = { re: new RegExp(`^${pat.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`), headers: [] };
+      headerRules.push(cur);
+    } else if (cur) {
+      const i = line.indexOf(':');
+      if (i > 0) cur.headers.push([line.slice(0, i).trim().toLowerCase(), line.slice(i + 1).trim()]);
+    }
+  }
+}
+const headersFor = (pathname) => Object.fromEntries(headerRules.filter((r) => r.re.test(pathname)).flatMap((r) => r.headers));
+
 let members = 0;
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
@@ -127,7 +146,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
   if (!fs.existsSync(file)) file = path.join(DIST, 'index.html');
-  res.writeHead(200, { 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
+  res.writeHead(200, { ...headersFor(u.pathname), 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
   fs.createReadStream(file).pipe(res);
 });
 
