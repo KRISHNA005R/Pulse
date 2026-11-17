@@ -87,6 +87,14 @@ several load machines (or k6 Cloud) and the staging site.
 
 ## Monitoring
 
-There is no monitoring beyond Netlify's function logs and PULSE's stats page. For load tests on the
+**Crash reports (Sentry), app only.** Off until the site is built with `VITE_SENTRY_DSN` (Netlify →
+Site configuration → Environment variables, then redeploy). The policy that limits outside
+addresses (scripts/csp.mjs) adds that one Sentry address by itself. Reports are cleaned on the phone
+first (src/lib/monitor.ts, tested in tests/monitor.test.ts): no amounts, names, emails, notes, link
+codes or typing. Check it works: open `https://pulsemoney.in/?sentry=test`; a "PULSE Sentry test"
+error shows up in Sentry. Locally, against a fake Sentry: see the top of e2e/sentry.spec.ts.
+In Sentry, turn on Settings → Security & Privacy → "Prevent storing of IP addresses".
+
+Server functions report to Netlify's function logs only. Beyond that, there is PULSE's stats page. For load tests on the
 local stand-in, watch CPU and memory with `top`. Netlify-side numbers (Blobs latency and limits,
 function cold starts) can only be measured on the staging site.

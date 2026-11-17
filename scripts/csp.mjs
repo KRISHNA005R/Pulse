@@ -43,6 +43,14 @@ if (problems.length) {
 }
 
 const GSI = 'https://accounts.google.com/gsi/';
+// Crash reports (Sentry), when the site is built with VITE_SENTRY_DSN: only that one address.
+let sentry = '';
+try {
+  if (process.env.VITE_SENTRY_DSN) sentry = new URL(process.env.VITE_SENTRY_DSN).origin;
+} catch {
+  console.error('[csp] VITE_SENTRY_DSN is not a valid address.');
+  process.exit(1);
+}
 const policy = [
   "default-src 'self'",
   `script-src 'self' ${[...hashes].sort().join(' ')} ${GSI}client`,
@@ -51,7 +59,7 @@ const policy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:", // small fonts are built into the CSS
   "media-src 'self' data: blob:",
-  `connect-src 'self' ${GSI}`,
+  `connect-src 'self' ${GSI}${sentry ? ` ${sentry}` : ''}`,
   `frame-src ${GSI}`,
   "worker-src 'self'",
   "manifest-src 'self'",
@@ -70,4 +78,4 @@ if (at < 0) {
 }
 lines.splice(at + 1, 0, `  Content-Security-Policy: ${policy}`);
 fs.writeFileSync(file, lines.join('\n'));
-console.log(`[csp] policy added: ${hashes.size} inline scripts allowed by fingerprint, ${pages.length} pages checked.`);
+console.log(`[csp] policy added: ${hashes.size} inline scripts allowed by fingerprint, ${pages.length} pages checked${sentry ? `, crash reports to ${sentry}` : ''}.`);

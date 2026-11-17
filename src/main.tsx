@@ -8,8 +8,11 @@ import './index.css';
 
 import { MIGRATED_FLAG, receiveMigration } from './lib/migrate';
 import { setupUpdates } from './lib/update';
+import { startMonitoring } from './lib/monitor';
 
 setupUpdates();
+// Crash reports, only when the site was built with a Sentry key (lib/monitor.ts).
+void startMonitoring();
 
 // Pick up data moved from the old address before the app reads storage.
 receiveMigration().then((result) => {
