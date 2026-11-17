@@ -95,6 +95,11 @@ codes or typing. Check it works: open `https://pulsemoney.in/?sentry=test`; a "P
 error shows up in Sentry. Locally, against a fake Sentry: see the top of e2e/sentry.spec.ts.
 In Sentry, turn on Settings → Security & Privacy → "Prevent storing of IP addresses".
 
+The stats page has a **Crashes** card: the newest open crashes (last 14 days), read from Sentry by the
+server (netlify/lib/crashes.ts). It needs `SENTRY_AUTH_TOKEN` in Netlify: a Sentry personal token
+with read access to issues (Sentry → User settings → Personal Tokens). Organisation, project and
+region come from `VITE_SENTRY_DSN`. Emails about new crashes come from Sentry's own alerts.
+
 Server functions report to Netlify's function logs only. Beyond that, there is PULSE's stats page. For load tests on the
 local stand-in, watch CPU and memory with `top`. Netlify-side numbers (Blobs latency and limits,
 function cold starts) can only be measured on the staging site.

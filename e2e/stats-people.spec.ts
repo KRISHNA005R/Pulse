@@ -33,3 +33,19 @@ test('the stats page itself: only the newest 5, then "See everyone"', async ({ p
   await page.getByRole('link', { name: /See everyone \(8\)/ }).click();
   await expect(page).toHaveURL(/\/stats\/people\/$/);
 });
+
+test('the stats page shows crashes from Sentry (and says when it is off)', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('pulse-stats-key', 'e2e-stats-key'));
+  // On the test server there is no Sentry: the card says what to add.
+  await page.goto('/stats/');
+  await expect(page.getByTestId('crashes')).toContainText('Crash reports are off');
+  // With Sentry connected (answer made up here): the newest open crashes, with a link to each.
+  await page.route('**/api/stats?crashes=1', (r) =>
+    r.fulfill({ json: { off: false, open: 1, crashes: [{ id: 'PULSE-1', title: 'TypeError: x is undefined', where: 'src/lib/sync', count: 12, people: 3, first: '', last: new Date(Date.now() - 5 * 60000).toISOString(), level: 'error', link: 'https://pulse-ea.sentry.io/issues/1/' }] } }),
+  );
+  await page.reload();
+  const card = page.getByTestId('crashes');
+  await expect(card.getByRole('link', { name: 'TypeError: x is undefined' })).toHaveAttribute('href', 'https://pulse-ea.sentry.io/issues/1/');
+  await expect(card).toContainText('12 times · 3 people · src/lib/sync');
+  await expect(card).toContainText('5 min ago');
+});

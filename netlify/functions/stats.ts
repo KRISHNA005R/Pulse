@@ -2,6 +2,7 @@
 //
 //   POST /api/ping   { v, id, day, since, ... }   -> 204   (one device's summary for one day; re-sent = overwritten)
 //   GET  /api/stats?days=60   header x-stats-key  -> aggregated numbers for the private dashboard
+//   GET  /api/stats?crashes=1 header x-stats-key  -> the newest open crashes from Sentry
 //
 // A ping holds only counts and yes/no flags (see src/lib/stats.ts). Each device's summary for a day
 // is its own blob, `u/YYYY-MM-DD/<id>`, so phones pinging at the same moment never collide. Once a
@@ -9,6 +10,7 @@
 // `day/YYYY-MM-DD` blob ({ users: { id: summary } }) and removes them. Days saved before this
 // change are already in that shape.
 import { adminKeyHash, checkAdmin } from '../lib/admin';
+import { crashList } from '../lib/crashes';
 import { getStore } from '@netlify/blobs';
 
 declare const process: { env: Record<string, string | undefined> };
@@ -285,6 +287,8 @@ export async function handle(req: Request, store: StoreLike, keyHash: string): P
       const guard = { get: async (k: string) => (await store.getWithMetadata(k, { type: 'json' }))?.data ?? null, setJSON: (k: string, v: unknown, o?: { onlyIfNew?: boolean }) => store.setJSON(k, v, o), delete: (k: string) => store.delete(k) };
       const denied = await checkAdmin(req, keyHash, guard);
       if (denied) return denied;
+      // Crashes from Sentry, for the "Crashes" card (lib/crashes.ts).
+      if (url.searchParams.get('crashes') === '1') return json(await crashList(process.env));
       const n = Math.max(7, Math.min(120, Number(url.searchParams.get('days')) || 60));
       // The person's "today" is up to a day ahead of UTC (India is +5:30).
       const today = url.searchParams.get('today') && DAY.test(url.searchParams.get('today')!) ? url.searchParams.get('today')! : utcToday();

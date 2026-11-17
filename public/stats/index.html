@@ -139,6 +139,7 @@
               .catch(function () { return null; })
               .then(function (push) {
                 render(d, fb, push);
+                loadCrashes();
                 loadMembers();
                 loadDaily();
               });
@@ -183,6 +184,38 @@
       '<div><div class="muted">Sender last ran</div><div class="n" style="font-size:16px' + (late ? ';color:#C2412D' : '') + '">' + (mins == null ? 'Never' : mins < 2 ? 'Just now' : mins < 120 ? mins + ' min ago' : Math.round(mins / 60) + ' h ago') + '</div></div></div>' +
       (mins == null ? '<p class="note">The sender runs every 15 minutes. If this still says “Never” an hour after the deploy, the schedule did not start: tell Claude.</p>'
         : late ? '<p class="note err">The sender should run every 15 minutes. It looks stuck.</p>' : '') + '</div>';
+  }
+
+  // ---- Crashes: the newest open ones from Sentry (the server reads them; the token never comes here) ----
+  function loadCrashes() {
+    fetch('/api/stats?crashes=1', { headers: { 'x-stats-key': getKey() }, cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (c) {
+        var el = document.getElementById('crashes');
+        if (el) el.innerHTML = crashes(c);
+      });
+  }
+  function since(iso) {
+    var t = Date.parse(iso);
+    if (!t) return '';
+    var m = Math.max(0, Math.round((Date.now() - t) / 60000));
+    return m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : Math.round(m / 1440) + ' d ago';
+  }
+  function crashes(c) {
+    var head = '<div class="card" style="margin-bottom:12px" data-testid="crashes"><h2>Crashes</h2>';
+    if (!c) return head + '<p class="muted">Could not load crashes right now.</p></div>';
+    if (c.off) return head + '<p class="muted">' + esc(c.why) + '</p></div>';
+    if (c.error) return head + '<p class="err">' + esc(c.error) + '</p></div>';
+    if (!c.crashes.length) return head + '<p class="muted">No open crashes in the last 14 days. 🎉</p></div>';
+    var rows = c.crashes.map(function (x) {
+      var title = esc(x.title);
+      return '<div style="padding:10px 0;border-top:1px solid var(--line)">' +
+        '<div style="display:flex;justify-content:space-between;gap:10px"><b style="word-break:break-word">' + (x.link ? '<a href="' + esc(x.link) + '" target="_blank" rel="noopener noreferrer" style="color:inherit">' + title + '</a>' : title) + '</b>' +
+        '<span class="muted" style="white-space:nowrap">' + esc(since(x.last)) + '</span></div>' +
+        '<div class="muted" style="margin-top:2px">' + fmt(x.count) + ' time' + (x.count === 1 ? '' : 's') + (x.people ? ' · ' + fmt(x.people) + ' ' + (x.people === 1 ? 'person' : 'people') : '') + (x.where ? ' · ' + esc(x.where) : '') + '</div></div>';
+    }).join('');
+    return head + '<div class="muted" style="margin-bottom:6px">Open in the last 14 days, newest first</div>' + rows + '</div>';
   }
 
   // ---- Accounts: how many people have signed in, and the latest to join ----
@@ -362,6 +395,7 @@
       kpi('Active today', t.dau) + kpi('Active this week', t.wau) + kpi('Active this month', t.mau) +
       kpi('Daily habit', pct(t.stickiness), 'of monthly users open it on a given day') + kpi('Devices seen', t.people, 'including people who only looked') +
       '</div>' +
+      '<div id="crashes"></div>' +
       '<div id="members"></div>' +
 
       '<div class="card"><h2>Active users per day</h2><div class="muted">People using their own money (not the demo). Grey = started that day.</div>' +
