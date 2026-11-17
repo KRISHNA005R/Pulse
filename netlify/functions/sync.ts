@@ -51,7 +51,7 @@ async function keep(store: StoreLike, id: string, rec: Stored) {
 const MAX_DATA = 3_000_000; // ~3 MB of encrypted text per person
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
 async function sha256(s: string) {
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));

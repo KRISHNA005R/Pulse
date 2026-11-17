@@ -584,7 +584,7 @@
             <p class="receipt-day">That's about <b class="num">₹405 a day</b> for the 7 days until payday.</p>
           </div>
 
-          <form class="calc reveal" id="calc" aria-labelledby="calc-title" onsubmit="return false">
+          <form class="calc reveal" id="calc" aria-labelledby="calc-title">
             <h3 id="calc-title">Try your own</h3>
             <p class="calc-sub">Change any number. Nothing is saved or sent anywhere.</p>
             <div class="calc-fields">
@@ -844,6 +844,9 @@
     var d = document, root = d.documentElement;
     var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     root.classList.add('js');
+    // The calculator never submits (it updates as you type).
+    var calcForm = d.getElementById('calc');
+    if (calcForm) calcForm.addEventListener('submit', function (e) { e.preventDefault(); });
     var inr = function (n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
 
     // Top bar: background and border only once the page has scrolled.

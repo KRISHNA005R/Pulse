@@ -50,14 +50,14 @@ export interface AnnounceCtx {
 
 type Person = { uid: string; email: string; name: string };
 
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 const page = (title: string, line: string, status = 200) =>
   new Response(
     `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title></head>` +
       `<body style="margin:0;background:#F6F5F2;color:#17140F;font-family:-apple-system,'Segoe UI',Roboto,sans-serif"><div style="max-width:420px;margin:18vh auto 0;padding:0 20px;text-align:center">` +
       `<div style="font-weight:800;font-size:24px;letter-spacing:-0.5px">PULSE<span style="color:#EC5B2B">.</span></div><h1 style="font-size:22px;margin:22px 0 8px">${esc(title)}</h1><p style="color:#57524A;line-height:1.5">${esc(line)}</p>` +
       `<p><a href="${SITE}" style="color:#17140F;font-weight:700">Open PULSE</a></p></div></body></html>`,
-    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } },
+    { status, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } },
   );
 
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
@@ -181,7 +181,7 @@ export async function handleAnnounce(req: Request, ctx: AnnounceCtx): Promise<Re
     if (url.searchParams.has('status')) return json((await overview(ctx)).body);
     if (url.searchParams.has('preview')) {
       const html = announceEmail('Krishna', `${SITE}/api/announce?u=preview&t=preview`).html;
-      return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+      return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
     }
     return json({ error: 'bad request' }, 400);
   }

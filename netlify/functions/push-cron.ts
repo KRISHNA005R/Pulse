@@ -15,7 +15,7 @@ export default async () => {
   // Finish any "send now" message that didn't reach everyone in its own call.
   const now = await runBlasts(store, send, vapid).catch((e) => ({ error: String(e) }));
   if (Array.isArray(now) ? now.length : true) console.log('send-now', JSON.stringify(now));
-  return new Response(JSON.stringify({ ...res, daily, now }), { headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify({ ...res, daily, now }), { headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' } });
 };
 
 export const config = { schedule: '*/15 * * * *' };

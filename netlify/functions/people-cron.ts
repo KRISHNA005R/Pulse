@@ -8,7 +8,7 @@ export default async () => {
   const store = getStore({ name: 'pulse-accounts', consistency: 'strong' }) as unknown as PeopleStore;
   const res = await backfillProfiles(store);
   console.log('usernames', JSON.stringify(res));
-  return new Response(JSON.stringify(res), { headers: { 'content-type': 'application/json' } });
+  return new Response(JSON.stringify(res), { headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' } });
 };
 
 export const config = { schedule: '17 3 * * *' };

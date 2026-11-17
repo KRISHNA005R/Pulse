@@ -52,7 +52,7 @@ function context(req: Request): AuthCtx {
   };
 }
 
-const back = (hash: string) => new Response(null, { status: 303, headers: { location: `/#${hash}`, 'cache-control': 'no-store' } });
+const back = (hash: string) => new Response(null, { status: 303, headers: { location: `/#${hash}`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
 export default async (req: Request) => {
   try {

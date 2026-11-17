@@ -13,7 +13,7 @@ export default async (req: Request) => {
     const store = getStore({ name: 'pulse-accounts', consistency: 'strong' }) as unknown as AuthStore;
     if (req.method === 'GET') {
       const gif = await readFace(store, new URL(req.url).searchParams.get('id') ?? '');
-      if (!gif) return new Response('not found', { status: 404, headers: { 'cache-control': 'no-store' } });
+      if (!gif) return new Response('not found', { status: 404, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
       // An id never gets a different picture, so a phone can keep its copy for good.
       return new Response(new Blob([gif.slice().buffer as ArrayBuffer], { type: 'image/gif' }), { status: 200, headers: { 'content-type': 'image/gif', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
     }

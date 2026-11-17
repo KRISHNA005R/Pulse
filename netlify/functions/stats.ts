@@ -43,7 +43,7 @@ export interface Rec {
 type DayBlob = { users: Record<string, Rec> };
 
 export const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 
 export async function sha256(s: string) {
   const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
@@ -278,7 +278,7 @@ export async function handle(req: Request, store: StoreLike, keyHash: string): P
       const c = clean(body);
       if (!c) return json({ error: 'bad ping' }, 400);
       await save(store, c.day, c.id, c.rec);
-      return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+      return new Response(null, { status: 204, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
     }
 
     if (req.method === 'GET') {
