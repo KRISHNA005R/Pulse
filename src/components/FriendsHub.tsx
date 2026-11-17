@@ -546,9 +546,10 @@ export function UsernameSheet({ onDone }: { onDone: () => void }) {
           {c === now ? 'Your username now.' : state.checking ? 'Checking…' : state.free ? 'It’s free.' : (state.why ?? ' ')}
         </p>
       </div>
-      {ideas.length > 0 && (
+      {ideas.some((x) => x !== now) && (
         <div className="flex flex-wrap gap-2" role="group" aria-label="Ideas">
-          {ideas.map((x) => (
+          {/* Never suggest the name they already have. */}
+          {ideas.filter((x) => x !== now).map((x) => (
             <button key={x} type="button" className="rounded-full border border-line px-3 py-1.5 text-[13.5px] font-medium hover:bg-sunk" onClick={() => setU(x)}>
               @{x}
             </button>
