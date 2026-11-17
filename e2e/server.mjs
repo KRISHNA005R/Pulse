@@ -12,6 +12,7 @@ import http from 'node:http';
 import https from 'node:https';
 import fs from 'node:fs';
 import os from 'node:os';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
@@ -103,6 +104,7 @@ const headerRules = [];
 }
 const headersFor = (pathname) => Object.fromEntries(headerRules.filter((r) => r.re.test(pathname)).flatMap((r) => r.headers));
 
+const packed = new Map();
 let members = 0;
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
@@ -146,7 +148,22 @@ const server = http.createServer(async (req, res) => {
   }
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
   if (!fs.existsSync(file)) file = path.join(DIST, 'index.html');
-  res.writeHead(200, { ...headersFor(u.pathname), 'content-type': types[path.extname(file)] ?? 'application/octet-stream' });
+  const type = types[path.extname(file)] ?? 'application/octet-stream';
+  // Compressed like Netlify does (brotli, else gzip), so speed tests see real download sizes.
+  const enc = String(req.headers['accept-encoding'] ?? '');
+  const how = /\bbr\b/.test(enc) ? 'br' : /\bgzip\b/.test(enc) ? 'gzip' : '';
+  if (how && /text|javascript|json|svg|manifest/.test(type)) {
+    const key = `${how}:${file}`;
+    let body = packed.get(key);
+    if (!body) {
+      const raw = fs.readFileSync(file);
+      body = how === 'br' ? zlib.brotliCompressSync(raw) : zlib.gzipSync(raw);
+      packed.set(key, body);
+    }
+    res.writeHead(200, { ...headersFor(u.pathname), 'content-type': type, 'content-encoding': how, vary: 'Accept-Encoding' });
+    return res.end(body);
+  }
+  res.writeHead(200, { ...headersFor(u.pathname), 'content-type': type });
   fs.createReadStream(file).pipe(res);
 });
 
