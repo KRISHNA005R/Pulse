@@ -205,11 +205,6 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         <h2 id="sts-label" className="eyebrow mt-2.5 text-ink2">
           {sts.onBuffer ? 'From your safety buffer' : 'Safe to spend'}
         </h2>
-        {sts.onBuffer && (
-          <p className="mt-1 text-[13.5px] text-ink3" data-testid="on-buffer">
-            Safe to spend is used up. Now using your buffer.
-          </p>
-        )}
       </div>
 
       {/* 3. Per day and payday, side by side (stacked on very narrow phones) */}
