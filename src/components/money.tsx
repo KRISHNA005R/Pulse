@@ -146,19 +146,21 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
   const { state } = useStore();
   const ui = useUI();
   const sts = useMemo(() => safeToSpend(state), [state]);
-  const shownDaily = useRolling(sts.daily, 900);
+  // Safe-to-spend used up: the buffer is what's left to spend from, shown in its place.
+  const big = sts.onBuffer ? sts.bufferLeft : sts.safe;
+  const shownDaily = useRolling(sts.onBuffer ? sts.bufferDaily : sts.daily, 900);
   // A floating "−₹450" chip whenever safe-to-spend moves.
-  const last = useRef({ v: sts.safe, who: `${state.mode}:${state.user.fullName}` });
+  const last = useRef({ v: big, who: `${state.mode}:${state.user.fullName}` });
   const [delta, setDelta] = useState<{ id: number; v: number } | null>(null);
   useEffect(() => {
     const who = `${state.mode}:${state.user.fullName}`;
-    const d = sts.safe - last.current.v;
+    const d = big - last.current.v;
     const sameData = who === last.current.who;
-    last.current = { v: sts.safe, who };
+    last.current = { v: big, who };
     // Only a change you made shows the floating chip, not switching between demo and your own data.
     if (sameData && Math.abs(d) >= 1) setDelta({ id: Date.now(), v: d });
     else if (!sameData) setDelta(null);
-  }, [sts.safe, state.mode, state.user.fullName]);
+  }, [big, state.mode, state.user.fullName]);
   const hide = state.settings.hideBalances;
   const billDays = new Set(upcoming(state, sts.payday).map((b) => (b.date < state.today ? state.today : b.date)));
   // This pay cycle: from a month before payday (the last payday, or the 1st with no salary set) to payday.
@@ -188,11 +190,11 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         <p
           key={`n${delta?.id ?? 0}`}
           className={`hero-amt num-hero ${delta ? 'animate-squash' : ''} ${hide ? 'blur-md select-none' : ''}`}
-          style={{ ['--len' as string]: Math.max(4, rupees(sts.safe).length) }}
+          style={{ ['--len' as string]: Math.max(4, rupees(big).length) }}
           aria-live="polite"
           aria-atomic="true"
         >
-          <RollingNumber text={rupees(sts.safe)} />
+          <RollingNumber text={rupees(big)} />
         </p>
         {delta && !hide && (
           <span key={`d${delta.id}`} className={`num pointer-events-none absolute -top-5 left-1 animate-floatup rounded-full px-2 py-0.5 text-[13px] font-bold ${delta.v < 0 ? 'bg-accent text-on-accent' : 'bg-pos text-white'}`} aria-hidden="true">
@@ -201,8 +203,13 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
           </span>
         )}
         <h2 id="sts-label" className="eyebrow mt-2.5 text-ink2">
-          Safe to spend
+          {sts.onBuffer ? 'From your safety buffer' : 'Safe to spend'}
         </h2>
+        {sts.onBuffer && (
+          <p className="mt-1 text-[13.5px] text-ink3" data-testid="on-buffer">
+            Safe to spend is used up. Now using your buffer.
+          </p>
+        )}
       </div>
 
       {/* 3. Per day and payday, side by side (stacked on very narrow phones) */}
@@ -210,7 +217,7 @@ export function SafeToSpendCard({ greeting }: { greeting: string }) {
         <div className="min-w-0 rounded-2xl bg-sunk/70 px-3.5 py-3">
           <dt className="text-[12px] font-medium text-ink3">{soon ? 'Left for today' : 'Per day'}</dt>
           <dd className={`mt-0.5 truncate ${hide ? 'blur-sm' : ''}`}>
-            <span className="stat-amt num font-semibold" style={{ ['--len' as string]: rupees(sts.daily).length + (soon ? 0 : 3) }}>
+            <span className="stat-amt num font-semibold" style={{ ['--len' as string]: rupees(sts.onBuffer ? sts.bufferDaily : sts.daily).length + (soon ? 0 : 3) }}>
               {rupees(Math.round(shownDaily))}
             </span>
             {!soon && <span className="text-[13px] font-medium text-ink3">/day</span>}
@@ -298,10 +305,19 @@ export function SafeBreakdown() {
       {state.cards.length > 0 && <Row label="Owed on credit cards" value={`−${rupees(sts.cards)}`} sub={brief(sts.cardItems.map((c) => c.name)) || 'Nothing owed'} />}
       <Row label="Plans" value={`−${rupees(sts.goals)}`} sub={brief(sts.goalItems.map((g) => g.plan.name)) || 'Nothing this cycle'} />
       <Row label="Safety buffer" value={`−${rupees(sts.buffer)}`} sub={bufferNote(state)} />
-      <Row label="Safe to spend" value={rupees(sts.safe)} strong />
-      <p className="text-[13.5px] text-ink3">
-        That's {rupees(sts.daily)} a day for {sts.daysLeft} days.
-      </p>
+      <Row label="Safe to spend" value={rupees(sts.safe)} strong={!sts.onBuffer} />
+      {sts.onBuffer ? (
+        <>
+          <Row label="Left in your buffer" value={rupees(sts.bufferLeft)} strong />
+          <p className="text-[13.5px] text-ink3">
+            Safe to spend is used up, so spending now comes from your buffer. That's {rupees(sts.bufferDaily)} a day for {sts.daysLeft} days.
+          </p>
+        </>
+      ) : (
+        <p className="text-[13.5px] text-ink3">
+          That's {rupees(sts.daily)} a day for {sts.daysLeft} days.{sts.buffer > 0 ? ` If it runs out, your ${rupees(sts.buffer)} buffer covers you.` : ''}
+        </p>
+      )}
       <p className="mt-2 text-[13px] text-ink3">A missing bill makes this too high.</p>
     </div>
   );

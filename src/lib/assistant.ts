@@ -465,10 +465,11 @@ export function askPulse(s: State, asked: string): AIAnswer {
   // --- Safe to spend ---
   if (/(how much|what).*(spend|left|free)|safe|today/.test(q)) {
     const sts = safeToSpend(s);
+    const until = sts.fixedPayday ? `until payday, ${fmtDate(sts.payday)}` : `in the next ${sts.daysLeft} days`;
     return {
-      text: sts.fixedPayday
-        ? `You can safely spend ${rupees(sts.safe)} until payday, ${fmtDate(sts.payday)}. About ${rupees(sts.daily)} a day.`
-        : `You can safely spend ${rupees(sts.safe)} in the next ${sts.daysLeft} days. About ${rupees(sts.daily)} a day.`,
+      text: sts.onBuffer
+        ? `Safe to spend is used up, so you're on your safety buffer: ${rupees(sts.bufferLeft)} left ${until}. About ${rupees(sts.bufferDaily)} a day.`
+        : `You can safely spend ${rupees(sts.safe)} ${until}. About ${rupees(sts.daily)} a day.`,
       blocks: [{ type: 'list', rows: [
         { label: 'Available now', value: rupees(sts.available) },
         { label: sts.fixedPayday ? 'Bills before payday' : 'Bills in these days', value: `−${rupees(sts.bills)}` },

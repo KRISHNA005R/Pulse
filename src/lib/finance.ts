@@ -358,6 +358,13 @@ export interface SafeToSpend {
   buffer: number;
   safe: number;
   daily: number;
+  /** What's left of the safety buffer. All of it until safe-to-spend runs out; then spending comes
+   *  out of the buffer, automatically, until it's used up too. */
+  bufferLeft: number;
+  /** Safe-to-spend is used up and the buffer is what's left to spend from (bufferLeft > 0). */
+  onBuffer: boolean;
+  /** bufferLeft spread over the days to payday. */
+  bufferDaily: number;
   daysLeft: number;
   payday: ISODate;
   /** A real payday (a monthly income with a date). False: no fixed payday, planned 30 days ahead. */
@@ -382,12 +389,25 @@ export function safeToSpend(s: State): SafeToSpend {
   const goals = goalItems.reduce((a, g) => a + g.amount, 0);
   const setAsideItems = (INSURANCE_ON ? (s.insurance ?? []) : []).map((policy) => ({ policy, amount: premiumSetAside(policy, payday) })).filter((x) => x.amount > 0);
   const setAside = setAsideItems.reduce((a, x) => a + x.amount, 0);
-  const buffer = s.settings.buffer;
-  const safe = Math.max(0, roundMoney(available - bills - invest - cards - goals - setAside - buffer));
+  const buffer = Math.max(0, s.settings.buffer);
+  // Free money before the buffer is kept aside. Spending past safe-to-spend comes out of the buffer.
+  const free = roundMoney(available - bills - invest - cards - goals - setAside);
+  const safe = Math.max(0, roundMoney(free - buffer));
+  const bufferLeft = Math.max(0, Math.min(buffer, free));
+  const onBuffer = buffer > 0 && safe === 0 && bufferLeft > 0;
   const daysLeft = Math.max(1, daysBetween(s.today, payday));
+  const perDay = (x: number) => (hasCents() ? Math.floor((x / daysLeft) * 100) / 100 : Math.floor(x / daysLeft));
   const fixedPayday = !!mainIncome(s)?.nextDate;
   const afterItems = upcoming(s, addDays(payday, 10)).filter((u) => u.date >= payday && u.kind !== 'card' && u.kind !== 'income');
-  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: hasCents() ? Math.floor((safe / daysLeft) * 100) / 100 : Math.floor(safe / daysLeft), daysLeft, payday, fixedPayday, afterItems };
+  return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: perDay(safe), bufferLeft, onBuffer, bufferDaily: perDay(bufferLeft), daysLeft, payday, fixedPayday, afterItems };
+}
+
+/** "Safe to spend: ₹X", or, once that's used up, "Safety buffer left: ₹X" (for toasts and answers). */
+export function spendNow(sts: SafeToSpend): string {
+  return sts.onBuffer ? `Safe to spend is used up. ${rupees(sts.bufferLeft)} left in your buffer.` : `Safe to spend is now ${rupees(sts.safe)}.`;
+}
+export function spendLine(sts: SafeToSpend): string {
+  return sts.onBuffer ? `Safety buffer left: ${rupees(sts.bufferLeft)}` : `Safe to spend: ${rupees(sts.safe)}`;
 }
 
 /**

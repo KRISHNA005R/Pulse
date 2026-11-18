@@ -23,6 +23,8 @@ export interface AffordResult {
   explanation: string;
   /** No rent, bills or loans added yet: the answer may be too generous (lib/setup.ts). */
   billsMissing: boolean;
+  /** The safety buffer, when this purchase comes out of it (or safe-to-spend is already used up). */
+  buffer: { now: boolean; before: number; after: number; dailyBefore: number; dailyAfter: number } | null;
 }
 
 /**
@@ -38,9 +40,12 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
   const safeAfter = Math.max(0, sts.safe - amount);
   const dailyAfter = Math.floor(safeAfter / sts.daysLeft);
 
+  // Past safe-to-spend, money comes out of the safety buffer first (that's what it's kept for), then
+  // out of this cycle's plan savings (largest first).
   let overflow = Math.max(0, amount - sts.safe);
+  const fromBuffer = Math.min(overflow, sts.bufferLeft);
+  overflow -= fromBuffer;
   const planImpacts: AffordResult['planImpacts'] = [];
-  // Overflow first comes out of this cycle's planned contributions (largest first).
   const reserves = [...sts.goalItems].sort((a, b) => b.amount - a.amount);
   for (const g of reserves) {
     if (overflow <= 0) break;
@@ -51,8 +56,6 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
     planImpacts.push({ planId: g.plan.id, name: g.plan.name, icon: g.plan.icon, amount: take, days: Math.max(1, Math.round(take / perDay)) });
   }
   const fromPlans = planImpacts.reduce((a, p) => a + p.amount, 0);
-  const fromBuffer = Math.min(overflow, sts.buffer);
-  overflow -= fromBuffer;
   const shortBy = overflow; // would eat into bills money
 
   let budget: AffordResult['budget'] = null;
@@ -76,14 +79,14 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
     verdict = 'yes';
     headline = 'Yes.';
     explanation = `It fits. You'd have ${rupees(safeAfter)} left for the next ${sts.daysLeft} days, so about ${rupees(dailyAfter)} a day instead of ${rupees(sts.daily)}.`;
-  } else if (fromBuffer === 0 && shortBy === 0) {
+  } else if (shortBy === 0 && fromPlans === 0) {
+    verdict = 'buffer';
+    headline = 'Yes, from your safety buffer.';
+    explanation = `${sts.safe > 0 ? `Safe to spend covers ${rupees(sts.safe)}, and` : 'Safe to spend is used up, so'} ${rupees(fromBuffer)} comes from your buffer. ${rupees(sts.bufferLeft - fromBuffer)} would be left in it.`;
+  } else if (shortBy === 0) {
     verdict = 'affects-plans';
     headline = 'Yes, but it affects your plans.';
-    explanation = `This purchase is possible, but it uses all of your free money ${until} and ${rupees(fromPlans)} you'd planned to save this cycle.`;
-  } else if (shortBy === 0) {
-    verdict = 'buffer';
-    headline = 'Possible, but it uses your safety buffer.';
-    explanation = `This would skip this cycle's plan savings and dip ${rupees(fromBuffer)} into the cushion you keep for surprises.`;
+    explanation = `It uses ${fromBuffer > 0 ? 'your safety buffer and ' : 'all your free money and '}${rupees(fromPlans)} you'd planned to save this cycle.`;
   } else if (amount <= sts.available) {
     verdict = 'tight';
     headline = 'Not before payday without touching bill money.';
@@ -112,6 +115,10 @@ export function canIAfford(s: State, amount: number, what = ''): AffordResult {
     budget,
     explanation,
     billsMissing: billsUnknown(s),
+    buffer:
+      sts.onBuffer || fromBuffer > 0
+        ? { now: sts.onBuffer, before: sts.bufferLeft, after: sts.bufferLeft - fromBuffer, dailyBefore: sts.bufferDaily, dailyAfter: Math.floor((sts.bufferLeft - fromBuffer) / sts.daysLeft) }
+        : null,
   };
 }
 

@@ -217,6 +217,9 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
     { value: 'transfer', label: 'Moved', emoji: '🔁' },
   ];
   const afterSafe = Math.max(0, sts.safe - impact);
+  // Past safe-to-spend, the rest comes out of the safety buffer.
+  const fromBuffer = Math.max(0, impact - sts.safe);
+  const afterBuffer = Math.max(0, sts.bufferLeft - fromBuffer);
 
   return (
     <div className="flex flex-col">
@@ -259,9 +262,17 @@ export function ExpenseComposer({ preset, onDone }: { preset?: ComposerPreset; o
       </div>
       {effType === 'expense' && (
         <p className="mx-auto -mt-1 inline-flex items-center gap-1.5 self-center rounded-full bg-accent-soft px-3 py-1 text-[12.5px] font-semibold text-accent-ink" aria-live="polite">
-          {impact > 0 ? (
+          {impact > 0 && fromBuffer > 0 && sts.buffer > 0 ? (
+            <>
+              Buffer left after: <span className="num">{rupees(afterBuffer)}</span>
+            </>
+          ) : impact > 0 ? (
             <>
               Safe to spend after: <span className="num">{rupees(afterSafe)}</span>
+            </>
+          ) : sts.onBuffer ? (
+            <>
+              Buffer left: <span className="num">{rupees(sts.bufferLeft)}</span>
             </>
           ) : (
             <>

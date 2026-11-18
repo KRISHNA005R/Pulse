@@ -47,20 +47,29 @@ export function AffordCard({ r }: { r: AffordResult }) {
       </p>
       {r.billsMissing && <BillsMissingNote />}
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
+        {/* Already on the safety buffer: its numbers, not safe-to-spend's ₹0. */}
         <div>
-          <dt className="text-[12.5px] text-ink3">Safe to spend now</dt>
-          <dd className="num text-[20px] font-semibold">{rupees(r.safeBefore)}</dd>
+          <dt className="text-[12.5px] text-ink3">{r.buffer?.now ? 'Buffer left now' : 'Safe to spend now'}</dt>
+          <dd className="num text-[20px] font-semibold">{rupees(r.buffer?.now ? r.buffer.before : r.safeBefore)}</dd>
         </div>
         <div>
           <dt className="text-[12.5px] text-ink3">After this</dt>
-          <dd className="num text-[20px] font-semibold">{rupees(r.safeAfter)}</dd>
+          <dd className="num text-[20px] font-semibold">{rupees(r.buffer?.now ? Math.max(0, r.buffer.after) : r.safeAfter)}</dd>
         </div>
         <div>
           <dt className="text-[12.5px] text-ink3">Per day until payday</dt>
           <dd className="num text-[15px] font-semibold">
-            {rupees(r.dailyBefore)} → {rupees(r.dailyAfter)}
+            {r.buffer?.now ? `${rupees(r.buffer.dailyBefore)} → ${rupees(Math.max(0, r.buffer.dailyAfter))}` : `${rupees(r.dailyBefore)} → ${rupees(r.dailyAfter)}`}
           </dd>
         </div>
+        {r.buffer && !r.buffer.now && (
+          <div>
+            <dt className="text-[12.5px] text-ink3">Buffer after this</dt>
+            <dd className="num text-[15px] font-semibold">
+              {rupees(r.buffer.before)} → {rupees(Math.max(0, r.buffer.after))}
+            </dd>
+          </div>
+        )}
         {r.budget && (
           <div>
             <dt className="text-[12.5px] text-ink3">{r.budget.name} budget</dt>

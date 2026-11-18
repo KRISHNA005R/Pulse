@@ -42,7 +42,7 @@ import { notePayday, nextCoin, gullakFull } from '../lib/fun';
 import { applyBhisi as applyBhisiIn, bhisiLink, createBhisiChannel, dropBhisi, leaveOrDeleteBhisi, seatOf, drawShared, joinBhisiChannel, leaveBhisiForGood, markPaidShared, newBhisiShare, newGhostId, type BhisiInvite, type BhisiNews, type BhisiView } from '../lib/bhisiShare';
 import { reminderDeviceId } from '../lib/reminders';
 import { chances, currentRound, pickWeighted, inBowl, pot } from '../lib/bhisi';
-import { holdingAccounts, mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend } from '../lib/finance';
+import { holdingAccounts, mainIncome, applyMoney, refillReserves, nextPayday, budgetFor, budgetState, categoryName, CYCLE_MONTHS, PREMIUM_MONTHS, debtDue, defaultAccount, emiName, emiParts, incomeCategory, investedTotal, netWorth, nextDayOfMonth, planMetrics, prevMonth, safeToSpend, spendLine, spendNow } from '../lib/finance';
 
 // Pure state transitions. Every mutation that moves money goes through applyMoney()
 // (lib/finance.ts) so balances, cards, plan pots and loans stay consistent.
@@ -607,7 +607,7 @@ function useStoreImpl() {
         return;
       }
       if (tx.type === 'income') {
-        toast({ text: `${tx.category === 'salary' ? 'Your salary landed.' : 'Money in.'} Safe to spend is now ${rupees(sts.safe)}.`, tone: 'good' });
+        toast({ text: `${tx.category === 'salary' ? 'Your salary landed.' : 'Money in.'} ${spendNow(sts)}`, tone: 'good' });
         return;
       }
       if (tx.type === 'transfer') {
@@ -620,12 +620,12 @@ function useStoreImpl() {
         const cat = categoryName(next, b.category).toLowerCase();
         const per = b.period === 'weekly' ? 'weekly' : 'monthly';
         if (st.left >= 0) toast({ text: `Nice. You're still ${rupees(st.left)} under your ${per} ${cat} budget.`, tone: 'good' });
-        else toast({ text: `That puts ${cat} ${rupees(-st.left)} over its ${per} budget. Safe to spend: ${rupees(sts.safe)}.`, tone: 'heads-up' });
+        else toast({ text: `That puts ${cat} ${rupees(-st.left)} over its ${per} budget. ${spendLine(sts)}.`, tone: 'heads-up' });
         return;
       }
       // Paid in cash: say what's left in the wallet, so it's clear which balance moved.
       const from = next.accounts.find((a) => a.id === tx.account);
-      toast({ text: from?.type === 'cash' ? `Paid in cash. ${rupees(from.balance)} cash left. Safe to spend is now ${rupees(sts.safe)}.` : `Added. Safe to spend is now ${rupees(sts.safe)}.` });
+      toast({ text: from?.type === 'cash' ? `Paid in cash. ${rupees(from.balance)} cash left. ${spendNow(sts)}` : `Added. ${spendNow(sts)}` });
     },
     [toast],
   );
@@ -1144,7 +1144,7 @@ function useStoreImpl() {
       });
       haptic(12);
       const paid = tx as Transaction | null;
-      toast(paid ? { text: `${paid.merchant} recorded. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good' } : { text: 'That payment was already recorded.' });
+      toast(paid ? { text: `${paid.merchant} recorded. ${spendLine(safeToSpend(next))}.`, tone: 'good' } : { text: 'That payment was already recorded.' });
     },
     [commit, toast],
   );
@@ -1425,7 +1425,7 @@ function useStoreImpl() {
       const mine = input.shares.find((x) => x.person === 'me')?.amount ?? 0;
       const sts = safeToSpend(next);
       toast({
-        text: input.paidBy === 'me' ? `Split saved. Your share is ${rupees(mine)}. Safe to spend: ${rupees(sts.safe)}.` : `Split saved. You owe ${rupees(mine)} for this.`,
+        text: input.paidBy === 'me' ? `Split saved. Your share is ${rupees(mine)}. ${spendLine(sts)}.` : `Split saved. You owe ${rupees(mine)} for this.`,
         tone: 'good',
       });
       return id;
@@ -1835,7 +1835,7 @@ function useStoreImpl() {
       const sts = safeToSpend(next);
       toast({
         text: made.length
-          ? `${inv.name} saved and ${rupees(made.reduce((a, t) => a + t.amount, 0))} deducted today. Safe to spend: ${rupees(sts.safe)}.`
+          ? `${inv.name} saved and ${rupees(made.reduce((a, t) => a + t.amount, 0))} deducted today. ${spendLine(sts)}.`
           : inv.id
             ? `${inv.name} updated.`
             : `${inv.name} added. ${rupees(inv.amount)} will be deducted on ${fmtDate(inv.nextDate)}.`,
@@ -1877,7 +1877,7 @@ function useStoreImpl() {
       const kept = sts.setAsideItems.find((x) => x.policy.name === p.name)?.amount ?? 0;
       toast({
         text: made.length
-          ? `${p.name} saved and ${rupees(made.reduce((a, t) => a + t.amount, 0))} recorded for today. Safe to spend: ${rupees(sts.safe)}.`
+          ? `${p.name} saved and ${rupees(made.reduce((a, t) => a + t.amount, 0))} recorded for today. ${spendLine(sts)}.`
           : p.id
             ? `${p.name} updated.`
             : kept > 0
@@ -1983,7 +1983,7 @@ function useStoreImpl() {
       const emi = made.find((t) => t.debtId === saved?.id);
       toast({
         text: emi
-          ? `${d.name} saved. Today's EMI of ${rupees(emi.amount)} is recorded. Safe to spend: ${rupees(safeToSpend(next).safe)}.`
+          ? `${d.name} saved. Today's EMI of ${rupees(emi.amount)} is recorded. ${spendLine(safeToSpend(next))}.`
           : d.id
             ? 'Loan updated.'
             : saved?.autoDebit === false
@@ -2012,7 +2012,7 @@ function useStoreImpl() {
         burst({ kind: 'confetti', power: 1.8 });
         stamp('Debt-free!', 'Loan closed');
       }
-      toast({ text: left <= 0 ? `${paid.merchant} recorded. This loan is paid off!` : `${paid.merchant} recorded. ${rupees(left)} left on the loan. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good', emoji: left <= 0 ? '🎉' : undefined });
+      toast({ text: left <= 0 ? `${paid.merchant} recorded. This loan is paid off!` : `${paid.merchant} recorded. ${rupees(left)} left on the loan. ${spendLine(safeToSpend(next))}.`, tone: 'good', emoji: left <= 0 ? '🎉' : undefined });
     },
     [commit, toast],
   );
@@ -2032,7 +2032,7 @@ function useStoreImpl() {
       } else if (mode === 'extra') {
         toast({ text: `Extra ${rupees(r.tx!.amount)} recorded. ${rupees(r.left)} left on the loan.`, tone: 'good' });
       } else {
-        toast({ text: `This month’s EMI recorded early. ${rupees(r.left)} left. Safe to spend: ${rupees(safeToSpend(next).safe)}.`, tone: 'good' });
+        toast({ text: `This month’s EMI recorded early. ${rupees(r.left)} left. ${spendLine(safeToSpend(next))}.`, tone: 'good' });
       }
       return null;
     },
