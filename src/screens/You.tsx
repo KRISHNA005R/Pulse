@@ -958,7 +958,7 @@ export function SettingsScreen({ section }: { section: Extract<Route, { name: 's
       {section === 'currency' && <CurrencyPicker />}
       {section === 'budget-prefs' && (
         <div className="flex flex-col gap-4">
-          <Field label="Safety buffer" htmlFor="buffer" hint="Kept out of safe-to-spend for surprises.">
+          <Field label="Safety buffer" htmlFor="buffer" hint="Kept aside all month. Used when safe to spend runs out.">
             <div className="flex gap-2">
               <AmountInput id="buffer" inputMode="decimal" className="field num" value={buffer} onChange={(e) => setBuffer(e.target.value.replace(/[^\d]/g, ''))} />
               <button type="button" className="btn-primary shrink-0" onClick={() => { updateSettings({ buffer: Number(buffer) || 0 }); store.toast({ text: `Buffer set to ${rupees(Number(buffer) || 0)}. Safe to spend: ${rupees(safeToSpend({ ...state, settings: { ...s, buffer: Number(buffer) || 0 } }).safe)}.` }); }}>

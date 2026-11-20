@@ -12,7 +12,7 @@ import { useStore } from '../store/store';
 import { useUI } from '../store/ui';
 import { EMOJI_GRID, suggestEmoji, typedEmoji } from '../lib/lexicon';
 import { addMonths, fmtDate, haptic, monthName, rupees, rupeesShort } from '../lib/format';
-import { CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closingCharge, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
+import { afterSpendLine, CYCLE_MONTHS, nextPayday, perMonth, monthlySaves, defaultAccount, closingCharge, debtDue, emiParts, prepaySavings, mainIncome, estimateInvested, firstRecorded, FUND_TYPES, investedIn, personBalances, planMetrics, safeToSpend, sipProjection } from '../lib/finance';
 import { Icon } from './ui/Icon';
 import { INV_KIND_ORDER, INV_META, kindMeta, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { PeoplePicker } from './People';
@@ -219,7 +219,7 @@ export function ContributeForm({ planId, onDone }: { planId: string; onDone: () 
         </select>
       </Field>
       <p className="mt-4 text-center text-[14px] text-ink2">
-        {n > 0 && (freeCost > 0 ? <>Safe to spend goes from {rupees(sts.safe)} to {rupees(Math.max(0, sts.safe - freeCost))}.</> : <>This was already set aside, so safe to spend stays at {rupees(sts.safe)}.</>)}
+        {n > 0 && (freeCost > 0 ? <>{afterSpendLine(sts, freeCost)}</> : <>This was already set aside, so safe to spend stays at {rupees(sts.safe)}.</>)}
       </p>
       <button
         type="button"

@@ -1,6 +1,6 @@
 import type { CategoryId, ISODate, Person, State, Transaction } from '../types';
 import { ex, scaled } from './currency';
-import { categoryName, myCost, personBalances, planMetrics, safeToSpend, spendBetween } from './finance';
+import { categoryName, myCost, personBalances, planMetrics, safeToSpend, spendBetween, spendLine } from './finance';
 import { addDays, addMonths, daysBetween, fmtDate, monthName, parseDate, relDay, rupees } from './format';
 import { guessCategory } from './parse';
 import { newQuickQuestions } from './assistantNew';
@@ -188,21 +188,31 @@ export function askMore(s: State, q: string): AIAnswer | null {
     const spent = s.transactions.filter((t) => everyday(t) && t.date >= from && t.date <= today).reduce((a, t) => a + myCost(s, t), 0);
     const pace = spent / 14;
     const end = sts.fixedPayday ? `payday, ${fmtDate(sts.payday)}` : fmtDate(sts.payday);
-    if (pace < 1) return { text: `No everyday spends in the last 2 weeks to go by. Safe to spend: ${rupees(sts.safe)} until ${end}.`, followups: ['How much can I spend today?'] };
+    if (pace < 1) return { text: `No everyday spends in the last 2 weeks to go by. ${spendLine(sts)} until ${end}.`, followups: ['How much can I spend today?'] };
+    // Safe to spend first, then the safety buffer (it's there for exactly this).
     const days = Math.floor(sts.safe / pace);
-    const until = addDays(today, days);
+    const withBuffer = Math.floor((sts.safe + sts.bufferLeft) / pace);
+    const until = addDays(today, withBuffer);
     const before = daysBetween(until, sts.payday);
+    const total = sts.safe + sts.bufferLeft;
+    const perDay = Math.floor(total / sts.daysLeft);
+    const p = rupees(Math.round(pace));
     const text =
       days >= sts.daysLeft
-        ? `At your pace of about ${rupees(Math.round(pace))} a day, your money lasts past ${end}. You’re fine.`
-        : `At your pace of about ${rupees(Math.round(pace))} a day, it lasts till ${fmtDate(until)}, ${plural(before, 'day')} short. Keep to ${rupees(sts.daily)} a day.`;
+        ? `At your pace of about ${p} a day, your money lasts past ${end}. You’re fine.`
+        : withBuffer >= sts.daysLeft && sts.bufferLeft > 0
+          ? sts.onBuffer
+            ? `At your pace of about ${p} a day, your buffer lasts past ${end}. You’re okay.`
+            : `At your pace of about ${p} a day, safe to spend lasts till ${fmtDate(addDays(today, days))}. Your buffer covers the rest, past ${end}.`
+          : `At your pace of about ${p} a day, ${sts.bufferLeft > 0 ? 'even with your buffer, ' : ''}it lasts till ${fmtDate(until)}, ${plural(before, 'day')} short. Keep to ${rupees(perDay)} a day.`;
     return {
       text,
       blocks: [{ type: 'list', rows: [
-        { label: 'Your pace (last 14 days)', value: `${rupees(Math.round(pace))}/day` },
+        { label: 'Your pace (last 14 days)', value: `${p}/day` },
         { label: 'Safe to spend', value: rupees(sts.safe) },
-        { label: 'Lasts till', value: days >= sts.daysLeft ? `Past ${fmtDate(sts.payday)}` : fmtDate(until) },
-        { label: sts.fixedPayday ? 'To reach payday' : `For ${sts.daysLeft} days`, value: `${rupees(sts.daily)}/day` },
+        ...(sts.bufferLeft > 0 ? [{ label: 'Safety buffer left', value: rupees(sts.bufferLeft) }] : []),
+        { label: 'Lasts till', value: withBuffer >= sts.daysLeft ? `Past ${fmtDate(sts.payday)}` : fmtDate(until) },
+        { label: sts.fixedPayday ? 'To reach payday' : `For ${sts.daysLeft} days`, value: `${rupees(sts.onBuffer ? sts.bufferDaily : sts.daily)}/day` },
       ] }],
       followups: ['Where did my money go?', 'Biggest expenses this month?'],
     };

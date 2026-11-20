@@ -10,7 +10,7 @@ import { reducedMotion } from '../lib/motion';
  * finishing or skipping means it's not shown again (You → "Show the tour again" brings it back).
  */
 export const TOUR_STEPS = [
-  { key: 'safe', title: 'Safe to spend', text: 'What you can spend until payday, after bills, SIPs and savings.' },
+  { key: 'safe', title: 'Safe to spend', text: 'What you can spend until payday, after bills, SIPs and savings. Then your safety buffer.' },
   { key: 'add', title: 'Add a spend', text: "Log a spend in 2 taps. Try typing 'chai 20'." },
   { key: 'ai', title: 'PULSE AI', text: `Ask anything, like 'Can I afford a ${rupees(2000)} dinner?'` },
   { key: 'plans', title: 'Plans', text: 'Goals, splits with friends, bhisi and budgets.' },

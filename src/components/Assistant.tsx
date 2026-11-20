@@ -3,7 +3,7 @@ import { track } from '../lib/stats';
 import { useStore } from '../store/store';
 import { useUI, type Route, type SheetSpec } from '../store/ui';
 import { askPulse, starterQuestions, type AIAnswer, type AIBlock, type AILink } from '../lib/assistant';
-import { defaultAccount, FUND_TYPES, safeToSpend } from '../lib/finance';
+import { afterSpend, defaultAccount, FUND_TYPES, safeToSpend } from '../lib/finance';
 import { INV_META, maturityDate, maturityValue, tenureLabel } from '../lib/invest';
 import { buildRecap } from '../lib/insights';
 import { yearSummary } from '../lib/history';
@@ -159,7 +159,7 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
         { label: 'Date', value: dayLabel(a.date) },
         { label: 'Paid from', value: acctName },
         ...(a.plan ? [{ label: 'Plan', value: state.plans.find((p) => p.id === a.plan)?.name ?? '' }] : []),
-        { label: 'Safe to spend after', value: rupees(Math.max(0, sts.safe - a.amount)) },
+        afterSpend(sts, a.amount).onBuffer ? { label: 'Buffer left after', value: rupees(afterSpend(sts, a.amount).bufferLeft) } : { label: 'Safe to spend after', value: rupees(afterSpend(sts, a.amount).safe) },
       ];
       break;
     case 'income':
@@ -294,8 +294,8 @@ function ActionCard({ block, msgId, index }: { block: Extract<AIBlock, { type: '
       case 'expense':
       case 'income': {
         const tx = store.addTransaction({ merchant: a.merchant, amount: a.amount, type: a.kind, category: a.category, date: a.date, account: acct, plan: a.plan, recurring: false, back: a.back || undefined });
-        const after = a.kind === 'expense' ? Math.max(0, sts.safe - a.amount) : null;
-        update({ status: 'done', txId: tx.id, note: a.kind === 'expense' ? `Added. Safe to spend is now about ${rupees(after ?? 0)}.` : `Added ${rupees(a.amount)} to ${acctName}.` });
+        const after = afterSpend(sts, a.amount);
+        update({ status: 'done', txId: tx.id, note: a.kind === 'expense' ? (after.onBuffer ? `Added. About ${rupees(after.bufferLeft)} left in your buffer.` : `Added. Safe to spend is now about ${rupees(after.safe)}.`) : `Added ${rupees(a.amount)} to ${acctName}.` });
         return;
       }
       case 'split':

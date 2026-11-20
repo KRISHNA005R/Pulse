@@ -402,6 +402,21 @@ export function safeToSpend(s: State): SafeToSpend {
   return { available, bills, billItems, invest, investItems, cards, cardItems, setAside, setAsideItems, goals, goalItems, buffer, safe, daily: perDay(safe), bufferLeft, onBuffer, bufferDaily: perDay(bufferLeft), daysLeft, payday, fixedPayday, afterItems };
 }
 
+/** After spending `amount`: what's left of safe-to-spend, how much comes out of the buffer, and what's left there. */
+export function afterSpend(sts: SafeToSpend, amount: number) {
+  const fromBuffer = Math.min(sts.bufferLeft, Math.max(0, amount - sts.safe));
+  const safe = Math.max(0, roundMoney(sts.safe - amount));
+  const bufferLeft = roundMoney(sts.bufferLeft - fromBuffer);
+  return { safe, fromBuffer, bufferLeft, onBuffer: sts.buffer > 0 && safe === 0 && (fromBuffer > 0 || sts.onBuffer) };
+}
+
+/** One line: what spending `amount` does ("Safe to spend goes from ₹A to ₹B." or the buffer's version). */
+export function afterSpendLine(sts: SafeToSpend, amount: number): string {
+  const a = afterSpend(sts, amount);
+  if (!a.onBuffer) return `Safe to spend goes from ${rupees(sts.safe)} to ${rupees(a.safe)}.`;
+  return `${sts.safe > 0 ? 'Safe to spend goes to ₹0, and' : 'Safe to spend is used up, so'} ${rupees(a.fromBuffer)} comes from your buffer. ${rupees(a.bufferLeft)} left in it.`;
+}
+
 /** "Safe to spend: ₹X", or, once that's used up, "Safety buffer left: ₹X" (for toasts and answers). */
 export function spendNow(sts: SafeToSpend): string {
   return sts.onBuffer ? `Safe to spend is used up. ${rupees(sts.bufferLeft)} left in your buffer.` : `Safe to spend is now ${rupees(sts.safe)}.`;
@@ -417,7 +432,7 @@ export function spendLine(sts: SafeToSpend): string {
 export function bufferNote(s: State): string {
   const income = mainIncome(s)?.expected ?? s.incomes.reduce((a, i) => a + (i.expected ?? 0), 0);
   const auto = income > 0 && Math.abs(s.settings.buffer - Math.min(3000, Math.max(500, Math.round((income * 0.03) / 100) * 100))) < 1;
-  return auto ? 'About 3% of your income, for surprises.' : 'A cushion for surprises.';
+  return auto ? 'About 3% of your income. Used when safe to spend runs out.' : 'Used when safe to spend runs out.';
 }
 
 // ------------------------------------------------------------------

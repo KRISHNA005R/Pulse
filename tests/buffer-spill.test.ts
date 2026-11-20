@@ -76,3 +76,31 @@ describe('the safety buffer, once safe-to-spend is used up', () => {
     expect(ask(me(2800), 'how much can i spend').text).toBe("Safe to spend is used up, so you're on your safety buffer: ₹1,300 left until payday, 1 Dec. About ₹130 a day.");
   });
 });
+
+describe('the buffer everywhere else', () => {
+  it('after-spend line: safe to spend, then the buffer', async () => {
+    const { afterSpendLine } = await import('../src/lib/finance');
+    expect(afterSpendLine(safeToSpend(me(10000)), 500)).toBe('Safe to spend goes from ₹6,500 to ₹6,000.');
+    expect(afterSpendLine(safeToSpend(me(10000)), 7000)).toBe('Safe to spend goes to ₹0, and ₹500 comes from your buffer. ₹1,500 left in it.');
+    expect(afterSpendLine(safeToSpend(me(2800)), 300)).toBe('Safe to spend is used up, so ₹300 comes from your buffer. ₹1,000 left in it.');
+  });
+
+  it('PULSE AI: what the buffer is, and how much is left', () => {
+    expect(ask(me(10000), 'what is safety buffer').text).toBe("Your safety buffer is ₹2,000, kept aside all month. If safe to spend runs out, you spend from it and Home shows what's left.");
+    expect(ask(me(2800), 'how much buffer is left').text).toBe("Safe to spend is used up, so you're spending from your ₹2,000 buffer. ₹1,300 left, about ₹130 a day.");
+    expect(ask(me(1000), 'buffer?').text).toMatch(/buffer is used up too/);
+  });
+
+  it('PULSE AI: the weekend comes from the buffer once safe to spend is used up', () => {
+    const a = ask(me(2800), 'how much for the weekend');
+    expect(a.text).toMatch(/from your safety buffer/);
+    expect(JSON.stringify(a.blocks)).toContain('Left in your buffer');
+  });
+
+  it('PULSE AI: how long the money lasts counts the buffer too', () => {
+    const s = me(8000); // safe ₹4,500, buffer ₹2,000, 10 days to payday
+    s.transactions = Array.from({ length: 14 }, (_, i) => ({ id: `t${i}`, type: 'expense', amount: 600, merchant: 'Food', category: 'food', date: `2026-11-${String(8 + i).padStart(2, '0')}`, account: 'bank' })) as never;
+    const a = ask(s, 'how long will my money last');
+    expect(a.text).toMatch(/safe to spend lasts till .*Your buffer covers the rest, past payday/);
+  });
+});

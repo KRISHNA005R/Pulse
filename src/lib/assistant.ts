@@ -235,21 +235,38 @@ export function askPulse(s: State, asked: string): AIAnswer {
     return { text: `${r.headline}${r.billsMissing ? ' No bills added yet, so this may be too generous.' : ''}`, blocks: [{ type: 'afford', result: r }], followups: ['How much can I spend this weekend?', ...(s.plans.some((p) => p.status === 'active') ? [`When will I reach my ${s.plans.find((p) => p.status === 'active')!.name} goal?`] : [])] };
   }
 
+  // --- The safety buffer: what it is, how much is left ---
+  if (/\b(safety )?buffer\b|\bcushion\b/.test(q) && !/^(set|change|make|increase|decrease|raise|lower)\b/.test(q)) {
+    const sts = safeToSpend(s);
+    const link: AIBlock = { type: 'link', label: 'Change buffer', to: { kind: 'route', tab: 'you', route: { name: 'settings', section: 'budget-prefs' } } };
+    if (sts.buffer <= 0) return { text: 'You have no safety buffer set. It’s money kept aside all month, used when safe to spend runs out.', blocks: [link] };
+    const text = sts.onBuffer
+      ? `Safe to spend is used up, so you're spending from your ${rupees(sts.buffer)} buffer. ${rupees(sts.bufferLeft)} left, about ${rupees(sts.bufferDaily)} a day.`
+      : sts.bufferLeft <= 0
+        ? `Your ${rupees(sts.buffer)} buffer is used up too. Safe to spend is back when money comes in.`
+        : `Your safety buffer is ${rupees(sts.buffer)}, kept aside all month. If safe to spend runs out, you spend from it and Home shows what's left.`;
+    return { text, blocks: [{ type: 'list', rows: [{ label: 'Safety buffer', value: rupees(sts.buffer) }, { label: 'Left in it', value: rupees(sts.bufferLeft) }, { label: 'Safe to spend', value: rupees(sts.safe) }] }, link], followups: ['How much can I spend today?', 'How long will my money last?'] };
+  }
+
   // --- Weekend ---
   if (/weekend/.test(q)) {
     const sts = safeToSpend(s);
     const dow = parseDate(today).getDay();
     const daysToWeekendEnd = dow === 0 ? 1 : dow === 6 ? 2 : 2;
-    const weekendAllowance = Math.min(sts.safe, sts.daily * daysToWeekendEnd);
+    // Safe-to-spend used up: the weekend comes out of the safety buffer.
+    const [left, perDay] = sts.onBuffer ? [sts.bufferLeft, sts.bufferDaily] : [sts.safe, sts.daily];
+    const weekendAllowance = Math.min(left, perDay * daysToWeekendEnd);
     const ent = s.budgets.find((b) => b.category === 'entertainment');
     const entLeft = ent ? budgetState(s, ent).left : null;
     const when = dow === 0 ? 'today' : dow === 6 ? 'this weekend' : 'this coming weekend';
     return {
-      text: `About ${rupees(weekendAllowance)} for ${when} keeps you on pace.${entLeft != null ? ` Going-out budget: ${rupees(Math.max(0, entLeft))} left.` : ''}`,
+      text: `About ${rupees(weekendAllowance)} for ${when} keeps you on pace${sts.onBuffer ? ', from your safety buffer' : ''}.${entLeft != null ? ` Going-out budget: ${rupees(Math.max(0, entLeft))} left.` : ''}`,
       blocks: [{ type: 'list', rows: [
-        { label: 'Daily allowance', value: `${rupees(sts.daily)}/day` },
+        { label: 'Daily allowance', value: `${rupees(perDay)}/day` },
         { label: 'Weekend days left', value: String(daysToWeekendEnd) },
-        { label: sts.fixedPayday ? 'Safe until payday' : `Safe for ${sts.daysLeft} days`, value: rupees(sts.safe) },
+        sts.onBuffer
+          ? { label: 'Left in your buffer', value: rupees(sts.bufferLeft) }
+          : { label: sts.fixedPayday ? 'Safe until payday' : `Safe for ${sts.daysLeft} days`, value: rupees(sts.safe) },
       ] }],
       followups: [`Can I afford ${ex(1500)}?`, 'Make a weekend budget card'],
     };
@@ -477,7 +494,9 @@ export function askPulse(s: State, asked: string): AIAnswer {
         ...(sts.setAside > 0 ? [{ label: 'Insurance kept aside', value: `−${rupees(sts.setAside)}` }] : []),
         ...(sts.cards > 0 ? [{ label: 'Owed on credit cards', value: `−${rupees(sts.cards)}` }] : []),
         { label: 'Plans', value: `−${rupees(sts.goals)}` },
-        { label: 'Safety buffer', value: `−${rupees(sts.buffer)}` },
+        { label: 'Safety buffer', value: `−${rupees(sts.buffer)}`, sub: 'Used when safe to spend runs out' },
+        { label: 'Safe to spend', value: rupees(sts.safe) },
+        ...(sts.onBuffer ? [{ label: 'Left in your buffer', value: rupees(sts.bufferLeft) }] : []),
       ] }],
     };
   }

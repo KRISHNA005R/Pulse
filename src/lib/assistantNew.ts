@@ -58,17 +58,18 @@ export function askNew(s: State, q: string): AIAnswer | null {
         {
           type: 'list',
           rows: [
-            { label: '🏺 Bhisi', value: '', sub: 'Friends join with one link. Pay the organiser by UPI.' },
-            { label: '🤝 Real friends only', value: '', sub: 'Split only with friends on PULSE. No typed names.' },
+            { label: '🛟 Safety buffer', value: '', sub: 'When safe to spend runs out, you spend from your buffer.' },
+            { label: '🤝 Meet', value: '', sub: 'Phones together to add a friend. Or find them by @username.' },
+            { label: '🏺 Bhisi', value: '', sub: 'Invite friends inside PULSE. Pay the organiser by UPI.' },
             { label: '📅 Pick dates', value: '', sub: 'Activity → Pick dates… for any range.' },
             { label: '🪙 Gullak', value: '', sub: 'A coin a day. Fill it, then break it.' },
             { label: '↩️ Got it back', value: '', sub: 'Paybacks and refunds come off your spending.' },
           ],
         },
+        { type: 'link', label: 'Meet a friend', to: { kind: 'sheet', sheet: { type: 'meet' } } },
         { type: 'link', label: 'Open Bhisi', to: { kind: 'route', tab: 'plans', segment: 'bhisi' } },
-        { type: 'link', label: 'Start a gullak', to: { kind: 'sheet', sheet: { type: 'gullak-form' } } },
       ],
-      followups: ['How does bhisi work?', 'How do I add a friend?', 'How much did I get back this month?'],
+      followups: ['What is my safety buffer?', 'How do I add a friend?', 'How does bhisi work?'],
     };
   }
 
