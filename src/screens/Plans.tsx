@@ -53,8 +53,8 @@ function PlansList() {
   if (!state.plans.length)
     return (
       <div className="flex flex-col gap-6">
-        <EmptyState icon="target" art="/illustrations/empty-plans.webp" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
         <GullakBanner />
+        <EmptyState icon="target" art="/illustrations/empty-plans.webp" title="No plans yet." body="Got something worth saving for?" action={{ label: 'Create a plan', onClick: () => ui.openSheet({ type: 'plan-form' }) }} />
       </div>
     );
   const open = (id: string) => ui.push({ name: 'plan', id });

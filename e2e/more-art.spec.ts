@@ -25,6 +25,11 @@ test('no plans yet: Plans shows the dreamer on the boxes', async ({ page }) => {
   await tab(page, 'Plans');
   await expect(page.getByText('No plans yet.')).toBeVisible();
   await looksRight(page.getByTestId('empty-art').first(), 'empty-plans');
+  // The Gullak challenge sits above the picture.
+  const gullak = await page.getByText('A coin a day', { exact: false }).first().boundingBox();
+  const art = await page.getByTestId('empty-art').first().boundingBox();
+  expect(gullak!.y).toBeLessThan(art!.y);
+  if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/plans-empty.png`, fullPage: false });
 });
 
 test('a finished plan: the plan page has the suitcase jump', async ({ page }) => {
